@@ -1,0 +1,1 @@
+Proof of 𝜑-calculus confluence.
