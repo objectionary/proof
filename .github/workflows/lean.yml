@@ -25,18 +25,19 @@ jobs:
         uses: actions/checkout@v3
 
       - name: '👝 Cache .lake/'
-        id: cache-primes
+        id: cache-lake
         uses: actions/cache@v3
         with:
           path: .lake/
-          key: ${{ runner.os }}-${{ hashFiles('lakefile.lean') }}-lake
+          key: ${{ runner.os }}-${{ hashFiles('lakefile.lean', 'lake-manifest.json') }}-lake
+
+      - name: '⚙️ Resolve dependencies (inluding docs)'
+        if: steps.cache-lake.outputs.cache-hit != 'true'
+        run: |
+          lake -R -Kenv=dev update
 
       - name: '🔨 Build Lean package'
         run: lake build -Kwerror
-
-      - name: '⚙️ Prepare docs for dependencies'
-        run: |
-          lake -R -Kenv=dev update
 
       - name: '🔨 Generate documentation'
         run: |
