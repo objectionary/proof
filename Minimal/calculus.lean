@@ -17,7 +17,6 @@ end
 open OptionalAttr
 open Term
 
-
 def mapObj : (Term → Term) → (List (Attr × OptionalAttr)) → (List (Attr × OptionalAttr))
   := λ f o =>
   let f' := λ (attr_name, attr_body) =>
@@ -25,7 +24,6 @@ def mapObj : (Term → Term) → (List (Attr × OptionalAttr)) → (List (Attr �
         | void => (attr_name, void)
         | attached x => (attr_name, attached (f x))
   (f' <$> o)
-
 
 partial def incLocatorsFrom : Nat → Term → Term
   := λ k term => match term with
