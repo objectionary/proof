@@ -1,0 +1,53 @@
+name: Lean (build)
+
+on:
+  push:
+  pull_request:
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+permissions:
+  contents: write # to submit generated documentation to GitHub Pages
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: '🧰 Install elan'
+        run: |
+          set -o pipefail
+          curl -sSfL https://github.com/leanprover/elan/releases/download/v1.4.5/elan-x86_64-unknown-linux-gnu.tar.gz | tar xz
+          ./elan-init -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> $GITHUB_PATH
+
+      - name: '📥 Checkout repository'
+        uses: actions/checkout@v3
+
+      - name: '👝 Cache .lake/'
+        id: cache-lake
+        uses: actions/cache@v3
+        with:
+          path: .lake/
+          key: ${{ runner.os }}-${{ hashFiles('lakefile.lean', 'lake-manifest.json') }}-lake
+
+      - name: '⚙️ Resolve dependencies (inluding docs)'
+        if: steps.cache-lake.outputs.cache-hit != 'true'
+        run: |
+          lake -R -Kenv=dev update
+
+      - name: '🔨 Build Lean package'
+        run: lake build -Kwerror
+
+      - name: '🔨 Generate documentation'
+        run: |
+          lake -R -Kenv=dev build PhiCalculus:docs
+
+      - name: '🚀 Publish Documentation'
+        if: ${{ github.ref_name == 'main' && github.event_name == 'push' }}
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          folder: .lake/build/doc
+          target-folder: docs
+          single-commit: true
