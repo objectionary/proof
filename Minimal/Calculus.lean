@@ -54,7 +54,7 @@ def lookup : (List (Attr × OptionalAttr)) → Attr → Option OptionalAttr
   := λ l a => match l with
     | [] => none
     | List.cons (name, term) tail =>
-        if (name == a) then term
+        if (name == a) then some term
         else lookup tail a
 
 def insert : (List (Attr × OptionalAttr)) → Attr → OptionalAttr → (List (Attr × OptionalAttr))
@@ -64,6 +64,11 @@ def insert : (List (Attr × OptionalAttr)) → Attr → OptionalAttr → (List (
         if (name == a) then List.cons (name, u) tail
         else List.cons (name, term) (insert tail a u)
 
+def insertMany : (List (Attr × OptionalAttr)) → List (Attr × OptionalAttr) → (List (Attr × OptionalAttr))
+  := λ old new => match new with
+    | [] => old
+    | List.cons (attr, term) tail =>
+        insertMany (insert old attr term) tail
 
 partial def whnf : Term → Term
   | loc n => loc n
@@ -100,3 +105,73 @@ partial def nf : Term → Term
         | some _ => nf (dot (dot (obj o) "φ") a)
         | none => dot (nf (obj o)) a
     | t' => dot (nf t') a
+
+inductive IsAttr : Attr → Term → Prop where
+
+
+inductive Reduce : Term → Term → Prop where
+  | congOBJ
+    : ∀ t t' b lst
+    , Reduce t t'
+    → lookup lst b = some (attached t)
+    → Reduce (obj lst) (obj (insert lst b (attached t')))
+  | congDOT : ∀ t t' a, Reduce t t' → Reduce (dot t a) (dot t' a)
+  | congAPPₗ : ∀ t t' u a, Reduce t t' → Reduce (app t a u) (app t' a u)
+  | congAPPᵣ : ∀ t u u' a, Reduce u u' → Reduce (app t a u) (app t a u')
+  | dot_c
+    : ∀ t t_c c lst
+    , t = obj lst
+    → lookup lst c = some (attached t_c)
+    → Reduce (dot t c) (substituteLocator (0, t) t_c)
+  | dot_cφ
+    : ∀ t c lst
+    , t = obj lst
+    → lookup lst c = none
+    → lookup lst "φ" = some _
+    → Reduce (dot t c) (dot (dot t "φ") c)
+  | app_c
+    : ∀ t u c lst
+    , t = obj lst
+    → lookup lst c = some void
+    → Reduce (app t c u) (obj (insert lst c (attached (incLocators u))))
+
+inductive ForAll : ∀ a, (a → Prop) → List a → Prop where
+  | triv : ∀ a f, ForAll a f []
+  | step
+    : ∀ a f lst
+    , ForAll a f lst
+    → (x : a)
+    → f x
+    → ForAll a f (x :: lst)
+
+inductive PReduce : Term → Term → Prop where
+  | pcongOBJ
+    : ∀ t lst
+    , t = obj lst
+    → (premise : List (Attr × Term × Term))
+    → ForAll (Attr × Term × Term) (λ (_, ti, ti') => PReduce ti ti') premise
+    → ForAll (Attr × Term × Term) (λ (a, t, _) => lookup lst a = some (attached t)) premise
+    → PReduce t (obj (insertMany lst (List.map (λ (a, _, ti') => (a, attached ti')) premise)))
+  | pcong_ρ : ∀ n, PReduce (loc n) (loc n)
+  | pcongDOT : ∀ t t' a, PReduce t t' → PReduce (dot t a) (dot t' a)
+  | pcongAPP : ∀ t t' u u' a, PReduce t t' → PReduce u u' → PReduce (app t a u) (app t' a u')
+  | pdot_c
+    : ∀ t t' t_c c lst
+    , PReduce t t'
+    → t' = obj lst
+    → lookup lst c = some (attached t_c)
+    → PReduce (dot t c) (substituteLocator (0, t') t_c)
+  | pdot_cφ
+    : ∀ t t' c lst
+    , PReduce t t'
+    → t' = obj lst
+    → lookup lst c = none
+    → lookup lst "φ" = some _
+    → PReduce (dot t c) (dot (dot t' "φ") c)
+  | papp_c
+    : ∀ t t' u u' c lst
+    , PReduce t t'
+    → PReduce u u'
+    → t' = obj lst
+    → lookup lst c = some void
+    → PReduce (app t c u) (obj (insert lst c (attached (incLocators u'))))
