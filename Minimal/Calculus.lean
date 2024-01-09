@@ -107,7 +107,17 @@ partial def nf : Term → Term
     | t' => dot (nf t') a
 
 inductive IsAttr : Attr → Term → Prop where
-
+  | zeroth
+    : (a : Attr)
+    -- → (t : OptionalAttr)
+    → (lst : List (Attr × OptionalAttr))
+    → IsAttr a (obj ((a, _) :: lst))
+  | after
+    : (a : Attr)
+    -- → (t : OptionalAttr)
+    → (lst : List (Attr × OptionalAttr))
+    → IsAttr a (obj lst)
+    → IsAttr a (obj ((_, _) :: lst))
 
 inductive Reduce : Term → Term → Prop where
   | congOBJ
@@ -127,7 +137,8 @@ inductive Reduce : Term → Term → Prop where
     : ∀ t c lst
     , t = obj lst
     → lookup lst c = none
-    → lookup lst "φ" = some _
+    -- → lookup lst "φ" = some _
+    → IsAttr "φ" t
     → Reduce (dot t c) (dot (dot t "φ") c)
   | app_c
     : ∀ t u c lst
@@ -135,23 +146,22 @@ inductive Reduce : Term → Term → Prop where
     → lookup lst c = some void
     → Reduce (app t c u) (obj (insert lst c (attached (incLocators u))))
 
-inductive ForAll : ∀ a, (a → Prop) → List a → Prop where
-  | triv : ∀ a f, ForAll a f []
+inductive ForAll : {a : Type} → (a → Prop) → List a → Prop where
+  | triv : ∀ f, ForAll f []
   | step
     : ∀ a f lst
-    , ForAll a f lst
+    , ForAll f lst
     → (x : a)
     → f x
-    → ForAll a f (x :: lst)
+    → ForAll f (x :: lst)
 
 inductive PReduce : Term → Term → Prop where
   | pcongOBJ
-    : ∀ t lst
-    , t = obj lst
-    → (premise : List (Attr × Term × Term))
-    → ForAll (Attr × Term × Term) (λ (_, ti, ti') => PReduce ti ti') premise
-    → ForAll (Attr × Term × Term) (λ (a, t, _) => lookup lst a = some (attached t)) premise
-    → PReduce t (obj (insertMany lst (List.map (λ (a, _, ti') => (a, attached ti')) premise)))
+    : ∀ lst
+    , (premise : List (Attr × Term × Term))
+    → ForAll (λ (_, ti, ti') => PReduce ti ti') premise
+    → ForAll (λ (a, ti, _) => lookup lst a = some (attached ti)) premise
+    → PReduce (obj lst) (obj (insertMany lst (List.map (λ (a, _, ti') => (a, attached ti')) premise)))
   | pcong_ρ : ∀ n, PReduce (loc n) (loc n)
   | pcongDOT : ∀ t t' a, PReduce t t' → PReduce (dot t a) (dot t' a)
   | pcongAPP : ∀ t t' u u' a, PReduce t t' → PReduce u u' → PReduce (app t a u) (app t' a u')
@@ -166,7 +176,8 @@ inductive PReduce : Term → Term → Prop where
     , PReduce t t'
     → t' = obj lst
     → lookup lst c = none
-    → lookup lst "φ" = some _
+    -- → lookup lst "φ" = some _
+    → IsAttr "φ" t
     → PReduce (dot t c) (dot (dot t' "φ") c)
   | papp_c
     : ∀ t t' u u' c lst
@@ -175,3 +186,31 @@ inductive PReduce : Term → Term → Prop where
     → t' = obj lst
     → lookup lst c = some void
     → PReduce (app t c u) (obj (insert lst c (attached (incLocators u'))))
+
+def prefl : (t : Term) → PReduce t t
+  := λ term => match term with
+    | loc n => PReduce.pcong_ρ n
+    | dot t a => PReduce.pcongDOT t t a (prefl t)
+    | app t a u => PReduce.pcongAPP t t u u a (prefl t) (prefl u)
+    | obj lst => PReduce.pcongOBJ
+        lst
+        []
+        (ForAll.triv _)
+        (ForAll.triv _)
+
+def reg_to_par : {t t' : Term} → Reduce t t' → PReduce t t'
+  := by intro _ _; intro
+    | .congOBJ t t' b lst red eq =>
+        refine .pcongOBJ
+          lst
+          [(b, t, t')]
+          (ForAll.step (Attr × Term × Term) _ [] (ForAll.triv _) _ (reg_to_par red))
+          (ForAll.step (Attr × Term × Term) _ [] (ForAll.triv _) _ eq)
+    | .congDOT t t' a red => refine .pcongDOT t t' a (reg_to_par red)
+    | .congAPPₗ t t' u a red => refine .pcongAPP t t' u u a (reg_to_par red) (prefl u)
+    | .congAPPᵣ t u u' a red => refine .pcongAPP t t u u' a (prefl t) (reg_to_par red)
+    | .dot_c t t_c c lst eq lookup_eq => refine .pdot_c t t t_c c lst (prefl t) eq lookup_eq
+    | .dot_cφ t c lst eq lookup_c isAttr_φ =>
+        refine .pdot_cφ t t c lst (prefl t) eq lookup_c isAttr_φ
+    | .app_c t u c lst eq lookup_eq =>
+        refine .papp_c t t u u c lst (prefl t) (prefl u) eq lookup_eq
