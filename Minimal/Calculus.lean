@@ -119,32 +119,46 @@ inductive IsAttr : Attr → Term → Prop where
     → IsAttr a (obj lst)
     → IsAttr a (obj ((_, _) :: lst))
 
-inductive Reduce : Term → Term → Prop where
-  | congOBJ
-    : ∀ t t' b lst
-    , Reduce t t'
-    → lookup lst b = some (attached t)
-    → Reduce (obj lst) (obj (insert lst b (attached t')))
-  | congDOT : ∀ t t' a, Reduce t t' → Reduce (dot t a) (dot t' a)
-  | congAPPₗ : ∀ t t' u a, Reduce t t' → Reduce (app t a u) (app t' a u)
-  | congAPPᵣ : ∀ t u u' a, Reduce u u' → Reduce (app t a u) (app t a u')
-  | dot_c
-    : ∀ t t_c c lst
-    , t = obj lst
-    → lookup lst c = some (attached t_c)
-    → Reduce (dot t c) (substituteLocator (0, t) t_c)
-  | dot_cφ
-    : ∀ t c lst
-    , t = obj lst
-    → lookup lst c = none
-    -- → lookup lst "φ" = some _
-    → IsAttr "φ" t
-    → Reduce (dot t c) (dot (dot t "φ") c)
-  | app_c
-    : ∀ t u c lst
-    , t = obj lst
-    → lookup lst c = some void
-    → Reduce (app t c u) (obj (insert lst c (attached (incLocators u))))
+namespace Reduce
+
+  inductive Reduce : Term → Term → Type where
+    | congOBJ
+      : ∀ t t' b lst
+      , Reduce t t'
+      → lookup lst b = some (attached t)
+      → Reduce (obj lst) (obj (insert lst b (attached t')))
+    | congDOT : ∀ t t' a, Reduce t t' → Reduce (dot t a) (dot t' a)
+    | congAPPₗ : ∀ t t' u a, Reduce t t' → Reduce (app t a u) (app t' a u)
+    | congAPPᵣ : ∀ t u u' a, Reduce u u' → Reduce (app t a u) (app t a u')
+    | dot_c
+      : ∀ t t_c c lst
+      , t = obj lst
+      → lookup lst c = some (attached t_c)
+      → Reduce (dot t c) (substituteLocator (0, t) t_c)
+    | dot_cφ
+      : ∀ t c lst
+      , t = obj lst
+      → lookup lst c = none
+      -- → lookup lst "φ" = some _
+      → IsAttr "φ" t
+      → Reduce (dot t c) (dot (dot t "φ") c)
+    | app_c
+      : ∀ t u c lst
+      , t = obj lst
+      → lookup lst c = some void
+      → Reduce (app t c u) (obj (insert lst c (attached (incLocators u))))
+
+  def size : {t t' : Term} → Reduce t t' → Nat
+    | _, _, .congOBJ t t' b lst red eq => 1 + size red
+    | _, _, .congDOT t t' a red => 1 + size red
+    | _, _, .congAPPₗ t t' u a red => 1 + size red
+    | _, _, .congAPPᵣ t u u' a red => 1 + size red
+    | _, _, .dot_c t t_c c lst eq lookup_eq => 1
+    | _, _, .dot_cφ t c lst eq lookup_c isAttr_φ => 1
+    | _, _, .app_c t u c lst eq lookup_eq => 1
+
+open Reduce
+
 
 inductive ForAll : {a : Type} → (a → Prop) → List a → Prop where
   | triv : ∀ f, ForAll f []
@@ -199,18 +213,21 @@ def prefl : (t : Term) → PReduce t t
         (ForAll.triv _)
 
 def reg_to_par : {t t' : Term} → Reduce t t' → PReduce t t'
-  := by intro _ _; intro
-    | .congOBJ t t' b lst red eq =>
-        refine .pcongOBJ
-          lst
-          [(b, t, t')]
-          (ForAll.step (Attr × Term × Term) _ [] (ForAll.triv _) _ (reg_to_par red))
-          (ForAll.step (Attr × Term × Term) _ [] (ForAll.triv _) _ eq)
-    | .congDOT t t' a red => refine .pcongDOT t t' a (reg_to_par red)
-    | .congAPPₗ t t' u a red => refine .pcongAPP t t' u u a (reg_to_par red) (prefl u)
-    | .congAPPᵣ t u u' a red => refine .pcongAPP t t u u' a (prefl t) (reg_to_par red)
-    | .dot_c t t_c c lst eq lookup_eq => refine .pdot_c t t t_c c lst (prefl t) eq lookup_eq
-    | .dot_cφ t c lst eq lookup_c isAttr_φ =>
-        refine .pdot_cφ t t c lst (prefl t) eq lookup_c isAttr_φ
-    | .app_c t u c lst eq lookup_eq =>
-        refine .papp_c t t u u c lst (prefl t) (prefl u) eq lookup_eq
+  | _, _, .congOBJ t t' b lst red eq =>
+      .pcongOBJ
+        lst
+        [(b, t, t')]
+        (ForAll.step (Attr × Term × Term) _ [] (ForAll.triv _) _ (reg_to_par red))
+        (ForAll.step (Attr × Term × Term) _ [] (ForAll.triv _) _ eq)
+  | _, _, .congDOT t t' a red =>
+      .pcongDOT t t' a (reg_to_par red)
+  | _, _, .congAPPₗ t t' u a red =>
+      .pcongAPP t t' u u a (reg_to_par red) (prefl u)
+  | _, _, .congAPPᵣ t u u' a red =>
+      .pcongAPP t t u u' a (prefl t) (reg_to_par red)
+  | _, _, .dot_c t t_c c lst eq lookup_eq =>
+      .pdot_c t t t_c c lst (prefl t) eq lookup_eq
+  | _, _, .dot_cφ t c lst eq lookup_c isAttr_φ =>
+      .pdot_cφ t t c lst (prefl t) eq lookup_c isAttr_φ
+  | _, _, .app_c t u c lst eq lookup_eq =>
+      .papp_c t t u u c lst (prefl t) (prefl u) eq lookup_eq
