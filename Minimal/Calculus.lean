@@ -191,7 +191,7 @@ inductive PReduce : Term → Term → Prop where
     → t' = obj lst
     → lookup lst c = none
     -- → lookup lst "φ" = some _
-    → IsAttr "φ" t
+    → IsAttr "φ" t'
     → PReduce (dot t c) (dot (dot t' "φ") c)
   | papp_c
     : ∀ t t' u u' c lst
@@ -269,6 +269,42 @@ def par_to_regMany : {t t' : Term} → (PReduce t t') → (RegMany t t')
     clos_trans (app t a u) (app t' a u) (app t' a u')
       (congAPPₗClos t t' u a (par_to_regMany prtt'))
       (congAPPᵣClos t' u u' a (par_to_regMany pruu'))
-  | _, _, .pdot_c t t' t_c c lst prtt' path_t'_obj_lst path_lst_c_tc => _
-  | _, _, .pdot_cφ t t' c lst prtt' path_t'_obj_lst path_lst_c_none isattr_φ_t => _
-  | _, _, .papp_c t t' u u' c lst prtt' pruu' path_t'_obj_lst path_lst_c_void => _
+  | _, _, .pdot_c t t' t_c c lst prtt' path_t'_obj_lst path_lst_c_tc =>
+    have tt'_many := (par_to_regMany prtt')
+    have tc_t'c_many := congDotClos t t' c tt'_many
+    have tc_dispatch : Reduce (dot t' c) (substituteLocator (0, t') t_c) :=
+      dot_c t' t_c c lst path_t'_obj_lst path_lst_c_tc
+    have tc_dispatch_clos :=
+      RegMany.cons (dot t' c)
+      (substituteLocator (0, t') t_c)
+      (substituteLocator (0, t') t_c)
+      tc_dispatch
+      (RegMany.nil _)
+    clos_trans (dot t c) (dot t' c) (substituteLocator (0, t') t_c) tc_t'c_many tc_dispatch_clos
+  | _, _, .pdot_cφ t t' c lst prtt' path_t'_obj_lst path_lst_c_none isattr_φ_t =>
+    have tt'_many := (par_to_regMany prtt')
+    have tc_t'c_many := congDotClos t t' c tt'_many
+    have tφc_dispatch : Reduce (dot t' c) (dot (dot t' "φ") c) :=
+      dot_cφ t' c lst path_t'_obj_lst path_lst_c_none isattr_φ_t
+    have tφc_dispatch_clos :=
+      RegMany.cons (dot t' c)
+      (dot (dot t' "φ") c)
+      (dot (dot t' "φ") c)
+      tφc_dispatch
+      (RegMany.nil _)
+    clos_trans (dot t c) (dot t' c) (dot (dot t' "φ") c) tc_t'c_many tφc_dispatch_clos
+  | _, _, .papp_c t t' u u' c lst prtt' pruu' path_t'_obj_lst path_lst_c_void =>
+    have tu_t'u_many := congAPPₗClos t t' u c (par_to_regMany prtt')
+    have t'u_t'u'_many := congAPPᵣClos t' u u' c (par_to_regMany pruu')
+    have tu_t'u'_many := clos_trans (app t c u) (app t' c u) (app t' c u')
+      tu_t'u_many t'u_t'u'_many
+    have tu_app : Reduce (app t' c u') (obj (insert lst c (attached (incLocators u')))) := app_c t' u' c lst path_t'_obj_lst path_lst_c_void
+    have tu_app_clos :=
+      RegMany.cons (app t' c u')
+      (obj (insert lst c (attached (incLocators u'))))
+      (obj (insert lst c (attached (incLocators u'))))
+      tu_app
+      (RegMany.nil _)
+    clos_trans (app t c u) (app t' c u')
+      (obj (insert lst c (attached (incLocators u'))))
+      tu_t'u'_many tu_app_clos
