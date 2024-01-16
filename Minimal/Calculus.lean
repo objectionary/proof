@@ -64,11 +64,21 @@ def insert : (List (Attr × OptionalAttr)) → Attr → OptionalAttr → (List (
         if (name == a) then List.cons (name, u) tail
         else List.cons (name, term) (insert tail a u)
 
-def insertMany : (List (Attr × OptionalAttr)) → List (Attr × OptionalAttr) → (List (Attr × OptionalAttr))
-  := λ old new => match new with
-    | [] => old
+def insertMany : List (Attr × OptionalAttr) → List (Attr × OptionalAttr) → List (Attr × OptionalAttr)
+  := λ lst newAttrs => match newAttrs with
+    | [] => lst
     | List.cons (attr, term) tail =>
-        insertMany (insert old attr term) tail
+        insertMany (insert lst attr term) tail
+
+def insertEmpty { a : Attr } { u : OptionalAttr } : insert [] a u = []
+  := by rfl
+def insertManyIdentity : { l : List (Attr × OptionalAttr) } → insertMany l [] = l
+  := by intro l
+        rw [insertMany]
+def insertManyEmpty : (lst : List (Attr × OptionalAttr)) → insertMany [] lst = []
+  := λ l => match l with
+    | [] => insertManyIdentity
+    | _ :: xs => insertManyEmpty xs
 
 partial def whnf : Term → Term
   | loc n => loc n
@@ -106,18 +116,42 @@ partial def nf : Term → Term
         | none => dot (nf (obj o)) a
     | t' => dot (nf t') a
 
-inductive IsAttr : Attr → Term → Prop where
-  | zeroth
+inductive IsAttr : Attr → Term → Type where
+  | zeroth_attr
     : (a : Attr)
-    -- → (t : OptionalAttr)
     → (lst : List (Attr × OptionalAttr))
     → IsAttr a (obj ((a, _) :: lst))
-  | after
+  | next_attr
     : (a : Attr)
-    -- → (t : OptionalAttr)
     → (lst : List (Attr × OptionalAttr))
     → IsAttr a (obj lst)
     → IsAttr a (obj ((_, _) :: lst))
+
+inductive IsAttached : Attr → Term → Term → Type where
+  | zeroth_attached
+    : { lst : List (Attr × OptionalAttr)}
+    → (a : Attr)
+    → (t : Term)
+    → IsAttached a t (obj ((a, attached t) :: lst))
+  | next_attached
+    : { lst : List (Attr × OptionalAttr)}
+    → (a : Attr)
+    → (t : Term)
+    → IsAttached a t (obj lst)
+    → IsAttached a t (obj ((_, _) :: lst))
+
+def insertAttached
+  { a : Attr }
+  { t : Term }
+  { lst : List (Attr × OptionalAttr) }
+  : IsAttached a t (obj lst)
+  → insert lst a (attached t) = lst
+  -- := λ isAttached => match isAttached with
+    | IsAttached.zeroth_attached _ _ => by simp [insert]
+    | IsAttached.next_attached _ _ isAttached => match lst with
+      | [] => _ -- by contradiction
+      | _ :: xs => _
+
 
 namespace Reduce
 
@@ -125,7 +159,7 @@ namespace Reduce
     | congOBJ
       : ∀ t t' b lst
       , Reduce t t'
-      → lookup lst b = some (attached t)
+      → IsAttached b t (obj lst)
       → Reduce (obj lst) (obj (insert lst b (attached t')))
     | congDOT : ∀ t t' a, Reduce t t' → Reduce (dot t a) (dot t' a)
     | congAPPₗ : ∀ t t' u a, Reduce t t' → Reduce (app t a u) (app t' a u)
@@ -139,7 +173,6 @@ namespace Reduce
       : ∀ t c lst
       , t = obj lst
       → lookup lst c = none
-      -- → lookup lst "φ" = some _
       → IsAttr "φ" t
       → Reduce (dot t c) (dot (dot t "φ") c)
     | app_c
@@ -160,7 +193,7 @@ namespace Reduce
 open Reduce
 
 
-inductive ForAll : {a : Type} → (a → Prop) → List a → Prop where
+inductive ForAll : {a : Type} → (a → Type) → List a → Type where
   | triv : ∀ f, ForAll f []
   | step
     : ∀ a f lst
@@ -169,48 +202,49 @@ inductive ForAll : {a : Type} → (a → Prop) → List a → Prop where
     → f x
     → ForAll f (x :: lst)
 
-inductive PReduce : Term → Term → Prop where
-  | pcongOBJ
-    : ∀ lst
-    , (premise : List (Attr × Term × Term))
-    → ForAll (λ (_, ti, ti') => PReduce ti ti') premise
-    → ForAll (λ (a, ti, _) => lookup lst a = some (attached ti)) premise
-    → PReduce (obj lst) (obj (insertMany lst (List.map (λ (a, _, ti') => (a, attached ti')) premise)))
-  | pcong_ρ : ∀ n, PReduce (loc n) (loc n)
-  | pcongDOT : ∀ t t' a, PReduce t t' → PReduce (dot t a) (dot t' a)
-  | pcongAPP : ∀ t t' u u' a, PReduce t t' → PReduce u u' → PReduce (app t a u) (app t' a u')
-  | pdot_c
-    : ∀ t t' t_c c lst
-    , PReduce t t'
-    → t' = obj lst
-    → lookup lst c = some (attached t_c)
-    → PReduce (dot t c) (substituteLocator (0, t') t_c)
-  | pdot_cφ
-    : ∀ t t' c lst
-    , PReduce t t'
-    → t' = obj lst
-    → lookup lst c = none
-    -- → lookup lst "φ" = some _
-    → IsAttr "φ" t'
-    → PReduce (dot t c) (dot (dot t' "φ") c)
-  | papp_c
-    : ∀ t t' u u' c lst
-    , PReduce t t'
-    → PReduce u u'
-    → t' = obj lst
-    → lookup lst c = some void
-    → PReduce (app t c u) (obj (insert lst c (attached (incLocators u'))))
+namespace PReduce
+  inductive PReduce : Term → Term → Type where
+    | pcongOBJ
+      : ∀ lst
+      , (premise : List (Attr × Term × Term))
+      → ForAll (λ (_, ti, ti') => PReduce ti ti') premise
+      → ForAll (λ (a, ti, _) => IsAttached a ti (obj lst)) premise
+      → PReduce (obj lst) (obj (insertMany lst (List.map (λ (a, _, ti') => (a, attached ti')) premise)))
+    | pcong_ρ : ∀ n, PReduce (loc n) (loc n)
+    | pcongDOT : ∀ t t' a, PReduce t t' → PReduce (dot t a) (dot t' a)
+    | pcongAPP : ∀ t t' u u' a, PReduce t t' → PReduce u u' → PReduce (app t a u) (app t' a u')
+    | pdot_c
+      : ∀ t t' t_c c lst
+      , PReduce t t'
+      → t' = obj lst
+      → lookup lst c = some (attached t_c)
+      → PReduce (dot t c) (substituteLocator (0, t') t_c)
+    | pdot_cφ
+      : ∀ t t' c lst
+      , PReduce t t'
+      → t' = obj lst
+      → lookup lst c = none
+      → IsAttr "φ" t'
+      → PReduce (dot t c) (dot (dot t' "φ") c)
+    | papp_c
+      : ∀ t t' u u' c lst
+      , PReduce t t'
+      → PReduce u u'
+      → t' = obj lst
+      → lookup lst c = some void
+      → PReduce (app t c u) (obj (insert lst c (attached (incLocators u'))))
 
-def prefl : (t : Term) → PReduce t t
-  := λ term => match term with
-    | loc n => PReduce.pcong_ρ n
-    | dot t a => PReduce.pcongDOT t t a (prefl t)
-    | app t a u => PReduce.pcongAPP t t u u a (prefl t) (prefl u)
-    | obj lst => PReduce.pcongOBJ
-        lst
-        []
-        (ForAll.triv _)
-        (ForAll.triv _)
+  def prefl : (t : Term) → PReduce t t
+    := λ term => match term with
+      | loc n => PReduce.pcong_ρ n
+      | dot t a => PReduce.pcongDOT t t a (prefl t)
+      | app t a u => PReduce.pcongAPP t t u u a (prefl t) (prefl u)
+      | obj lst => PReduce.pcongOBJ
+          lst
+          []
+          (ForAll.triv _)
+          (ForAll.triv _)
+open PReduce
 
 def reg_to_par : {t t' : Term} → Reduce t t' → PReduce t t'
   | _, _, .congOBJ t t' b lst red eq =>
@@ -242,6 +276,22 @@ def clos_trans : ∀ t t' t'', RegMany t t' → RegMany t' t'' → RegMany t t''
   | _, _, z, RegMany.cons l m n lm mn_many, reds =>
     RegMany.cons l m z lm (clos_trans m n z mn_many reds)
 
+-- | congOBJ
+      -- : ∀ t t' b lst
+      -- , Reduce t t'
+      -- → IsAttached b t (obj lst)
+      -- → Reduce (obj lst) (obj (insert lst b (attached t')))
+def confOBJClos
+  { t t' : Term }
+  { b : Attr }
+  { lst : List (Attr × OptionalAttr) }
+  : RegMany t t'
+  → IsAttached b t (obj lst)
+  → RegMany (obj lst) (obj (insert lst b (attached t')))
+  := λ r a => match r with
+    | RegMany.nil m => _
+    | RegMany.cons l m n red regMany => _
+
 def congDotClos : ∀ t t' a, RegMany t t' → RegMany (dot t a) (dot t' a)
   | _, _, a, RegMany.nil m => RegMany.nil (dot m a)
   | _, _, a, RegMany.cons l m n lm mn_many => RegMany.cons
@@ -262,7 +312,9 @@ def congAPPᵣClos : ∀ t u u' a, RegMany u u' → RegMany (app t a u) (app t a
 
 
 def par_to_regMany : {t t' : Term} → (PReduce t t') → (RegMany t t')
-  | _, _, .pcongOBJ lst premise f f' => _
+  | _, _, .pcongOBJ lst premise f f' => match lst with
+    | [] => Eq.ndrec (RegMany.nil (obj [])) (congrArg obj (Eq.symm (insertManyEmpty _)))
+    | a :: b => _
   | _, _, .pcong_ρ n => RegMany.nil (loc n)
   | _, _, .pcongDOT t t' a prtt' => congDotClos t t' a (par_to_regMany prtt')
   | _, _, .pcongAPP t t' u u' a prtt' pruu' =>
