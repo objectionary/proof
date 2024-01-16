@@ -231,3 +231,44 @@ def reg_to_par : {t t' : Term} → Reduce t t' → PReduce t t'
       .pdot_cφ t t c lst (prefl t) eq lookup_c isAttr_φ
   | _, _, .app_c t u c lst eq lookup_eq =>
       .papp_c t t u u c lst (prefl t) (prefl u) eq lookup_eq
+
+
+inductive RegMany : Term → Term → Type where
+  | nil : ∀ m, RegMany m m
+  | cons : ∀ l m n, Reduce l m → RegMany m n → RegMany l n
+
+def clos_trans : ∀ t t' t'', RegMany t t' → RegMany t' t'' → RegMany t t''
+  | _, _, _, RegMany.nil m, reds => reds
+  | _, _, z, RegMany.cons l m n lm mn_many, reds =>
+    RegMany.cons l m z lm (clos_trans m n z mn_many reds)
+
+def congDotClos : ∀ t t' a, RegMany t t' → RegMany (dot t a) (dot t' a)
+  | _, _, a, RegMany.nil m => RegMany.nil (dot m a)
+  | _, _, a, RegMany.cons l m n lm mn_many => RegMany.cons
+    (dot l a) (dot m a) (dot n a)
+    (congDOT l m a lm) (congDotClos m n a mn_many)
+
+def congAPPₗClos : ∀ t t' u a, RegMany t t' → RegMany (app t a u) (app t' a u)
+  | _, _, u, a, RegMany.nil m => RegMany.nil (app m a u)
+  | _, _, u, a, RegMany.cons l m n lm mn_many => RegMany.cons
+    (app l a u) (app m a u) (app n a u)
+    (congAPPₗ l m u a lm) (congAPPₗClos m n u a mn_many)
+
+def congAPPᵣClos : ∀ t u u' a, RegMany u u' → RegMany (app t a u) (app t a u')
+  | t, _, _, a, RegMany.nil u => RegMany.nil (app t a u)
+  | t, _, _, a, RegMany.cons l m n lm mn_many => RegMany.cons
+    (app t a l) (app t a m) (app t a n)
+    (congAPPᵣ t l m a lm) (congAPPᵣClos t m n a mn_many)
+
+
+def par_to_regMany : {t t' : Term} → (PReduce t t') → (RegMany t t')
+  | _, _, .pcongOBJ lst premise f f' => _
+  | _, _, .pcong_ρ n => RegMany.nil (loc n)
+  | _, _, .pcongDOT t t' a prtt' => congDotClos t t' a (par_to_regMany prtt')
+  | _, _, .pcongAPP t t' u u' a prtt' pruu' =>
+    clos_trans (app t a u) (app t' a u) (app t' a u')
+      (congAPPₗClos t t' u a (par_to_regMany prtt'))
+      (congAPPᵣClos t' u u' a (par_to_regMany pruu'))
+  | _, _, .pdot_c t t' t_c c lst prtt' path_t'_obj_lst path_lst_c_tc => _
+  | _, _, .pdot_cφ t t' c lst prtt' path_t'_obj_lst path_lst_c_none isattr_φ_t => _
+  | _, _, .papp_c t t' u u' c lst prtt' pruu' path_t'_obj_lst path_lst_c_void => _
