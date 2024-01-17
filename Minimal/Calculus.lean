@@ -17,6 +17,7 @@ end
 open OptionalAttr
 open Term
 
+
 def mapObj : (Term → Term) → (List (Attr × OptionalAttr)) → (List (Attr × OptionalAttr))
   := λ f o =>
   let f' := λ (attr_name, attr_body) =>
@@ -25,17 +26,15 @@ def mapObj : (Term → Term) → (List (Attr × OptionalAttr)) → (List (Attr �
         | attached x => (attr_name, attached (f x))
   (f' <$> o)
 
-partial def incLocatorsFrom : Nat → Term → Term
-  := λ k term => match term with
+partial def incLocatorsFrom (k : Nat) (term : Term) : Term
+  := match term with
     | loc n => if n ≥ k then loc (n+1) else loc n
     | dot t a => dot (incLocatorsFrom k t) a
     | app t a u => app (incLocatorsFrom k t) a (incLocatorsFrom k u)
     | obj o => (obj (mapObj (incLocatorsFrom (k+1)) o))
 
-
 partial def incLocators : Term → Term
   := incLocatorsFrom 0
-
 
 partial def substituteLocator : Int × Term → Term → Term
   := λ (k, v) term => match term with
@@ -47,18 +46,15 @@ partial def substituteLocator : Int × Term → Term → Term
       else if (n == k) then v
       else loc (n-1)
 
--- def checkUniqueAttributes : (List (Attr × OptionalAttr)) → Bool
---   | _ => true
-
-def lookup : (List (Attr × OptionalAttr)) → Attr → Option OptionalAttr
-  := λ l a => match l with
+def lookup (l : List (Attr × OptionalAttr)) (a : Attr) : Option OptionalAttr
+  := match l with
     | [] => none
     | List.cons (name, term) tail =>
         if (name == a) then some term
         else lookup tail a
 
-def insert : (List (Attr × OptionalAttr)) → Attr → OptionalAttr → (List (Attr × OptionalAttr))
-  := λ l a u => match l with
+def insert (l : List (Attr × OptionalAttr)) (a : Attr) (u : OptionalAttr) : (List (Attr × OptionalAttr))
+  := match l with
     | [] => []
     | List.cons (name, term) tail =>
         if (name == a) then List.cons (name, u) tail
@@ -192,7 +188,6 @@ namespace Reduce
 
 open Reduce
 
-
 inductive ForAll : {a : Type} → (a → Type) → List a → Type where
   | triv : ∀ f, ForAll f []
   | step
@@ -246,7 +241,21 @@ namespace PReduce
           (ForAll.triv _)
 open PReduce
 
-def reg_to_par : {t t' : Term} → Reduce t t' → PReduce t t'
+
+inductive RedMany : Term → Term → Type where
+  | nil : { m : Term } → RedMany m m
+  | cons : { l m n : Term} → Reduce l m → RedMany m n → RedMany l n
+
+inductive ParMany : Term → Term → Type where
+  | nil : { m : Term } → ParMany m m
+  | cons : { l m n : Term} → PReduce l m → ParMany m n → ParMany l n
+
+scoped infix:20 " ⇝ " => Reduce
+scoped infix:20 " ⇛ " => PReduce
+scoped infix:20 " ⇝* " => RedMany
+scoped infix:20 " ⇛* " => RedMany
+
+def reg_to_par : {t t' : Term} → (t ⇝ t') → (t ⇛ t')
   | _, _, .congOBJ t t' b lst red eq =>
       .pcongOBJ
         lst
@@ -267,14 +276,9 @@ def reg_to_par : {t t' : Term} → Reduce t t' → PReduce t t'
       .papp_c t t u u c lst (prefl t) (prefl u) eq lookup_eq
 
 
-inductive RegMany : Term → Term → Type where
-  | nil : ∀ m, RegMany m m
-  | cons : ∀ l m n, Reduce l m → RegMany m n → RegMany l n
-
-def clos_trans : ∀ t t' t'', RegMany t t' → RegMany t' t'' → RegMany t t''
-  | _, _, _, RegMany.nil m, reds => reds
-  | _, _, z, RegMany.cons l m n lm mn_many, reds =>
-    RegMany.cons l m z lm (clos_trans m n z mn_many reds)
+def clos_trans : { t t' t'' : Term } → (t ⇝* t') → (t' ⇝* t'') → (t ⇝* t'')
+  | _, _, _, RedMany.nil, reds => reds
+  | _, _, _, RedMany.cons lm mn_many, reds => RedMany.cons lm (clos_trans mn_many reds)
 
 -- | congOBJ
       -- : ∀ t t' b lst
@@ -285,78 +289,51 @@ def confOBJClos
   { t t' : Term }
   { b : Attr }
   { lst : List (Attr × OptionalAttr) }
-  : RegMany t t'
+  : (t ⇝* t')
   → IsAttached b t (obj lst)
-  → RegMany (obj lst) (obj (insert lst b (attached t')))
+  → RedMany (obj lst) (obj (insert lst b (attached t')))
   := λ r a => match r with
-    | RegMany.nil m => _
-    | RegMany.cons l m n red regMany => _
+    | RedMany.nil => _
+    | RedMany.cons red redMany => _
 
-def congDotClos : ∀ t t' a, RegMany t t' → RegMany (dot t a) (dot t' a)
-  | _, _, a, RegMany.nil m => RegMany.nil (dot m a)
-  | _, _, a, RegMany.cons l m n lm mn_many => RegMany.cons
-    (dot l a) (dot m a) (dot n a)
-    (congDOT l m a lm) (congDotClos m n a mn_many)
+def congDotClos : { t t' : Term } → { a : Attr } → (t ⇝* t') → ((dot t a) ⇝* (dot t' a))
+  | _, _, _, RedMany.nil => RedMany.nil
+  | _, _, a, @RedMany.cons l m n lm mn_many =>
+    RedMany.cons (congDOT l m a lm) (congDotClos mn_many)
 
-def congAPPₗClos : ∀ t t' u a, RegMany t t' → RegMany (app t a u) (app t' a u)
-  | _, _, u, a, RegMany.nil m => RegMany.nil (app m a u)
-  | _, _, u, a, RegMany.cons l m n lm mn_many => RegMany.cons
-    (app l a u) (app m a u) (app n a u)
-    (congAPPₗ l m u a lm) (congAPPₗClos m n u a mn_many)
+def congAPPₗClos : { t t' u : Term } → { a : Attr } → (t ⇝* t') → ((app t a u) ⇝* (app t' a u))
+  | _, _, _, _, RedMany.nil => RedMany.nil
+  | _, _, u, a, @RedMany.cons l m n lm mn_many =>
+    RedMany.cons (congAPPₗ l m u a lm) (congAPPₗClos mn_many)
 
-def congAPPᵣClos : ∀ t u u' a, RegMany u u' → RegMany (app t a u) (app t a u')
-  | t, _, _, a, RegMany.nil u => RegMany.nil (app t a u)
-  | t, _, _, a, RegMany.cons l m n lm mn_many => RegMany.cons
-    (app t a l) (app t a m) (app t a n)
-    (congAPPᵣ t l m a lm) (congAPPᵣClos t m n a mn_many)
+def congAPPᵣClos : { t u u' : Term } → { a : Attr } → (u ⇝* u') → ((app t a u) ⇝* (app t a u'))
+  | _, _, _, _, RedMany.nil => RedMany.nil
+  | t, _, _, a, @RedMany.cons l m n lm mn_many =>
+    RedMany.cons (congAPPᵣ t l m a lm) (congAPPᵣClos mn_many)
 
-
-def par_to_regMany : {t t' : Term} → (PReduce t t') → (RegMany t t')
+def par_to_redMany : {t t' : Term} → (t ⇛ t') → (t ⇝* t')
   | _, _, .pcongOBJ lst premise f f' => match lst with
-    | [] => Eq.ndrec (RegMany.nil (obj [])) (congrArg obj (Eq.symm (insertManyEmpty _)))
+    | [] => Eq.ndrec (@RedMany.nil (obj [])) (congrArg obj (Eq.symm (insertManyEmpty _)))
     | a :: b => _
-  | _, _, .pcong_ρ n => RegMany.nil (loc n)
-  | _, _, .pcongDOT t t' a prtt' => congDotClos t t' a (par_to_regMany prtt')
-  | _, _, .pcongAPP t t' u u' a prtt' pruu' =>
-    clos_trans (app t a u) (app t' a u) (app t' a u')
-      (congAPPₗClos t t' u a (par_to_regMany prtt'))
-      (congAPPᵣClos t' u u' a (par_to_regMany pruu'))
+  | _, _, .pcong_ρ n => RedMany.nil
+  | _, _, .pcongDOT t t' a prtt' => congDotClos (par_to_redMany prtt')
+  | _, _, .pcongAPP t t' u u' a prtt' pruu' => clos_trans
+    (congAPPₗClos (par_to_redMany prtt'))
+    (congAPPᵣClos (par_to_redMany pruu'))
   | _, _, .pdot_c t t' t_c c lst prtt' path_t'_obj_lst path_lst_c_tc =>
-    have tt'_many := (par_to_regMany prtt')
-    have tc_t'c_many := congDotClos t t' c tt'_many
-    have tc_dispatch : Reduce (dot t' c) (substituteLocator (0, t') t_c) :=
-      dot_c t' t_c c lst path_t'_obj_lst path_lst_c_tc
-    have tc_dispatch_clos :=
-      RegMany.cons (dot t' c)
-      (substituteLocator (0, t') t_c)
-      (substituteLocator (0, t') t_c)
-      tc_dispatch
-      (RegMany.nil _)
-    clos_trans (dot t c) (dot t' c) (substituteLocator (0, t') t_c) tc_t'c_many tc_dispatch_clos
+    have tc_t'c_many := congDotClos (par_to_redMany prtt')
+    have tc_dispatch := dot_c t' t_c c lst path_t'_obj_lst path_lst_c_tc
+    have tc_dispatch_clos := RedMany.cons tc_dispatch RedMany.nil
+    clos_trans tc_t'c_many tc_dispatch_clos
   | _, _, .pdot_cφ t t' c lst prtt' path_t'_obj_lst path_lst_c_none isattr_φ_t =>
-    have tt'_many := (par_to_regMany prtt')
-    have tc_t'c_many := congDotClos t t' c tt'_many
-    have tφc_dispatch : Reduce (dot t' c) (dot (dot t' "φ") c) :=
-      dot_cφ t' c lst path_t'_obj_lst path_lst_c_none isattr_φ_t
-    have tφc_dispatch_clos :=
-      RegMany.cons (dot t' c)
-      (dot (dot t' "φ") c)
-      (dot (dot t' "φ") c)
-      tφc_dispatch
-      (RegMany.nil _)
-    clos_trans (dot t c) (dot t' c) (dot (dot t' "φ") c) tc_t'c_many tφc_dispatch_clos
+    have tc_t'c_many := congDotClos (par_to_redMany prtt')
+    have tφc_dispatch := dot_cφ t' c lst path_t'_obj_lst path_lst_c_none isattr_φ_t
+    have tφc_dispatch_clos := RedMany.cons tφc_dispatch RedMany.nil
+    clos_trans tc_t'c_many tφc_dispatch_clos
   | _, _, .papp_c t t' u u' c lst prtt' pruu' path_t'_obj_lst path_lst_c_void =>
-    have tu_t'u_many := congAPPₗClos t t' u c (par_to_regMany prtt')
-    have t'u_t'u'_many := congAPPᵣClos t' u u' c (par_to_regMany pruu')
-    have tu_t'u'_many := clos_trans (app t c u) (app t' c u) (app t' c u')
-      tu_t'u_many t'u_t'u'_many
-    have tu_app : Reduce (app t' c u') (obj (insert lst c (attached (incLocators u')))) := app_c t' u' c lst path_t'_obj_lst path_lst_c_void
-    have tu_app_clos :=
-      RegMany.cons (app t' c u')
-      (obj (insert lst c (attached (incLocators u'))))
-      (obj (insert lst c (attached (incLocators u'))))
-      tu_app
-      (RegMany.nil _)
-    clos_trans (app t c u) (app t' c u')
-      (obj (insert lst c (attached (incLocators u'))))
-      tu_t'u'_many tu_app_clos
+    have tu_t'u_many := congAPPₗClos (par_to_redMany prtt')
+    have t'u_t'u'_many := congAPPᵣClos (par_to_redMany pruu')
+    have tu_t'u'_many := clos_trans tu_t'u_many t'u_t'u'_many
+    have tu_app := app_c t' u' c lst path_t'_obj_lst path_lst_c_void
+    have tu_app_clos := RedMany.cons tu_app RedMany.nil
+    clos_trans tu_t'u'_many tu_app_clos
