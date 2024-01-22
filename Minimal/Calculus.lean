@@ -192,43 +192,6 @@ inductive IsAttached : { lst : List Attr } → Attr → Term → AttrList lst �
     → (u : OptionalAttr)
     → IsAttached a t l
     → IsAttached a t (AttrList.cons b not_in u l)
--- inductive IsAttached : Attr → Term → Term → Type where
---   | zeroth_attached
---     : { lst : List Attr }
---     → (a : Attr)
---     → (not_in : a ∉ lst)
---     → (t : Term)
---     → (l : AttrList lst)
---     → IsAttached a t (obj (AttrList.cons a not_in (attached t) l))
---   | next_attached
---     : { lst : List Attr }
---     → (a : Attr)
---     → (t : Term)
---     → (l : AttrList lst)
---     → (b : Attr)
---     → (a ≠ b)
---     → (not_in : b ∉ lst)
---     → (u : OptionalAttr)
---     → IsAttached a t (obj l)
---     → IsAttached a t (obj (AttrList.cons b not_in u l))
-
--- def head_belongs
---   { α : Type }
---   { lst : List α }
---   (a : α)
---   : a ∈ a :: lst
---   := List.Mem.head lst
-
--- def attached_to_attr
---   { a : Attr }
---   { t u : Term }
---   (isAttached : IsAttached a t u)
---   : IsAttr a u
---   := match isAttached with
---     | IsAttached.zeroth_attached _ not_in _ l =>
---         IsAttr.is_attr a (head_belongs a) (AttrList.cons a not_in (attached t) l)
---     | IsAttached.next_attached _ _ l b not_eq not_in u is_att =>
---         IsAttr.is_attr a (List.Mem.tail b _) _
 
 namespace Insert
   def insertAttachedStep
@@ -435,7 +398,7 @@ inductive ParMany : Term → Term → Type where
 scoped infix:20 " ⇝ " => Reduce
 scoped infix:20 " ⇛ " => PReduce
 scoped infix:20 " ⇝* " => RedMany
-scoped infix:20 " ⇛* " => RedMany
+-- scoped infix:20 " ⇛* " => RedMany
 
 def reg_to_par {t t' : Term} : (t ⇝ t') → (t ⇛ t')
   | .congOBJ b l red isAttached =>
@@ -468,8 +431,8 @@ def clos_trans { t t' t'' : Term } : (t ⇝* t') → (t' ⇝* t'') → (t ⇝* t
 --   : (t ⇝* t')
 --   → IsAttached b t l
 --   → (obj l ⇝* obj (insert l b (attached t')))
---   := λ r a => match r with
---     | RedMany.nil => _
+--   := λ r isAttached => match r with
+--     | RedMany.nil => _ -- congrArg obj (Eq.symm (Insert.insertAttached isAttached))
 --     | RedMany.cons red redMany => _
 
 def congDotClos : { t t' : Term } → { a : Attr } → (t ⇝* t') → ((dot t a) ⇝* (dot t' a))
@@ -490,7 +453,9 @@ def congAPPᵣClos : { t u u' : Term } → { a : Attr } → (u ⇝* u') → ((ap
 def par_to_redMany {t t' : Term} : (t ⇛ t') → (t ⇝* t')
   | @PReduce.pcongOBJ lst l newAttrs premise => match lst with
     | [] => Eq.ndrec (@RedMany.nil (obj l)) (congrArg obj (match l, newAttrs with | AttrList.nil, AttrList.nil => rfl))
-    | a :: b => _
+    | a :: as => match premise with
+      | Premise.consVoid _ _ => _
+      | Premise.consAttached _ _ _ _ _ => _
   | .pcong_ρ n => RedMany.nil
   | .pcongDOT t t' a prtt' => congDotClos (par_to_redMany prtt')
   | .pcongAPP t t' u u' a prtt' pruu' => clos_trans
