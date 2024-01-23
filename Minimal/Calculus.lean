@@ -194,6 +194,16 @@ inductive IsAttached : { lst : List Attr } → Attr → Term → AttrList lst �
     → IsAttached a t l
     → IsAttached a t (AttrList.cons b not_in u l)
 
+def isAttachedIsIn
+  { lst : List Attr }
+  { a : Attr }
+  { t : Term }
+  { l : AttrList lst }
+  : IsAttached a t l
+  → a ∈ lst
+  | @IsAttached.zeroth_attached lst' _ _ _ _ => List.Mem.head lst'
+  | IsAttached.next_attached _ _ _ b _ _ _ isAttached' => List.Mem.tail b (isAttachedIsIn isAttached')
+
 namespace Insert
 
   def insertAttachedStep
@@ -231,7 +241,17 @@ namespace Insert
     (a : Attr)
     (t t' : Term)
     : insert (insert l a (attached t')) a (attached t) = insert l a (attached t)
-    := sorry
+    := match lst with
+      | [] => match l with
+        | AttrList.nil => by simp [insert]
+      | b :: bs => match l with
+        | AttrList.cons _ not_in _ tail => dite (a = b)
+          (λ eq => by simp [insert, eq])
+          (λ neq =>
+            let neq' : b ≠ a := λ eq => neq eq.symm
+            by  simp [insert, neq']
+                exact insertTwice tail a t t'
+          )
 
   def insert_new_isAttached
     { lst : List Attr }
@@ -450,6 +470,17 @@ def clos_trans { t t' t'' : Term } : (t ⇝* t') → (t' ⇝* t'') → (t ⇝* t
   | RedMany.nil, reds => reds
   | RedMany.cons lm mn_many, reds => RedMany.cons lm (clos_trans mn_many reds)
 
+def notEqByMem
+  { lst : List Attr }
+  { a b : Attr }
+  (a_is_in : a ∈ lst)
+  (b_not_in : b ∉ lst)
+  : a ≠ b
+  := λ eq =>
+    let memEq : List.Mem a lst = List.Mem b lst :=
+      congrArg (λ x => Membership.mem x lst) eq
+    b_not_in (Eq.mp memEq a_is_in)
+
 def mapRedManyObj
   { lst : List Attr}
   (a : Attr)
@@ -463,12 +494,14 @@ def mapRedManyObj
     | RedMany.cons (@congOBJ t t' c _ _ red_tt' isAttached) reds =>
       have one_step : (obj (AttrList.cons a not_in_a u_a l1) ⇝
         obj (AttrList.cons a not_in_a u_a (insert l1 c (attached t')))) := by
-          have neq_c_a : c ≠ a := sorry
+          have c_is_in := isAttachedIsIn isAttached
+          have a_not_in := not_in_a
+          have neq_c_a : c ≠ a := notEqByMem c_is_in a_not_in
           have intermediate := congOBJ c (AttrList.cons a not_in_a u_a l1) red_tt'
             (IsAttached.next_attached c _ _ _ neq_c_a _ _ isAttached)
           simp [insert, neq_c_a.symm] at intermediate
           assumption
-      (RedMany.cons (one_step) (mapRedManyObj _ _ reds))
+      (RedMany.cons one_step (mapRedManyObj _ _ reds))
 
 def congOBJClos
   { t t' : Term }
