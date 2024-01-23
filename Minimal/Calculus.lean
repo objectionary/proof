@@ -127,6 +127,7 @@ namespace Insert
     := match l with
       | nil => by rfl
       | cons a not_in op_attr tail => congrArg (cons a not_in op_attr) (insertAllSelf tail)
+
 end Insert
 
 partial def whnf : Term → Term
@@ -194,6 +195,7 @@ inductive IsAttached : { lst : List Attr } → Attr → Term → AttrList lst �
     → IsAttached a t (AttrList.cons b not_in u l)
 
 namespace Insert
+
   def insertAttachedStep
     { a b : Attr }
     { neq : a ≠ b }
@@ -222,6 +224,31 @@ namespace Insert
       | IsAttached.next_attached _ _ l b neq not_in u isAttached =>
           let step := @insertAttachedStep a b neq t _ not_in u _ isAttached
           Eq.trans step (congrArg (AttrList.cons b not_in u) (insertAttached isAttached))
+
+  def insertTwice
+    {lst : List Attr}
+    (l : AttrList lst)
+    (a : Attr)
+    (t t' : Term)
+    : insert (insert l a (attached t')) a (attached t) = insert l a (attached t)
+    := sorry
+
+  def insert_new_isAttached
+    { lst : List Attr }
+    { l : AttrList lst }
+    { a : Attr }
+    { t t' : Term}
+    : IsAttached a t l → IsAttached a t' (insert l a (attached t'))
+    := λ isAttached => match isAttached with
+      | IsAttached.zeroth_attached _ not_in _ _=> by
+        simp [insert]
+        exact IsAttached.zeroth_attached _ _ _ _
+      | IsAttached.next_attached _ _ l b neq not_in u new_isAttached => by
+        have hypothesis : IsAttached a t' (insert l a (attached t'))
+          := insert_new_isAttached new_isAttached
+        simp [insert, neq.symm]
+        exact IsAttached.next_attached a t' (insert l a (attached t')) b neq not_in u hypothesis
+
 end Insert
 
 namespace Reduce
@@ -423,17 +450,43 @@ def clos_trans { t t' t'' : Term } : (t ⇝* t') → (t' ⇝* t'') → (t ⇝* t
   | RedMany.nil, reds => reds
   | RedMany.cons lm mn_many, reds => RedMany.cons lm (clos_trans mn_many reds)
 
--- def congOBJClos
---   { t t' : Term }
---   { b : Attr }
---   { lst : List Attr }
---   { l : AttrList lst }
---   : (t ⇝* t')
---   → IsAttached b t l
---   → (obj l ⇝* obj (insert l b (attached t')))
---   := λ r isAttached => match r with
---     | RedMany.nil => _ -- congrArg obj (Eq.symm (Insert.insertAttached isAttached))
---     | RedMany.cons red redMany => _
+def mapRedManyObj
+  { lst : List Attr}
+  (a : Attr)
+  { not_in_a : a ∉ lst }
+  (u_a  : OptionalAttr)
+  { l1 l2 : AttrList lst }
+  : (obj l1 ⇝* obj l2)
+  → (obj (AttrList.cons a not_in_a u_a l1) ⇝* obj (AttrList.cons a not_in_a u_a l2))
+  := λ redmany => match redmany with
+    | RedMany.nil => RedMany.nil
+    | RedMany.cons (@congOBJ t t' c _ _ red_tt' isAttached) reds =>
+      have one_step : (obj (AttrList.cons a not_in_a u_a l1) ⇝
+        obj (AttrList.cons a not_in_a u_a (insert l1 c (attached t')))) := by
+          have neq_c_a : c ≠ a := sorry
+          have intermediate := congOBJ c (AttrList.cons a not_in_a u_a l1) red_tt'
+            (IsAttached.next_attached c _ _ _ neq_c_a _ _ isAttached)
+          simp [insert, neq_c_a.symm] at intermediate
+          assumption
+      (RedMany.cons (one_step) (mapRedManyObj _ _ reds))
+
+def congOBJClos
+  { t t' : Term }
+  { b : Attr }
+  { lst : List Attr }
+  { l : AttrList lst }
+  : (t ⇝* t')
+  → IsAttached b t l
+  → (obj l ⇝* obj (insert l b (attached t')))
+  := λ red_tt' isAttached => match red_tt' with
+    | RedMany.nil => Eq.ndrec (RedMany.nil) (congrArg obj (Eq.symm (Insert.insertAttached isAttached)))
+    | @RedMany.cons t t_i t' red redMany =>
+      have ind_hypothesis : obj (insert l b (attached t_i)) ⇝* obj (insert (insert l b (attached t_i)) b (attached t'))
+        := (congOBJClos redMany (Insert.insert_new_isAttached isAttached))
+      RedMany.cons
+        (congOBJ b l red isAttached)
+        (Eq.ndrec ind_hypothesis
+        (congrArg obj (Insert.insertTwice l b t' t_i)))
 
 def congDotClos : { t t' : Term } → { a : Attr } → (t ⇝* t') → ((dot t a) ⇝* (dot t' a))
   | _, _, _, RedMany.nil => RedMany.nil
@@ -451,11 +504,27 @@ def congAPPᵣClos : { t u u' : Term } → { a : Attr } → (u ⇝* u') → ((ap
     RedMany.cons (congAPPᵣ t l m a lm) (congAPPᵣClos mn_many)
 
 def par_to_redMany {t t' : Term} : (t ⇛ t') → (t ⇝* t')
-  | @PReduce.pcongOBJ lst l newAttrs premise => match lst with
-    | [] => Eq.ndrec (@RedMany.nil (obj l)) (congrArg obj (match l, newAttrs with | AttrList.nil, AttrList.nil => rfl))
-    | a :: as => match premise with
-      | Premise.consVoid _ _ => _
-      | Premise.consAttached _ _ _ _ _ => _
+  | @PReduce.pcongOBJ lst l l' premise =>
+    let rec fold_premise
+      { lst : List Attr }
+      { al al' : AttrList lst }
+      (premise : Premise al al')
+      : (obj al) ⇝* (obj al')
+      := match lst with
+        | [] => match al, al' with
+          | AttrList.nil, AttrList.nil => RedMany.nil
+        | a :: as => match al, al' with
+          | AttrList.cons _ not_in u tail, AttrList.cons _ _ u' tail' => match premise with
+            | Premise.consVoid _ premiseTail => mapRedManyObj a void (fold_premise premiseTail)
+            | @Premise.consAttached _ t1 t2 preduce _ l1 l2 not_in premiseTail => by
+                suffices temp : obj (insert (AttrList.cons a not_in (attached t1) l1) a (attached t2)) ⇝*
+                  obj (AttrList.cons a _ (attached t2) l2) from
+                  (clos_trans
+                    (congOBJClos (par_to_redMany preduce) (IsAttached.zeroth_attached a _ t1 l1))
+                    (temp))
+                simp [insert]
+                exact mapRedManyObj a (attached t2) (fold_premise premiseTail)
+    fold_premise premise
   | .pcong_ρ n => RedMany.nil
   | .pcongDOT t t' a prtt' => congDotClos (par_to_redMany prtt')
   | .pcongAPP t t' u u' a prtt' pruu' => clos_trans
