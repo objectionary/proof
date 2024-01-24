@@ -37,25 +37,27 @@ def mapAttrList : (Term → Term) → { lst : List Attr } → AttrList lst → A
     | AttrList.cons a not_in opAttr attrLst =>
         AttrList.cons a not_in (f' opAttr) (mapAttrList f attrLst)
 
-partial def incLocatorsFrom (k : Nat) (term : Term) : Term
+def incLocatorsFrom (k : Nat) (term : Term) : Term
   := match term with
     | loc n => if n ≥ k then loc (n+1) else loc n
     | dot t a => dot (incLocatorsFrom k t) a
     | app t a u => app (incLocatorsFrom k t) a (incLocatorsFrom k u)
     | obj o => (obj (mapAttrList (incLocatorsFrom (k+1)) o))
+decreasing_by sorry
 
-partial def incLocators : Term → Term
+def incLocators : Term → Term
   := incLocatorsFrom 0
 
-partial def substituteLocator : Int × Term → Term → Term
+def substitute : Nat × Term → Term → Term
   := λ (k, v) term => match term with
-    | obj o => obj (mapAttrList (substituteLocator (k + 1, incLocators v)) o)
-    | dot t a => dot (substituteLocator (k, v) t) a
-    | app t a u => app (substituteLocator (k, v) t) a (substituteLocator (k, v) u)
+    | obj o => obj (mapAttrList (substitute (k + 1, incLocators v)) o)
+    | dot t a => dot (substitute (k, v) t) a
+    | app t a u => app (substitute (k, v) t) a (substitute (k, v) u)
     | loc n =>
       if (n < k) then (loc n)
       else if (n == k) then v
       else loc (n-1)
+decreasing_by sorry
 
 def lookup { lst : List Attr } (l : AttrList lst) (a : Attr) : Option OptionalAttr
   := match l with
@@ -141,7 +143,7 @@ partial def whnf : Term → Term
     | t' => app t' a u
   | dot t a => match (whnf t) with
     | obj o => match lookup o a with
-      | some (attached u) => whnf (substituteLocator (0, obj o) u)
+      | some (attached u) => whnf (substitute (0, obj o) u)
       | some void => dot (obj o) a
       | none => match lookup o "φ" with
         | some _ => dot (dot (obj o) "φ") a
@@ -159,7 +161,7 @@ partial def nf : Term → Term
     | t' => app (nf t') a (nf u)
   | dot t a => match (whnf t) with
     | obj o => match lookup o a with
-      | some (attached u) => nf (substituteLocator (0, obj o) u)
+      | some (attached u) => nf (substitute (0, obj o) u)
       | some void => dot (nf (obj o)) a
       | none => match lookup o "φ" with
         | some _ => nf (dot (dot (obj o) "φ") a)
@@ -294,7 +296,7 @@ namespace Reduce
       → (l : AttrList lst)
       → t = obj l
       → lookup l c = some (attached t_c)
-      → Reduce (dot t c) (substituteLocator (0, t) t_c)
+      → Reduce (dot t c) (substitute (0, t) t_c)
     | dot_cφ
       : { t : Term }
       → (c : Attr)
@@ -360,7 +362,7 @@ namespace PReduce
         → PReduce t t'
         → t' = obj l
         → lookup l c = some (attached t_c)
-        → PReduce (dot t c) (substituteLocator (0, t') t_c)
+        → PReduce (dot t c) (substitute (0, t') t_c)
       | pdot_cφ
         : { t t' : Term }
         → (c : Attr)
@@ -596,3 +598,64 @@ def parMany_to_redMany {t t' : Term} : (t ⇛* t') → (t ⇝* t')
 def redMany_to_parMany {t t' : Term} : (t ⇝* t') → (t ⇛* t')
   | RedMany.nil => ParMany.nil
   | RedMany.cons red reds => ParMany.cons (reg_to_par red) (redMany_to_parMany reds)
+
+-------------------------------------------------------
+
+-- Reordering substitutions
+def subst_swap
+  ( i j : Nat)
+  ( le_ji : j ≤ i)
+  ( t u v : Term)
+  : substitute (i, v) (substitute (j, u) t) =
+    substitute (j, substitute (i, v) u) (substitute (i+1, incLocators v) t)
+  := match t with
+    | loc k => by
+        simp [substitute]
+        split
+        . rename_i lt_kj
+          have lt_ki : k < i := Nat.le_trans lt_kj le_ji
+          have lt_ki1 : k < i + 1 := Nat.le_step lt_ki
+          simp [substitute, lt_kj, lt_ki, lt_ki1]
+          -- case k < j
+        . rename_i not_lt
+          have le_jk: j ≤ k := Nat.ge_of_not_lt not_lt
+          split
+          . rename_i eq_kj
+            have le_ki : k ≤ i := eq_kj ▸ le_ji
+            have lt_ji1 : j < i + 1 :=  Nat.lt_succ_of_le le_ji
+            simp [substitute, eq_kj, lt_ji1]
+            -- case k == j
+          . rename_i neq_kj
+            have neq_jk : ¬j = k := λ eq => neq_kj eq.symm
+            have lt_jk : j < k := Nat.lt_of_le_of_ne le_jk neq_jk
+            simp [substitute]
+            have le_k1: 1 ≤ k := Nat.succ_le_of_lt
+              (Nat.lt_of_le_of_lt (Nat.zero_le j) lt_jk)
+            split
+            . rename_i le_k1i
+              have lt_ki1: k < i + 1 := by
+                have temp := Nat.add_lt_add_right le_k1i 1
+                simp [Nat.sub_add_cancel le_k1] at temp
+                exact temp
+              have nlt_kj : ¬ k < j := λ lt_kj => Nat.lt_irrefl k (Nat.lt_trans lt_kj lt_jk)
+              simp [substitute, lt_ki1, neq_kj, nlt_kj]
+              -- case j < k ≤ i
+            . rename_i nle_k1i
+              split
+              . rename_i eq_k1i
+                have eq_ki1 : k = i + 1 := by
+                  have temp : k - 1 + 1 = i + 1 := congrArg Nat.succ eq_k1i
+                  simp [Nat.sub_add_cancel le_k1] at temp
+                  exact temp
+                simp [substitute, eq_ki1]
+                admit
+              . rename_i neq_k1i
+                have nle_ki1 : ¬ k < i + 1 := sorry
+                have neq_ki1 : ¬ k = i + 1 := sorry
+                simp [substitute, nle_ki1, neq_ki1]
+                have nlt : ¬ k - 1 < j := sorry
+                have neq : ¬ k - 1 = j := sorry
+                simp [nlt, neq]
+    | dot s a => _
+    | app s₁ a s₂ => _
+    | obj o => _
