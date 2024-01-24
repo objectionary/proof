@@ -433,7 +433,6 @@ namespace PReduce
               )
 open PReduce
 
-
 inductive RedMany : Term → Term → Type where
   | nil : { m : Term } → RedMany m m
   | cons : { l m n : Term} → Reduce l m → RedMany m n → RedMany l n
@@ -445,7 +444,7 @@ inductive ParMany : Term → Term → Type where
 scoped infix:20 " ⇝ " => Reduce
 scoped infix:20 " ⇛ " => PReduce
 scoped infix:20 " ⇝* " => RedMany
--- scoped infix:20 " ⇛* " => RedMany
+scoped infix:20 " ⇛* " => ParMany
 
 def reg_to_par {t t' : Term} : (t ⇝ t') → (t ⇛ t')
   | .congOBJ b l red isAttached =>
@@ -466,9 +465,9 @@ def reg_to_par {t t' : Term} : (t ⇝ t') → (t ⇛ t')
   | Reduce.app_c t u c l eq lookup_eq =>
       PReduce.papp_c c l (prefl t) (prefl u) eq lookup_eq
 
-def clos_trans { t t' t'' : Term } : (t ⇝* t') → (t' ⇝* t'') → (t ⇝* t'')
+def red_trans { t t' t'' : Term } : (t ⇝* t') → (t' ⇝* t'') → (t ⇝* t'')
   | RedMany.nil, reds => reds
-  | RedMany.cons lm mn_many, reds => RedMany.cons lm (clos_trans mn_many reds)
+  | RedMany.cons lm mn_many, reds => RedMany.cons lm (red_trans mn_many reds)
 
 def notEqByMem
   { lst : List Attr }
@@ -552,7 +551,7 @@ def par_to_redMany {t t' : Term} : (t ⇛ t') → (t ⇝* t')
             | @Premise.consAttached _ t1 t2 preduce _ l1 l2 not_in premiseTail => by
                 suffices temp : obj (insert (AttrList.cons a not_in (attached t1) l1) a (attached t2)) ⇝*
                   obj (AttrList.cons a _ (attached t2) l2) from
-                  (clos_trans
+                  (red_trans
                     (congOBJClos (par_to_redMany preduce) (IsAttached.zeroth_attached a _ t1 l1))
                     (temp))
                 simp [insert]
@@ -560,23 +559,31 @@ def par_to_redMany {t t' : Term} : (t ⇛ t') → (t ⇝* t')
     fold_premise premise
   | .pcong_ρ n => RedMany.nil
   | .pcongDOT t t' a prtt' => congDotClos (par_to_redMany prtt')
-  | .pcongAPP t t' u u' a prtt' pruu' => clos_trans
+  | .pcongAPP t t' u u' a prtt' pruu' => red_trans
     (congAPPₗClos (par_to_redMany prtt'))
     (congAPPᵣClos (par_to_redMany pruu'))
   | PReduce.pdot_c t_c c l preduce eq lookup_eq =>
     let tc_t'c_many := congDotClos (par_to_redMany preduce)
     let tc_dispatch := Reduce.dot_c t_c c l eq lookup_eq
     let tc_dispatch_clos := RedMany.cons tc_dispatch RedMany.nil
-    clos_trans tc_t'c_many tc_dispatch_clos
+    red_trans tc_t'c_many tc_dispatch_clos
   | PReduce.pdot_cφ c l preduce eq lookup_eq isAttr =>
     let tc_t'c_many := congDotClos (par_to_redMany preduce)
     let tφc_dispatch := dot_cφ c l eq lookup_eq isAttr
     let tφc_dispatch_clos := RedMany.cons tφc_dispatch RedMany.nil
-    clos_trans tc_t'c_many tφc_dispatch_clos
+    red_trans tc_t'c_many tφc_dispatch_clos
   | @PReduce.papp_c t t' u u' c lst l prtt' pruu' path_t'_obj_lst path_lst_c_void =>
     let tu_t'u_many := congAPPₗClos (par_to_redMany prtt')
     let t'u_t'u'_many := congAPPᵣClos (par_to_redMany pruu')
-    let tu_t'u'_many := clos_trans tu_t'u_many t'u_t'u'_many
+    let tu_t'u'_many := red_trans tu_t'u_many t'u_t'u'_many
     let tu_app := app_c t' u' c l path_t'_obj_lst path_lst_c_void
     let tu_app_clos := RedMany.cons tu_app RedMany.nil
-    clos_trans tu_t'u'_many tu_app_clos
+    red_trans tu_t'u'_many tu_app_clos
+
+def parMany_to_redMany {t t' : Term} : (t ⇛* t') → (t ⇝* t')
+  | ParMany.nil => RedMany.nil
+  | ParMany.cons red reds => red_trans (par_to_redMany red) (parMany_to_redMany reds)
+
+def redMany_to_parMany {t t' : Term} : (t ⇝* t') → (t ⇛* t')
+  | RedMany.nil => ParMany.nil
+  | RedMany.cons red reds => ParMany.cons (reg_to_par red) (redMany_to_parMany reds)
