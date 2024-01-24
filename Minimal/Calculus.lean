@@ -520,19 +520,28 @@ def congOBJClos
         (Eq.ndrec ind_hypothesis
         (congrArg obj (Insert.insertTwice l b t' t_i)))
 
-def congDotClos : { t t' : Term } → { a : Attr } → (t ⇝* t') → ((dot t a) ⇝* (dot t' a))
-  | _, _, _, RedMany.nil => RedMany.nil
-  | _, _, a, @RedMany.cons l m n lm mn_many =>
+def congDotClos
+  { t t' : Term }
+  { a : Attr }
+  : (t ⇝* t') → ((dot t a) ⇝* (dot t' a))
+  | RedMany.nil => RedMany.nil
+  | @RedMany.cons l m n lm mn_many =>
     RedMany.cons (congDOT l m a lm) (congDotClos mn_many)
 
-def congAPPₗClos : { t t' u : Term } → { a : Attr } → (t ⇝* t') → ((app t a u) ⇝* (app t' a u))
-  | _, _, _, _, RedMany.nil => RedMany.nil
-  | _, _, u, a, @RedMany.cons l m n lm mn_many =>
+def congAPPₗClos
+  { t t' u : Term }
+  { a : Attr }
+  : (t ⇝* t') → ((app t a u) ⇝* (app t' a u))
+  | RedMany.nil => RedMany.nil
+  | @RedMany.cons l m n lm mn_many =>
     RedMany.cons (congAPPₗ l m u a lm) (congAPPₗClos mn_many)
 
-def congAPPᵣClos : { t u u' : Term } → { a : Attr } → (u ⇝* u') → ((app t a u) ⇝* (app t a u'))
-  | _, _, _, _, RedMany.nil => RedMany.nil
-  | t, _, _, a, @RedMany.cons l m n lm mn_many =>
+def congAPPᵣClos
+  { t u u' : Term }
+  { a : Attr }
+  : (u ⇝* u') → ((app t a u) ⇝* (app t a u'))
+  | RedMany.nil => RedMany.nil
+  | @RedMany.cons l m n lm mn_many =>
     RedMany.cons (congAPPᵣ t l m a lm) (congAPPᵣClos mn_many)
 
 def par_to_redMany {t t' : Term} : (t ⇛ t') → (t ⇝* t')
