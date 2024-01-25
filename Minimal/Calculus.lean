@@ -1420,3 +1420,23 @@ def substitution_lemma
         (by rw [eq, substitute])
         (MapAttrList.mapAttrList_lookup_void (substitute (i + 1, incLocators u')) lookup_eq)
 decreasing_by sorry
+
+
+----------------------------------------------
+-- Complete Development
+
+def complete_development : Term → Term
+  | loc n => loc n
+  | dot t a => match (complete_development t) with
+    | @obj attrs bnds => match (lookup bnds a) with
+      | some (attached t_a) => (substitute (0, (obj bnds)) t_a)
+      | some void => if ("φ" ∈ attrs) then dot (dot (obj bnds) "φ") a else dot (obj bnds) a
+      | none => dot (obj bnds) a
+    | t' => dot t' a
+  | app t a u => match (complete_development t) with
+    | @obj attrs bnds => match (lookup bnds a) with
+      | some void => obj (insert bnds a (attached (incLocators u)))
+      | _ => app (obj bnds) a (complete_development u)
+    | _ => app (complete_development t) a (complete_development u)
+  | obj bnds => obj (mapAttrList complete_development bnds)
+decreasing_by sorry
