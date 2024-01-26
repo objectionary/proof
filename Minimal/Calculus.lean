@@ -37,12 +37,12 @@ def mapAttrList : (Term → Term) → { lst : List Attr } → AttrList lst → A
     | AttrList.cons a not_in opAttr attrLst =>
         AttrList.cons a not_in (f' opAttr) (mapAttrList f attrLst)
 
-def incLocatorsFrom (k : Nat) (term : Term) : Term
+def incLocatorsFrom (n : Nat) (term : Term) : Term
   := match term with
-    | loc n => if n ≥ k then loc (n+1) else loc n
-    | dot t a => dot (incLocatorsFrom k t) a
-    | app t a u => app (incLocatorsFrom k t) a (incLocatorsFrom k u)
-    | obj o => (obj (mapAttrList (incLocatorsFrom (k+1)) o))
+    | loc m => if m < n then loc m else loc (m + 1)
+    | dot t a => dot (incLocatorsFrom n t) a
+    | app t a u => app (incLocatorsFrom n t) a (incLocatorsFrom n u)
+    | obj o => (obj (mapAttrList (incLocatorsFrom (n+1)) o))
 decreasing_by sorry
 
 def incLocators : Term → Term
@@ -601,7 +601,113 @@ def redMany_to_parMany {t t' : Term} : (t ⇝* t') → (t ⇛* t')
 
 -------------------------------------------------------
 
--- Reordering substitutions
+def mapAttrList_compose
+  (f g : Term → Term )
+  { lst : List Attr }
+  ( l : AttrList lst)
+  : mapAttrList f (mapAttrList g l) = mapAttrList (λ t => f (g t)) l
+  := match l with
+    | AttrList.nil => rfl
+    | AttrList.cons _ _ u tail => by
+      cases u <;> simp [mapAttrList] <;> exact mapAttrList_compose f g tail
+
+-- A.9 (Increment swap)
+def inc_swap
+  ( i j : Nat)
+  ( le_ij : i ≤ j)
+  ( t : Term)
+  : incLocatorsFrom i (incLocatorsFrom j t) = incLocatorsFrom (j + 1) (incLocatorsFrom i t)
+  := match t with
+    | loc k => by
+      simp [incLocatorsFrom]
+      split
+      . rename_i lt_kj
+        simp [incLocatorsFrom]
+        split
+        . rename_i lt_ki
+          have lt_kj1 : k < j + 1 := Nat.lt_trans lt_kj (Nat.lt_succ_self j)
+          simp [incLocatorsFrom, lt_kj1]
+        . rename_i nlt_ki
+          simp [incLocatorsFrom, Nat.succ_lt_succ lt_kj]
+      . rename_i nlt_kj
+        have le_ik : i ≤ k := Nat.le_trans le_ij (Nat.ge_of_not_lt nlt_kj)
+        have nlt_k1i: ¬ k + 1 < i :=
+          λ x => absurd ((Nat.lt_trans (Nat.lt_of_le_of_lt le_ik (Nat.lt_succ_self k)) x)) (Nat.lt_irrefl i)
+        have nlt_ki : ¬ k < i := λ x => absurd le_ik (Nat.not_le_of_gt x)
+        have nlt_k1j1 : ¬ k + 1 < j + 1 := λ x => nlt_kj (Nat.lt_of_succ_lt_succ x)
+        simp [incLocatorsFrom, nlt_k1i, nlt_ki, nlt_k1j1]
+    | dot s a => by
+      simp [incLocatorsFrom]
+      exact inc_swap i j le_ij s
+    | app s a u => by
+      simp [incLocatorsFrom]
+      constructor
+      . exact inc_swap i j le_ij s
+      . exact inc_swap i j le_ij u
+    | obj _ => by
+      have ih : (t' : Term) → incLocatorsFrom (i + 1) (incLocatorsFrom (j + 1) t') = incLocatorsFrom (j + 1 + 1) (incLocatorsFrom (i + 1) t') :=
+        λ t' => inc_swap (i + 1) (j + 1) (Nat.succ_le_succ le_ij) t'
+      simp [incLocatorsFrom, mapAttrList_compose, ih]
+decreasing_by sorry
+
+-- A.8 (Increment and substitution swap)
+def subst_inc_swap
+  ( i j : Nat)
+  ( le_ji : j ≤ i)
+  ( t u : Term)
+  : substitute (i+1, incLocatorsFrom j u) (incLocatorsFrom j t) =
+    (incLocatorsFrom j (substitute (i, u) t))
+  := match t with
+    | loc k => by
+      simp [substitute, incLocatorsFrom]
+      split
+      . rename_i lt_kj
+        have lt_ki: k < i := Nat.lt_of_lt_of_le lt_kj le_ji
+        have lt_ki1 : k < i + 1 := Nat.lt_succ_of_le (Nat.le_of_lt lt_ki)
+        simp [substitute, lt_ki1, lt_ki, incLocatorsFrom, lt_kj]
+      . rename_i nlt_kj
+        split
+        . rename_i lt_ki
+          have lt_k1i1 : k + 1 < i + 1 := Nat.succ_lt_succ lt_ki
+          simp [substitute, incLocatorsFrom, lt_k1i1, nlt_kj]
+        . rename_i nlt_ki
+          have nlt_k1i1 : ¬k + 1 < i + 1
+            := λ x => absurd (Nat.lt_of_succ_lt_succ x) nlt_ki
+          simp [substitute, nlt_k1i1]
+          split
+          . rename_i eq_ki
+            rfl
+          . rename_i neq_ki
+            have neq_ik : ¬ i = k := λ eq => neq_ki eq.symm
+            have lt_ik : i < k := Nat.lt_of_le_of_ne (Nat.ge_of_not_lt nlt_ki) neq_ik
+            have lt_jk : j < k := Nat.lt_of_le_of_lt le_ji lt_ik
+            have le_k1 : 1 ≤ k := Nat.succ_le_of_lt
+              (Nat.lt_of_le_of_lt (Nat.zero_le j) lt_jk)
+            have k0 : k - 1 + 1 = k := Nat.sub_add_cancel le_k1
+            have lt_j1k1 : j + 1 < k + 1 := Nat.succ_lt_succ lt_jk
+            have le_j1k : j + 1 ≤ k := Nat.le_of_lt_succ lt_j1k1
+            have le_jk1 := Nat.le_of_succ_le_succ (k0.symm ▸ le_j1k)
+            have nlt_jk1: ¬k - 1 < j := λ x => absurd le_jk1 (Nat.not_le_of_gt x)
+            simp [incLocatorsFrom, nlt_jk1, k0, Nat.add_sub_cancel]
+    | dot s a => by
+      simp [substitute, incLocatorsFrom]
+      exact subst_inc_swap i j le_ji s u
+    | app s₁ a s₂ => by
+      simp [substitute, incLocatorsFrom]
+      constructor
+      . exact subst_inc_swap i j le_ji s₁ u
+      . exact subst_inc_swap i j le_ji s₂ u
+    | obj o => by
+      have ih := λ t' => subst_inc_swap (i + 1) (j + 1) (Nat.succ_le_succ le_ji) t' (incLocators u)
+      have ih_func : (fun t' => substitute (i + 1 + 1, incLocatorsFrom (j + 1) (incLocators u)) (incLocatorsFrom (j + 1) t')) = (fun t' => incLocatorsFrom (j + 1) (substitute (i + 1, (incLocators u)) t')) := funext ih
+      simp [substitute, incLocatorsFrom, mapAttrList_compose]
+      simp [incLocators]
+      simp [inc_swap]
+      rw [← incLocators]
+      simp [ih_func]
+decreasing_by sorry
+
+-- A.7 (Substitution swap)
 def subst_swap
   ( i j : Nat)
   ( le_ji : j ≤ i)
@@ -656,6 +762,6 @@ def subst_swap
                 have nlt : ¬ k - 1 < j := sorry
                 have neq : ¬ k - 1 = j := sorry
                 simp [nlt, neq]
-    | dot s a => _
-    | app s₁ a s₂ => _
-    | obj o => _
+    | dot s a => sorry
+    | app s₁ a s₂ => sorry
+    | obj o => sorry
