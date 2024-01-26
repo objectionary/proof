@@ -1430,8 +1430,8 @@ def complete_development : Term → Term
   | dot t a => match (complete_development t) with
     | @obj attrs bnds => match (lookup bnds a) with
       | some (attached t_a) => (substitute (0, (obj bnds)) t_a)
-      | some void => if ("φ" ∈ attrs) then dot (dot (obj bnds) "φ") a else dot (obj bnds) a
-      | none => dot (obj bnds) a
+      | some void => dot (obj bnds) a
+      | none => if ("φ" ∈ attrs) then dot (dot (obj bnds) "φ") a else dot (obj bnds) a
     | t' => dot t' a
   | app t a u => match (complete_development t) with
     | @obj attrs bnds => match (lookup bnds a) with
@@ -1440,3 +1440,91 @@ def complete_development : Term → Term
     | _ => app (complete_development t) a (complete_development u)
   | obj bnds => obj (mapAttrList complete_development bnds)
 decreasing_by sorry
+
+def term_to_development
+  (t : Term)
+  : t ⇛ complete_development t
+  := match t with
+    | loc n => by simp [complete_development]; exact prefl (loc n)
+    | dot t a => by
+        simp [complete_development]
+        split
+        . rename_i cd_is_obj
+          rename_i l
+          rename_i attrs
+          split
+          . rename_i lookup_attached
+            rename_i u
+            have goal := PReduce.pdot_c u a l (term_to_development t) cd_is_obj lookup_attached
+            simp [cd_is_obj] at goal
+            exact goal
+          . have goal := PReduce.pcongDOT t (complete_development t) a (term_to_development t)
+            simp [cd_is_obj] at goal
+            exact goal
+          . rename_i lookup_none
+            exact dite ("φ" ∈ attrs)
+              (λ φ_in => by
+                simp [φ_in]
+                have temp := term_to_development t
+                simp [cd_is_obj] at temp
+                exact PReduce.pdot_cφ a l temp rfl lookup_none (IsAttr.is_attr "φ" φ_in l)
+              )
+              (λ not_in => by
+                simp [not_in]
+                have goal := PReduce.pcongDOT t (complete_development t) a (term_to_development t)
+                simp [cd_is_obj] at goal
+                exact goal
+              )
+        . rename_i cd_not_obj
+          exact PReduce.pcongDOT t (complete_development t) a (term_to_development t)
+    | app t a u => by
+        simp [complete_development]
+        split
+        . rename_i cd_is_obj
+          rename_i l
+          split
+          . rename_i lookup_void
+            exact PReduce.papp_c a l (term_to_development t) (prefl u) cd_is_obj lookup_void
+          . rename_i lookup_not_void
+            have goal := PReduce.pcongAPP
+              t
+              (complete_development t)
+              u
+              (complete_development u)
+              a
+              (term_to_development t)
+              (term_to_development u)
+            simp [cd_is_obj] at goal
+            exact goal
+        . exact PReduce.pcongAPP
+            t
+            (complete_development t)
+            u
+            (complete_development u)
+            a
+            (term_to_development t)
+            (term_to_development u)
+
+    | obj bnds => by
+        simp [complete_development]
+        let rec make_premise
+          { attrs : List Attr }
+          (bnds : AttrList attrs)
+          : Premise bnds (mapAttrList complete_development bnds)
+          := match bnds with
+            | AttrList.nil => Premise.nil
+            | AttrList.cons a not_in void tail => by
+                simp [mapAttrList]
+                exact Premise.consVoid a (make_premise tail)
+            | AttrList.cons a not_in (attached u) tail => by
+                simp [mapAttrList]
+                exact Premise.consAttached
+                  a
+                  u
+                  (complete_development u)
+                  (term_to_development u)
+                  (make_premise tail)
+        exact PReduce.pcongOBJ
+          bnds
+          (mapAttrList complete_development bnds)
+          (make_premise bnds)
