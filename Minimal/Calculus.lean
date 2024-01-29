@@ -482,6 +482,65 @@ namespace PReduce
                 | void => Premise.consVoid b premise
                 | attached u' => Premise.consAttached b u' u' (prefl u') premise
               )
+
+  def singlePremiseInsert
+    { lst : List Attr }
+    { l1 l2 : AttrList lst }
+    { a : Attr }
+    { t1 t2 : Term }
+    (preduce : PReduce t1 t2)
+    (premise : Premise l1 l2)
+    : Premise (insert l1 a (attached t1)) (insert l2 a (attached t2))
+    := match premise with
+      | Premise.nil => Premise.nil
+      | Premise.consVoid b tail => dite
+          (b = a)
+          (λ eq => by
+            simp [insert, eq]
+            exact Premise.consAttached b _ _ preduce tail
+          )
+          (λ neq => by
+            simp [insert, neq]
+            exact Premise.consVoid b (singlePremiseInsert preduce tail)
+          )
+      | Premise.consAttached b t' t'' preduce' tail => dite
+          (b = a)
+          (λ eq => by
+            simp [insert, eq]
+            exact Premise.consAttached b _ _ preduce tail
+          )
+          (λ neq => by
+            simp [insert, neq]
+            exact Premise.consAttached b t' t'' preduce' (singlePremiseInsert preduce tail)
+          )
+
+  def lookup_void_premise
+    { lst : List Attr }
+    { l1 l2 : AttrList lst }
+    { a : Attr }
+    (lookup_void : lookup l1 a = some void)
+    (premise : Premise l1 l2)
+    : lookup l2 a = some void
+    := match lst with
+      | [] => match l1, l2 with | AttrList.nil, AttrList.nil => by contradiction
+      | b :: bs => match l1, l2 with
+          | AttrList.cons _ _ _ tail1, AttrList.cons _ _ _ tail2 => match premise with
+            | Premise.consVoid _ premise_tail => dite
+              (b = a)
+              (λ eq => by simp [lookup, eq])
+              (λ neq => by
+                simp [lookup, neq] at lookup_void
+                simp [lookup, neq]
+                exact lookup_void_premise lookup_void premise_tail
+              )
+            | Premise.consAttached _ _ _ _ premise_tail => dite
+              (b = a)
+              (λ eq => by simp [lookup, eq] at lookup_void)
+              (λ neq => by
+                simp [lookup, neq] at lookup_void
+                simp [lookup, neq]
+                exact lookup_void_premise lookup_void premise_tail
+              )
 open PReduce
 
 inductive RedMany : Term → Term → Type where
@@ -1684,4 +1743,16 @@ def half_diamond
               let preduce := (pcongOBJ _ _ premise)
               simp [<-eq] at preduce
               exact pcongDOT _ _ c (pcongDOT _ _ "φ" preduce)
-    | @papp_c lt lt' lu lu' c _ l preduce_t preduce_u eq lookup_eq => sorry
+    | @papp_c lt lt' lu lu' c _ l preduce_t preduce_u eq lookup_eq => by
+        let preduce_t' := half_diamond preduce_t
+        let preduce_u' := half_diamond preduce_u
+        generalize h : complete_development lt = foo
+        simp [eq, h] at preduce_t'
+        cases preduce_t' with
+          | pcongOBJ _ newAttrs premise =>
+              simp [complete_development, h]
+              let lookup_void
+                := lookup_void_premise lookup_eq premise
+              simp [lookup_void]
+              -- need to turn x ⇛ y into incLocators x ⇛ incLocators y
+              exact pcongOBJ _ _ (singlePremiseInsert sorry premise)
