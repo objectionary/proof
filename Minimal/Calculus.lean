@@ -1756,3 +1756,39 @@ def half_diamond
               simp [lookup_void]
               -- need to turn x ⇛ y into incLocators x ⇛ incLocators y
               exact pcongOBJ _ _ (singlePremiseInsert sorry premise)
+
+inductive BothPReduce : Term → Term → Term → Type where
+  | reduce : { u v w : Term } → (u ⇛ w) → (v ⇛ w) → BothPReduce u v w
+
+inductive BothPReduceClosure : Term → Term → Term → Type where
+  | reduce : { u v w : Term } → (u ⇛* w) → (v ⇛* w) → BothPReduceClosure u v w
+
+inductive BothReduceTo : Term → Term → Term → Type where
+  | reduce : { u v w : Term } → (u ⇝ w) → (v ⇝ w) → BothReduceTo u v w
+-- inductive BothReduceGeneric (f : Term → Term → Type) : Term → Term → Term → Type where
+--   | reduce : { u v w : Term } → (f : Term → Term → Type) → (f u w) → (f v w) → BothReduceClosure f u v w
+
+def diamond_preduce
+  { t u v : Term }
+  : (t ⇛ u)
+  → (t ⇛ v)
+  -- → ∃ w : Term, (u ⇛ w, v ⇛ w)
+  → Σ w : Term, BothPReduce u v w
+  := λ tu tv =>
+    ⟨ complete_development t
+    , BothPReduce.reduce (half_diamond tu) (half_diamond tv)
+    ⟩
+
+def confluence_preduce
+  { t u v : Term }
+  : (t ⇛* u)
+  → (t ⇛* v)
+  → Σ w : Term, BothPReduceClosure u v w
+  := λ tu tv => match tu, tv with
+    -- | ParMany.nil, ParMany.nil => ⟨t, BothPReduceClosure.reduce ParMany.nil ParMany.nil⟩
+    | ParMany.nil, tv => ⟨v, BothPReduceClosure.reduce tv ParMany.nil⟩
+    | tu, ParMany.nil => ⟨u, BothPReduceClosure.reduce ParMany.nil tu⟩
+    | @ParMany.cons _ u' _ preduce_u tail_u, @ParMany.cons _ v' _ preduce_v tail_v =>
+      let ⟨t', BothPReduce.reduce u't' v't'⟩ := diamond_preduce preduce_u preduce_v
+      sorry
+      -- ⟨w, _⟩
