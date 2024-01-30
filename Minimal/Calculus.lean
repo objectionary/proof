@@ -611,6 +611,73 @@ def mapAttrList_compose
     | AttrList.cons _ _ u tail => by
       cases u <;> simp [mapAttrList] <;> exact mapAttrList_compose f g tail
 
+def mapAttrList_lookup_attached
+  ( f : Term → Term)
+  { lst : List Attr}
+  { l : AttrList lst}
+  { t_c : Term}
+  { c : Attr}
+  : lookup l c = some (attached t_c) →
+    lookup (mapAttrList f l) c = some (attached (f t_c))
+  := λ lookup_eq => by match l with
+    | AttrList.nil => contradiction
+    | AttrList.cons name _ u tail =>
+      simp [lookup] at *
+      split
+      . rename_i eq
+        simp [eq] at lookup_eq
+        simp [lookup_eq]
+      . rename_i neq
+        simp [neq] at lookup_eq
+        exact mapAttrList_lookup_attached f lookup_eq
+
+def mapAttrList_lookup_void
+  ( f : Term → Term)
+  { lst : List Attr}
+  { l : AttrList lst}
+  { c : Attr}
+  : lookup l c = some void → lookup (mapAttrList f l) c = some void
+  := λ lookup_eq => by match l with
+    | AttrList.nil => contradiction
+    | AttrList.cons name _ u tail =>
+      simp [lookup] at *
+      split
+      . rename_i eq
+        simp [eq] at lookup_eq
+        simp [lookup_eq]
+      . rename_i neq
+        simp [neq] at lookup_eq
+        exact mapAttrList_lookup_void f lookup_eq
+
+def mapAttrList_lookup_none
+  ( f : Term → Term)
+  { lst : List Attr}
+  { l : AttrList lst}
+  { c : Attr}
+  : lookup l c = none →
+    lookup (mapAttrList f l) c = none
+  := λ lookup_eq => by match l with
+    | AttrList.nil => rfl
+    | AttrList.cons name _ u tail =>
+      simp [lookup] at *
+      split
+      . rename_i eq
+        simp [eq] at lookup_eq
+      . rename_i neq
+        simp [neq] at lookup_eq
+        exact mapAttrList_lookup_none f lookup_eq
+
+def substitute_isAttr
+  { u : Term}
+  { i : Nat}
+  { c : Attr}
+  { lst : List Attr}
+  ( l : AttrList lst)
+  : IsAttr c (obj l) → IsAttr c (substitute (i, u) (obj l))
+  | @IsAttr.is_attr lst a _in _ => by
+    simp [substitute]
+    exact @IsAttr.is_attr lst a _in (mapAttrList (substitute (i + 1, incLocators u)) l)
+
 -- A.9 (Increment swap)
 def inc_swap
   ( i j : Nat)
@@ -746,7 +813,7 @@ def subst_swap
               have nlt_kj : ¬ k < j := λ lt_kj => Nat.lt_irrefl k (Nat.lt_trans lt_kj lt_jk)
               simp [substitute, lt_ki1, neq_kj, nlt_kj]
               -- case j < k ≤ i
-            . rename_i nle_k1i
+            . rename_i nlt_k1i
               split
               . rename_i eq_k1i
                 have eq_ki1 : k = i + 1 := by
@@ -756,12 +823,230 @@ def subst_swap
                 simp [substitute, eq_ki1]
                 admit
               . rename_i neq_k1i
-                have nle_ki1 : ¬ k < i + 1 := sorry
-                have neq_ki1 : ¬ k = i + 1 := sorry
+                have lt_ik1: i < k - 1 := Nat.lt_of_le_of_ne (Nat.ge_of_not_lt (nlt_k1i)) (λ x => neq_k1i x.symm)
+                have lt_i1k : i + 1 < k := by
+                  have := Nat.add_lt_add_right lt_ik1 1
+                  simp [Nat.sub_add_cancel le_k1] at this
+                  exact this
+                have nle_ki1 : ¬ k < i + 1 := λ x => Nat.lt_irrefl k (Nat.lt_trans x lt_i1k)
+                have neq_ki1 : ¬ k = i + 1 := λ x => Nat.lt_irrefl k (x ▸ lt_i1k)
                 simp [substitute, nle_ki1, neq_ki1]
-                have nlt : ¬ k - 1 < j := sorry
-                have neq : ¬ k - 1 = j := sorry
-                simp [nlt, neq]
-    | dot s a => sorry
-    | app s₁ a s₂ => sorry
-    | obj o => sorry
+                have nlt_k1j : ¬ k - 1 < j := λ x => Nat.lt_irrefl j
+                  (Nat.lt_trans (Nat.lt_of_le_of_lt le_ji lt_ik1) x)
+                have neq : ¬ k - 1 = j := λ x => Nat.lt_irrefl j
+                  (Nat.lt_of_le_of_lt le_ji (x ▸ lt_ik1))
+                simp [nlt_k1j, neq]
+    | dot s a => by
+      simp [substitute]
+      apply subst_swap _ _ le_ji
+    | app s₁ a s₂ => by
+      simp [substitute]
+      constructor <;> apply subst_swap _ _ le_ji
+    | obj o => by
+      simp [substitute]
+      simp [mapAttrList_compose]
+      let rec traverse_bindings
+      { lst : List Attr}
+      ( bindings : AttrList lst)
+      : mapAttrList (fun t => substitute (i + 1, incLocators v) (substitute (j + 1, incLocators u) t)) bindings = mapAttrList (fun t =>
+      substitute (j + 1, incLocators (substitute (i, v) u)) (substitute (i + 1 + 1, incLocators (incLocators v)) t)) bindings
+      := by match bindings with
+        | AttrList.nil =>
+          simp [mapAttrList]
+        | AttrList.cons _ _ u tail =>
+          simp [mapAttrList]
+          split
+          . constructor
+            . rfl
+            . exact traverse_bindings tail
+          . constructor
+            . rename_i term
+              have ih := subst_swap (i+1) (j+1) (Nat.add_le_add_right le_ji 1) term (incLocators u) (incLocators v)
+              rw [incLocators] at ih
+              simp [subst_inc_swap] at ih
+              rw [← incLocators] at ih
+              exact congrArg attached ih
+            . exact traverse_bindings tail
+      exact traverse_bindings o
+      decreasing_by sorry
+
+def preduce_incLocatorsFrom
+  { t t' : Term}
+  ( i : Nat)
+  : ( t ⇛ t') → (incLocatorsFrom i t ⇛ incLocatorsFrom i t')
+  | pcongOBJ l l' premise => sorry
+  | pcong_ρ n =>  prefl (incLocatorsFrom i (loc n))
+  | pcongAPP t t' u u' a tt' uu' => by
+    simp [incLocatorsFrom]
+    apply pcongAPP
+    . exact preduce_incLocatorsFrom i tt'
+    . exact preduce_incLocatorsFrom i uu'
+  | pcongDOT t t' a tt' => by
+    simp [incLocatorsFrom]
+    apply pcongDOT
+    exact preduce_incLocatorsFrom i tt'
+  | @pdot_c s s' t_c c lst l ss' eq lookup_eq => by
+    simp [incLocatorsFrom]
+    have := @pdot_c
+      (incLocatorsFrom i s)
+      (incLocatorsFrom i s')
+      _
+      c
+      lst
+      (mapAttrList (incLocatorsFrom (i+1)) l)
+      (preduce_incLocatorsFrom i ss')
+      (by simp [eq, incLocatorsFrom])
+      (mapAttrList_lookup_attached (incLocatorsFrom (i + 1)) lookup_eq)
+    admit
+  | @pdot_cφ s s' c lst l ss' eq lookup_eq is_attr => sorry
+  | @papp_c s s' v v' c lst l ss' vv' eq lookup_eq => sorry
+
+def subst_insert_swap
+  { i : Nat }
+  { c : Attr }
+  { lst : List Attr }
+  { l : AttrList lst }
+  { u v : Term}
+  : (insert (mapAttrList (substitute (i + 1, incLocators u)) l) c (attached (incLocators (substitute (i, u) v)))) =
+  (mapAttrList (substitute (i + 1, incLocators u)) (insert l c (attached (incLocators v))))
+  := match l with
+  | AttrList.nil => by
+    simp [insert, mapAttrList]
+  | AttrList.cons a not_in op_attr tail => by
+    simp [insert]
+    split
+    . rw [incLocators]
+      simp [← subst_inc_swap]
+      rw [mapAttrList]
+    . split <;> simp [mapAttrList] <;> exact subst_insert_swap
+
+def substitution_lemma
+  ( i : Nat )
+  { t t' u u' : Term }
+  (tt' : t ⇛ t')
+  (uu' : u ⇛ u')
+  : substitute (i, u) t ⇛ substitute (i, u') t'
+  := match tt' with
+    | @pcongOBJ attrs bnds bnds' premise =>
+      let rec fold_premise
+      { lst : List Attr }
+      { al al' : AttrList lst }
+      (premise : Premise al al')
+      : substitute (i, u) (obj al) ⇛ substitute (i, u') (obj al')
+      := match lst with
+        | [] => match al, al' with
+          | AttrList.nil, AttrList.nil => by
+            simp [substitute, mapAttrList]
+            exact prefl (obj AttrList.nil)
+        | a :: as => match al, al' with
+          | AttrList.cons _ not_in op_attr tail, AttrList.cons _ _ op_attr' tail' => match premise with
+            | Premise.consVoid _ premiseTail => by
+              simp [substitute, mapAttrList]
+              have h := fold_premise premiseTail
+              simp [substitute] at h
+              match h with
+                | PReduce.pcongOBJ _ _ subst_premise =>
+                  exact PReduce.pcongOBJ _ _ (Premise.consVoid a subst_premise)
+            | @Premise.consAttached _ t1 t2 preduce_t1_t2 _ l1 l2 not_in premiseTail => by
+              simp [substitute, mapAttrList]
+              have h1 := substitution_lemma (i + 1) preduce_t1_t2 (preduce_incLocatorsFrom 0 uu')
+              have h2 := fold_premise premiseTail
+              simp [substitute] at h2
+              match h2 with
+                | PReduce.pcongOBJ _ _ subst_premise =>
+                  have premise := @Premise.consAttached
+                    a
+                    (substitute (i + 1, incLocators u) t1)
+                    (substitute (i + 1, incLocators u') t2)
+                    h1
+                    as
+                    (mapAttrList (substitute (i + 1, incLocators u)) l1)
+                    (mapAttrList (substitute (i + 1, incLocators u')) l2)
+                    not_in
+                    subst_premise
+                  exact PReduce.pcongOBJ _ _ premise
+      fold_premise premise
+    | pcong_ρ n => by
+        simp [substitute]
+        exact dite (n < i)
+          (λ less => by
+            simp [less]
+            exact pcong_ρ n
+          )
+          (λ not_less =>
+            dite (n = i)
+              (λ eq => by
+                have obvious : ¬ i < i := Nat.lt_irrefl i
+                simp [not_less, eq, obvious]
+                exact uu'
+              )
+              (λ not_eq => by
+                simp [not_less, not_eq]
+                exact pcong_ρ (n - 1)
+              )
+          )
+    | pcongDOT lt lt' a preduce => by
+        simp [substitute]
+        exact pcongDOT
+          (substitute (i, u) lt)
+          (substitute (i, u') lt')
+          a
+          (substitution_lemma i preduce uu')
+    | pcongAPP lt lt' lu lu' a preduce_t preduce_u => by
+        simp [substitute]
+        exact pcongAPP
+          (substitute (i, u) lt)
+          (substitute (i, u') lt')
+          (substitute (i, u) lu)
+          (substitute (i, u') lu')
+          a
+          (substitution_lemma i preduce_t uu')
+          (substitution_lemma i preduce_u uu')
+    | @pdot_c s s' t_c c lst l ss' eq lookup_eq => by
+      have ih := substitution_lemma i ss' uu'
+      have dot_subst : dot (substitute (i, u) s) c ⇛
+        substitute (0, substitute (i, u') s') (substitute (i+1, incLocators u') t_c)
+        := @PReduce.pdot_c
+          (substitute (i, u) s)
+          (substitute (i, u') s')
+          (substitute (i+1, incLocators u') t_c)
+          c
+          lst
+          (mapAttrList (substitute (i+1, incLocators u')) l)
+          (substitution_lemma i ss' uu')
+          (by rw [eq, substitute])
+          (mapAttrList_lookup_attached (substitute (i + 1, incLocators u')) lookup_eq)
+      simp [← subst_swap] at dot_subst
+      simp [substitute]
+      exact dot_subst
+    | @pdot_cφ s s' c lst l ss' eq lookup_eq is_attr => by
+      simp [eq] at is_attr
+      have is_attr': IsAttr "φ" (substitute (i, u') (obj l))
+        := substitute_isAttr l is_attr
+      rw [← eq] at is_attr'
+      simp [substitute]
+      exact @pdot_cφ
+        (substitute (i, u) s)
+        (substitute (i, u') s')
+        c
+        lst
+        (mapAttrList (substitute (i+1, incLocators u')) l)
+        (substitution_lemma i ss' uu')
+        (by rw [eq, substitute])
+        (mapAttrList_lookup_none (substitute (i + 1, incLocators u')) lookup_eq)
+        (is_attr')
+    | @papp_c s s' v v' c lst l ss' vv' eq lookup_eq => by
+      simp [substitute]
+      rw [← subst_insert_swap]
+      exact @papp_c
+        (substitute (i, u) s)
+        (substitute (i, u') s')
+        (substitute (i, u) v)
+        (substitute (i, u') v')
+        c
+        lst
+        (mapAttrList (substitute (i+1, incLocators u')) l)
+        (substitution_lemma i ss' uu')
+        (substitution_lemma i vv' uu')
+        (by rw [eq, substitute])
+        (mapAttrList_lookup_void (substitute (i + 1, incLocators u')) lookup_eq)
