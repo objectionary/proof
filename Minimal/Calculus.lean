@@ -874,7 +874,31 @@ def preduce_incLocatorsFrom
   { t t' : Term}
   ( i : Nat)
   : ( t ⇛ t') → (incLocatorsFrom i t ⇛ incLocatorsFrom i t')
-  | pcongOBJ l l' premise => sorry
+  | pcongOBJ bnds bnds' premise => by
+    simp [incLocatorsFrom]
+    let rec make_premise
+      { lst : List Attr }
+      { bnds bnds' : AttrList lst }
+      (premise : Premise bnds bnds')
+      : Premise (mapAttrList (incLocatorsFrom (i + 1)) bnds) (mapAttrList (incLocatorsFrom (i + 1)) bnds')
+      := match lst with
+        | [] => match bnds, bnds' with
+          | AttrList.nil, AttrList.nil => by
+            simp [mapAttrList]
+            exact Premise.nil
+        | a :: as => match premise with
+          | Premise.consVoid a tail => by
+            simp [mapAttrList]
+            exact Premise.consVoid a (make_premise tail)
+          | Premise.consAttached a t1 t2 preduce tail => by
+            simp [mapAttrList]
+            exact Premise.consAttached
+              a
+              _
+              _
+              (preduce_incLocatorsFrom (i+1) preduce)
+              (make_premise tail)
+    exact pcongOBJ _ _ (make_premise premise)
   | pcong_ρ n =>  prefl (incLocatorsFrom i (loc n))
   | pcongAPP t t' u u' a tt' uu' => by
     simp [incLocatorsFrom]
