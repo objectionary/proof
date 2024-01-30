@@ -1636,6 +1636,7 @@ def term_to_development
           (mapAttrList complete_development bnds)
           (make_premise bnds)
 
+-- [KS 2022, Proposition 3.8]
 def half_diamond
   { t t' : Term }
   (preduce : PReduce t t')
@@ -1772,12 +1773,37 @@ def diamond_preduce
   { t u v : Term }
   : (t ⇛ u)
   → (t ⇛ v)
-  -- → ∃ w : Term, (u ⇛ w, v ⇛ w)
   → Σ w : Term, BothPReduce u v w
   := λ tu tv =>
     ⟨ complete_development t
     , BothPReduce.reduce (half_diamond tu) (half_diamond tv)
     ⟩
+
+inductive PReduceClosureStep : Term → Term → Term → Type where
+  | step
+    : { v u' vv : Term }
+    → (u' ⇛* vv)
+    → (v ⇛ vv)
+    → PReduceClosureStep v u' vv
+
+def confluence_step
+  { t u' v v' : Term }
+  : (t ⇛ u')
+  → (t ⇛ v')
+  → (v' ⇛* v)
+  → Σ vv : Term, PReduceClosureStep v u' vv
+  := λ tu tv v_clos =>
+    let ⟨t', BothPReduce.reduce u't' v't'⟩ := diamond_preduce tu tv
+    match v_clos with
+    | ParMany.nil =>
+      ⟨ t'
+      , PReduceClosureStep.step (ParMany.cons u't' ParMany.nil) v't'
+      ⟩
+    | @ParMany.cons _ _v'' _ v'_to_v'' tail =>
+      let ⟨vv, PReduceClosureStep.step t'_to_vv v_to_vv⟩ := confluence_step v't' v'_to_v'' tail
+      ⟨ vv
+      , PReduceClosureStep.step (ParMany.cons u't' t'_to_vv) v_to_vv
+      ⟩
 
 def confluence_preduce
   { t u v : Term }
@@ -1785,10 +1811,9 @@ def confluence_preduce
   → (t ⇛* v)
   → Σ w : Term, BothPReduceClosure u v w
   := λ tu tv => match tu, tv with
-    -- | ParMany.nil, ParMany.nil => ⟨t, BothPReduceClosure.reduce ParMany.nil ParMany.nil⟩
     | ParMany.nil, tv => ⟨v, BothPReduceClosure.reduce tv ParMany.nil⟩
     | tu, ParMany.nil => ⟨u, BothPReduceClosure.reduce ParMany.nil tu⟩
-    | @ParMany.cons _ u' _ preduce_u tail_u, @ParMany.cons _ v' _ preduce_v tail_v =>
-      let ⟨t', BothPReduce.reduce u't' v't'⟩ := diamond_preduce preduce_u preduce_v
-      sorry
-      -- ⟨w, _⟩
+    | @ParMany.cons _ _u' _ tu' tail_u, @ParMany.cons _ _v' _ tv' tail_v =>
+      let ⟨_vv, PReduceClosureStep.step u'vv v_to_vv⟩ := confluence_step tu' tv' tail_v
+      let ⟨w, BothPReduceClosure.reduce uw vvw⟩ := confluence_preduce tail_u u'vv
+      ⟨w, BothPReduceClosure.reduce uw (ParMany.cons v_to_vv vvw)⟩
