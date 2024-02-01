@@ -722,6 +722,82 @@ def le_min_option
   | none, some n => simp [le_nat_option_nat] at * ; assumption
   | none, none   => simp [le_nat_option_nat] at *
 
+def le_min_option_reverse
+  { j : Nat}
+  { option_n1 option_n2 : Option Nat}
+  ( le_and : le_nat_option_nat j option_n1 ∧ le_nat_option_nat j option_n2)
+  : le_nat_option_nat j (min option_n1 option_n2) := by
+  match option_n1, option_n2 with
+  | some n1, some n2 =>
+    simp [le_nat_option_nat] at *
+    simp [Nat.min_def]
+    split
+    . exact le_and.left
+    . exact le_and.right
+  | some n, none => simp [le_nat_option_nat] at * ; assumption
+  | none, some n => simp [le_nat_option_nat] at * ; assumption
+  | none, none   => simp [le_nat_option_nat] at *
+
+def min_free_loc_inc
+  { i j : Nat}
+  { v : Term}
+  ( free_locs_v : le_nat_option_nat i (min_free_loc j v))
+  : le_nat_option_nat (i + 1) (min_free_loc j (incLocatorsFrom j v)) := by
+  match v with
+  | loc k =>
+    simp [incLocatorsFrom]
+    split
+    . rename_i lt_kj
+      simp [min_free_loc, lt_kj]
+      simp [le_nat_option_nat]
+    . rename_i nlt_kj
+      simp [min_free_loc, nlt_kj, le_nat_option_nat] at free_locs_v
+      simp [min_free_loc]
+      have le_jk : j ≤ k := Nat.ge_of_not_lt nlt_kj
+      have le_jk1 : j ≤ k+1 := Nat.le_succ_of_le le_jk
+      have nlt_k1j : ¬ k + 1 < j := λ x => Nat.lt_irrefl j (Nat.lt_of_le_of_lt le_jk1 x)
+      simp [le_nat_option_nat, nlt_k1j]
+      have zzz : (i + j) + 1 ≤ k + 1 := Nat.succ_le_succ (Nat.add_le_of_le_sub le_jk free_locs_v)
+      rw [Nat.add_right_comm] at zzz
+      exact Nat.le_sub_of_add_le zzz
+  | dot t _ =>
+    simp [incLocatorsFrom]
+    simp [min_free_loc] at *
+    apply min_free_loc_inc free_locs_v
+  | app t _ u =>
+    simp [incLocatorsFrom, min_free_loc]
+    apply le_min_option_reverse
+    simp [min_free_loc] at free_locs_v
+    have free_locs_v := le_min_option free_locs_v
+    constructor <;> simp [min_free_loc] at *
+    . exact min_free_loc_inc free_locs_v.left
+    . exact min_free_loc_inc free_locs_v.right
+  | obj o =>
+    simp [incLocatorsFrom]
+    let rec traverse_bindings
+    { lst : List Attr}
+    ( bindings : AttrList lst)
+    ( free_locs : le_nat_option_nat i (min_free_loc j (obj bindings)))
+    : le_nat_option_nat (i + 1) (min_free_loc j (obj (mapAttrList (incLocatorsFrom (j + 1)) bindings)))
+    := by match bindings with
+      | AttrList.nil =>
+        simp [mapAttrList]
+        simp [min_free_loc, le_nat_option_nat]
+      | AttrList.cons _ _ void tail =>
+        simp [mapAttrList, min_free_loc]
+        exact traverse_bindings tail (by simp [min_free_loc] at free_locs ; exact free_locs)
+      | AttrList.cons _ _ (attached term) tail =>
+        simp [mapAttrList, min_free_loc]
+        apply le_min_option_reverse
+        constructor
+        . simp [min_free_loc] at free_locs
+          have free_locs := (le_min_option free_locs).left
+          exact min_free_loc_inc free_locs
+        . simp [min_free_loc] at free_locs
+          have free_locs := le_min_option free_locs
+          exact traverse_bindings tail free_locs.right
+    exact traverse_bindings o free_locs_v
+
 -- zeroth_level -- c какого момента включительно начинаются свободные локаторы
 -- min_free_loc zeroth_level v -- самый маленький свободный локатор в v, учитывая что свободными мы считаем локаторы которые начинаются с zeroth_level
 def subst_inc_cancel
@@ -956,6 +1032,7 @@ def subst_swap
   ( i j : Nat)
   ( le_ji : j ≤ i)
   ( t u v : Term)
+  ( free_locs_v : le_nat_option_nat i (min_free_loc 0 v))
   : substitute (i, v) (substitute (j, u) t) =
     substitute (j, substitute (i, v) u) (substitute (i+1, incLocators v) t)
   := match t with
@@ -1005,7 +1082,7 @@ def subst_swap
                   (Nat.zero_le i)
                   (Nat.zero_le j)
                   (Nat.zero_le 0)
-                  sorry
+                  free_locs_v
               . rename_i neq_k1i
                 have lt_ik1: i < k - 1 := Nat.lt_of_le_of_ne (Nat.ge_of_not_lt (nlt_k1i)) (λ x => neq_k1i x.symm)
                 have lt_i1k : i + 1 < k := by
@@ -1022,10 +1099,10 @@ def subst_swap
                 simp [nlt_k1j, neq]
     | dot s a => by
       simp [substitute]
-      apply subst_swap _ _ le_ji
+      apply subst_swap _ _ le_ji _ _ _ free_locs_v
     | app s₁ a s₂ => by
       simp [substitute]
-      constructor <;> apply subst_swap _ _ le_ji
+      constructor <;> apply subst_swap _ _ le_ji _ _ _ free_locs_v
     | obj o => by
       simp [substitute]
       simp [mapAttrList_compose]
@@ -1045,14 +1122,20 @@ def subst_swap
             . exact traverse_bindings tail
           . constructor
             . rename_i term
-              have ih := subst_swap (i+1) (j+1) (Nat.add_le_add_right le_ji 1) term (incLocators u) (incLocators v)
+              simp
+              have ih := subst_swap
+                (i+1)
+                (j+1)
+                (Nat.add_le_add_right le_ji 1)
+                term (incLocators u) (incLocators v)
+                (min_free_loc_inc free_locs_v)
               rw [incLocators] at ih
               simp [subst_inc_swap] at ih
               rw [← incLocators] at ih
-              exact congrArg attached ih
+              exact ih
             . exact traverse_bindings tail
       exact traverse_bindings o
-      decreasing_by sorry
+decreasing_by sorry
 
 def mapAttrList_subst_insert
   { i : Nat }
@@ -1184,6 +1267,7 @@ def substitution_lemma
   { t t' u u' : Term }
   (tt' : t ⇛ t')
   (uu' : u ⇛ u')
+  (min_free_locs_u' : le_nat_option_nat i (min_free_loc 0 u'))
   : substitute (i, u) t ⇛ substitute (i, u') t'
   := match tt' with
     | @pcongOBJ attrs bnds bnds' premise =>
@@ -1208,7 +1292,7 @@ def substitution_lemma
                   exact PReduce.pcongOBJ _ _ (Premise.consVoid a subst_premise)
             | @Premise.consAttached _ t1 t2 preduce_t1_t2 _ l1 l2 not_in premiseTail => by
               simp [substitute, mapAttrList]
-              have h1 := substitution_lemma (i + 1) preduce_t1_t2 (preduce_incLocatorsFrom 0 uu')
+              have h1 := substitution_lemma (i + 1) preduce_t1_t2 (preduce_incLocatorsFrom 0 uu') (by rw [← incLocators] ; exact min_free_loc_inc min_free_locs_u')
               have h2 := fold_premise premiseTail
               simp [substitute] at h2
               match h2 with
@@ -1250,7 +1334,7 @@ def substitution_lemma
           (substitute (i, u) lt)
           (substitute (i, u') lt')
           a
-          (substitution_lemma i preduce uu')
+          (substitution_lemma i preduce uu' (by assumption))
     | pcongAPP lt lt' lu lu' a preduce_t preduce_u => by
         simp [substitute]
         exact pcongAPP
@@ -1259,8 +1343,8 @@ def substitution_lemma
           (substitute (i, u) lu)
           (substitute (i, u') lu')
           a
-          (substitution_lemma i preduce_t uu')
-          (substitution_lemma i preduce_u uu')
+          (substitution_lemma i preduce_t uu' (by assumption))
+          (substitution_lemma i preduce_u uu' (by assumption))
     | @pdot_c s s' t_c c lst l ss' eq lookup_eq => by
       have ih := substitution_lemma i ss' uu'
       have dot_subst : dot (substitute (i, u) s) c ⇛
@@ -1272,10 +1356,11 @@ def substitution_lemma
           c
           lst
           (mapAttrList (substitute (i+1, incLocators u')) l)
-          (substitution_lemma i ss' uu')
+          (substitution_lemma i ss' uu' (by assumption))
           (by rw [eq, substitute])
           (mapAttrList_lookup_attached (substitute (i + 1, incLocators u')) lookup_eq)
-      simp [← subst_swap] at dot_subst
+      have : substitute (0, substitute (i, u') s') (substitute (i + 1, incLocators u') t_c) = substitute (i, u') (substitute (0, s') t_c) := (subst_swap i 0 (Nat.zero_le i) t_c s' u' ((by assumption))).symm
+      simp [this] at dot_subst
       simp [substitute]
       exact dot_subst
     | @pdot_cφ s s' c lst l ss' eq lookup_eq is_attr => by
@@ -1291,7 +1376,7 @@ def substitution_lemma
         c
         lst
         (mapAttrList (substitute (i+1, incLocators u')) l)
-        (substitution_lemma i ss' uu')
+        (substitution_lemma i ss' uu' (by assumption))
         (by rw [eq, substitute])
         (mapAttrList_lookup_none (substitute (i + 1, incLocators u')) lookup_eq)
         (is_attr')
@@ -1306,8 +1391,8 @@ def substitution_lemma
         c
         lst
         (mapAttrList (substitute (i+1, incLocators u')) l)
-        (substitution_lemma i ss' uu')
-        (substitution_lemma i vv' uu')
+        (substitution_lemma i ss' uu' (by assumption))
+        (substitution_lemma i vv' uu' ((by assumption)))
         (by rw [eq, substitute])
         (mapAttrList_lookup_void (substitute (i + 1, incLocators u')) lookup_eq)
 decreasing_by sorry
