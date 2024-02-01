@@ -385,6 +385,7 @@ namespace PReduce
         → PReduce (app t c u) (obj (insert l c (attached (incLocators u'))))
   end
 
+-- [KS22, Proposition 3.3 (Reflexivity of parallel reduction)]
   mutual
     def reflexivePremise
       { lst : List Attr }
@@ -448,6 +449,7 @@ scoped infix:20 " ⇛ " => PReduce
 scoped infix:20 " ⇝* " => RedMany
 scoped infix:20 " ⇛* " => ParMany
 
+-- [KS22, Proposition 3.4 (1), Eqivalence of ⇛ and ⇝]
 def reg_to_par {t t' : Term} : (t ⇝ t') → (t ⇛ t')
   | .congOBJ b l red isAttached =>
       .pcongOBJ
@@ -467,6 +469,7 @@ def reg_to_par {t t' : Term} : (t ⇝ t') → (t ⇛ t')
   | Reduce.app_c t u c l eq lookup_eq =>
       PReduce.papp_c c l (prefl t) (prefl u) eq lookup_eq
 
+-- [KS22, Lemma A.3 (Transitivity of ⇝*)]
 def red_trans { t t' t'' : Term } : (t ⇝* t') → (t' ⇝* t'') → (t ⇝* t'')
   | RedMany.nil, reds => reds
   | RedMany.cons lm mn_many, reds => RedMany.cons lm (red_trans mn_many reds)
@@ -504,6 +507,7 @@ def mapRedManyObj
           assumption
       (RedMany.cons one_step (mapRedManyObj _ _ reds))
 
+-- [KS22, Lemma A.4 (1), Congruence for ⇝* in OBJ]
 def congOBJClos
   { t t' : Term }
   { b : Attr }
@@ -522,6 +526,7 @@ def congOBJClos
         (Eq.ndrec ind_hypothesis
         (congrArg obj (Insert.insertTwice l b t' t_i)))
 
+-- [KS22, Lemma A.4 (2), Congruence for ⇝* in DOT]
 def congDotClos
   { t t' : Term }
   { a : Attr }
@@ -530,6 +535,7 @@ def congDotClos
   | @RedMany.cons l m n lm mn_many =>
     RedMany.cons (congDOT l m a lm) (congDotClos mn_many)
 
+-- [KS22, Lemma A.4 (3), Congruence for ⇝* in APPₗ]
 def congAPPₗClos
   { t t' u : Term }
   { a : Attr }
@@ -538,6 +544,7 @@ def congAPPₗClos
   | @RedMany.cons l m n lm mn_many =>
     RedMany.cons (congAPPₗ l m u a lm) (congAPPₗClos mn_many)
 
+-- [KS22, Lemma A.4 (4), Congruence for ⇝* in APPᵣ]
 def congAPPᵣClos
   { t u u' : Term }
   { a : Attr }
@@ -546,6 +553,7 @@ def congAPPᵣClos
   | @RedMany.cons l m n lm mn_many =>
     RedMany.cons (congAPPᵣ t l m a lm) (congAPPᵣClos mn_many)
 
+-- [KS22, Proposition 3.4 (3), Eqivalence of ⇛ and ⇝]
 def par_to_redMany {t t' : Term} : (t ⇛ t') → (t ⇝* t')
   | @PReduce.pcongOBJ lst l l' premise =>
     let rec fold_premise
@@ -591,90 +599,94 @@ def par_to_redMany {t t' : Term} : (t ⇛ t') → (t ⇝* t')
     let tu_app_clos := RedMany.cons tu_app RedMany.nil
     red_trans tu_t'u'_many tu_app_clos
 
+-- [KS22, Proposition 3.4 (4), Eqivalence of ⇛ and ⇝]
 def parMany_to_redMany {t t' : Term} : (t ⇛* t') → (t ⇝* t')
   | ParMany.nil => RedMany.nil
   | ParMany.cons red reds => red_trans (par_to_redMany red) (parMany_to_redMany reds)
 
+-- [KS22, Proposition 3.4 (2), Eqivalence of ⇛ and ⇝]
 def redMany_to_parMany {t t' : Term} : (t ⇝* t') → (t ⇛* t')
   | RedMany.nil => ParMany.nil
   | RedMany.cons red reds => ParMany.cons (reg_to_par red) (redMany_to_parMany reds)
 
 -------------------------------------------------------
+-- properties of mapAttrList
+namespace MapAttrList
+  def mapAttrList_compose
+    (f g : Term → Term )
+    { lst : List Attr }
+    ( l : AttrList lst)
+    : mapAttrList f (mapAttrList g l) = mapAttrList (λ t => f (g t)) l
+    := match l with
+      | AttrList.nil => rfl
+      | AttrList.cons _ _ u tail => by
+        cases u <;> simp [mapAttrList] <;> exact mapAttrList_compose f g tail
 
-def mapAttrList_compose
-  (f g : Term → Term )
-  { lst : List Attr }
-  ( l : AttrList lst)
-  : mapAttrList f (mapAttrList g l) = mapAttrList (λ t => f (g t)) l
-  := match l with
-    | AttrList.nil => rfl
-    | AttrList.cons _ _ u tail => by
-      cases u <;> simp [mapAttrList] <;> exact mapAttrList_compose f g tail
+  def mapAttrList_lookup_attached
+    ( f : Term → Term)
+    { lst : List Attr}
+    { l : AttrList lst}
+    { t_c : Term}
+    { c : Attr}
+    : lookup l c = some (attached t_c) →
+      lookup (mapAttrList f l) c = some (attached (f t_c))
+    := λ lookup_eq => by match l with
+      | AttrList.nil => contradiction
+      | AttrList.cons name _ u tail =>
+        simp [lookup] at *
+        split
+        . rename_i eq
+          simp [eq] at lookup_eq
+          simp [lookup_eq]
+        . rename_i neq
+          simp [neq] at lookup_eq
+          exact mapAttrList_lookup_attached f lookup_eq
 
-def mapAttrList_lookup_attached
-  ( f : Term → Term)
-  { lst : List Attr}
-  { l : AttrList lst}
-  { t_c : Term}
-  { c : Attr}
-  : lookup l c = some (attached t_c) →
-    lookup (mapAttrList f l) c = some (attached (f t_c))
-  := λ lookup_eq => by match l with
-    | AttrList.nil => contradiction
-    | AttrList.cons name _ u tail =>
-      simp [lookup] at *
-      split
-      . rename_i eq
-        simp [eq] at lookup_eq
-        simp [lookup_eq]
-      . rename_i neq
-        simp [neq] at lookup_eq
-        exact mapAttrList_lookup_attached f lookup_eq
+  def mapAttrList_lookup_void
+    ( f : Term → Term)
+    { lst : List Attr}
+    { l : AttrList lst}
+    { c : Attr}
+    : lookup l c = some void → lookup (mapAttrList f l) c = some void
+    := λ lookup_eq => by match l with
+      | AttrList.nil => contradiction
+      | AttrList.cons name _ u tail =>
+        simp [lookup] at *
+        split
+        . rename_i eq
+          simp [eq] at lookup_eq
+          simp [lookup_eq]
+        . rename_i neq
+          simp [neq] at lookup_eq
+          exact mapAttrList_lookup_void f lookup_eq
 
-def mapAttrList_lookup_void
-  ( f : Term → Term)
-  { lst : List Attr}
-  { l : AttrList lst}
-  { c : Attr}
-  : lookup l c = some void → lookup (mapAttrList f l) c = some void
-  := λ lookup_eq => by match l with
-    | AttrList.nil => contradiction
-    | AttrList.cons name _ u tail =>
-      simp [lookup] at *
-      split
-      . rename_i eq
-        simp [eq] at lookup_eq
-        simp [lookup_eq]
-      . rename_i neq
-        simp [neq] at lookup_eq
-        exact mapAttrList_lookup_void f lookup_eq
+  def mapAttrList_lookup_none
+    ( f : Term → Term)
+    { lst : List Attr}
+    { l : AttrList lst}
+    { c : Attr}
+    : lookup l c = none →
+      lookup (mapAttrList f l) c = none
+    := λ lookup_eq => by match l with
+      | AttrList.nil => rfl
+      | AttrList.cons name _ u tail =>
+        simp [lookup] at *
+        split
+        . rename_i eq
+          simp [eq] at lookup_eq
+        . rename_i neq
+          simp [neq] at lookup_eq
+          exact mapAttrList_lookup_none f lookup_eq
 
-def mapAttrList_lookup_none
-  ( f : Term → Term)
-  { lst : List Attr}
-  { l : AttrList lst}
-  { c : Attr}
-  : lookup l c = none →
-    lookup (mapAttrList f l) c = none
-  := λ lookup_eq => by match l with
-    | AttrList.nil => rfl
-    | AttrList.cons name _ u tail =>
-      simp [lookup] at *
-      split
-      . rename_i eq
-        simp [eq] at lookup_eq
-      . rename_i neq
-        simp [neq] at lookup_eq
-        exact mapAttrList_lookup_none f lookup_eq
-
-def mapAttrList_isAttr
-  ( c : Attr)
-  { lst : List Attr}
-  ( l : AttrList lst)
-  ( f : Term → Term)
-  : IsAttr c (obj l) → IsAttr c (obj (mapAttrList f l))
-  | @IsAttr.is_attr lst a _in _ => by
-    exact @IsAttr.is_attr lst a _in (mapAttrList f l)
+  def mapAttrList_isAttr
+    ( c : Attr)
+    { lst : List Attr}
+    ( l : AttrList lst)
+    ( f : Term → Term)
+    : IsAttr c (obj l) → IsAttr c (obj (mapAttrList f l))
+    | @IsAttr.is_attr lst a _in _ => by
+      exact @IsAttr.is_attr lst a _in (mapAttrList f l)
+end MapAttrList
 
 instance : Min (Option Nat) where
   min
@@ -683,6 +695,7 @@ instance : Min (Option Nat) where
   | none, some k => some k
   | none, none => none
 
+-- Definition. Minimal free locator in a term, if free locators exist, if we consider free locators start at `zeroth_level`.
 def min_free_loc
   (zeroth_level : Nat)
   : Term → Option Nat
@@ -738,6 +751,7 @@ def le_min_option_reverse
   | none, some n => simp [le_nat_option_nat] at * ; assumption
   | none, none   => simp [le_nat_option_nat] at *
 
+-- IncLocatorsFrom increments minimal free locator if it acts only on free locators
 def min_free_loc_inc
   { i j : Nat}
   { v : Term}
@@ -798,8 +812,7 @@ def min_free_loc_inc
           exact traverse_bindings tail free_locs.right
     exact traverse_bindings o free_locs_v
 
--- zeroth_level -- c какого момента включительно начинаются свободные локаторы
--- min_free_loc zeroth_level v -- самый маленький свободный локатор в v, учитывая что свободными мы считаем локаторы которые начинаются с zeroth_level
+-- `substitute (j, _)` and `incLocatorsFrom k` cancel each other, if they act free locators
 def subst_inc_cancel
   (v u : Term)
   (j k i zeroth_level : Nat)
@@ -840,7 +853,7 @@ def subst_inc_cancel
     . exact v_loc.left
     . exact v_loc.right
   | obj o => by
-    simp [incLocatorsFrom, substitute, mapAttrList_compose]
+    simp [incLocatorsFrom, substitute, MapAttrList.mapAttrList_compose]
     let rec traverse_bindings
     { lst : List Attr}
     ( bindings : AttrList lst)
@@ -875,7 +888,7 @@ def subst_inc_cancel
     exact traverse_bindings o v_loc
 decreasing_by sorry
 
--- A.9 (Increment swap)
+-- [KS22, Lemma A.9, Increment swap]
 def inc_swap
   ( i j : Nat)
   ( le_ij : i ≤ j)
@@ -911,10 +924,10 @@ def inc_swap
     | obj _ => by
       have ih : (t' : Term) → incLocatorsFrom (i + 1) (incLocatorsFrom (j + 1) t') = incLocatorsFrom (j + 1 + 1) (incLocatorsFrom (i + 1) t') :=
         λ t' => inc_swap (i + 1) (j + 1) (Nat.succ_le_succ le_ij) t'
-      simp [incLocatorsFrom, mapAttrList_compose, ih]
+      simp [incLocatorsFrom, MapAttrList.mapAttrList_compose, ih]
 decreasing_by sorry
 
--- A.8 (Increment and substitution swap)
+-- [KS22, Lemma A.8, Increment and substitution swap]
 def subst_inc_swap
   ( i j : Nat)
   ( le_ji : j ≤ i)
@@ -964,13 +977,14 @@ def subst_inc_swap
     | obj o => by
       have ih := λ t' => subst_inc_swap (i + 1) (j + 1) (Nat.succ_le_succ le_ji) t' (incLocators u)
       have ih_func : (fun t' => substitute (i + 1 + 1, incLocatorsFrom (j + 1) (incLocators u)) (incLocatorsFrom (j + 1) t')) = (fun t' => incLocatorsFrom (j + 1) (substitute (i + 1, (incLocators u)) t')) := funext ih
-      simp [substitute, incLocatorsFrom, mapAttrList_compose]
+      simp [substitute, incLocatorsFrom, MapAttrList.mapAttrList_compose]
       simp [incLocators]
       simp [inc_swap]
       rw [← incLocators]
       simp [ih_func]
 decreasing_by sorry
 
+-- [Increment and substitution swap, dual to A.8]
 def inc_subst_swap
   ( i j : Nat)
   ( le_ji : j ≤ i)
@@ -1020,14 +1034,14 @@ def inc_subst_swap
     | obj o => by
       have ih := λ t' => inc_subst_swap (i + 1) (j + 1) (Nat.succ_le_succ le_ji) t' (incLocators u)
       have ih_func := funext ih
-      simp [substitute, incLocatorsFrom, mapAttrList_compose]
+      simp [substitute, incLocatorsFrom, MapAttrList.mapAttrList_compose]
       simp [incLocators]
       simp [inc_swap]
       rw [← incLocators]
       simp [ih_func]
 decreasing_by sorry
 
--- A.7 (Substitution swap)
+-- [KS22, Lemma A.7, Substitutions swap]
 def subst_swap
   ( i j : Nat)
   ( le_ji : j ≤ i)
@@ -1105,7 +1119,7 @@ def subst_swap
       constructor <;> apply subst_swap _ _ le_ji _ _ _ free_locs_v
     | obj o => by
       simp [substitute]
-      simp [mapAttrList_compose]
+      simp [MapAttrList.mapAttrList_compose]
       let rec traverse_bindings
       { lst : List Attr}
       ( bindings : AttrList lst)
@@ -1137,44 +1151,47 @@ def subst_swap
       exact traverse_bindings o
 decreasing_by sorry
 
-def mapAttrList_subst_insert
-  { i : Nat }
-  { c : Attr }
-  { lst : List Attr }
-  { l : AttrList lst }
-  { u v : Term}
-  : (insert (mapAttrList (substitute (i + 1, incLocators u)) l) c (attached (incLocators (substitute (i, u) v)))) =
-  (mapAttrList (substitute (i + 1, incLocators u)) (insert l c (attached (incLocators v))))
-  := match l with
-  | AttrList.nil => by
-    simp [insert, mapAttrList]
-  | AttrList.cons a not_in op_attr tail => by
-    simp [insert]
-    split
-    . rw [incLocators]
-      simp [← subst_inc_swap]
-      rw [mapAttrList]
-    . split <;> simp [mapAttrList] <;> exact mapAttrList_subst_insert
+namespace MapAttrList
+  def mapAttrList_subst_insert
+    { i : Nat }
+    { c : Attr }
+    { lst : List Attr }
+    { l : AttrList lst }
+    { u v : Term}
+    : (insert (mapAttrList (substitute (i + 1, incLocators u)) l) c (attached (incLocators (substitute (i, u) v)))) =
+    (mapAttrList (substitute (i + 1, incLocators u)) (insert l c (attached (incLocators v))))
+    := match l with
+    | AttrList.nil => by
+      simp [insert, mapAttrList]
+    | AttrList.cons a not_in op_attr tail => by
+      simp [insert]
+      split
+      . rw [incLocators]
+        simp [← subst_inc_swap]
+        rw [mapAttrList]
+      . split <;> simp [mapAttrList] <;> exact mapAttrList_subst_insert
 
-def mapAttrList_inc_insert
-  { i : Nat }
-  { c : Attr }
-  { lst : List Attr }
-  { l : AttrList lst }
-  { v : Term}
-  : (insert (mapAttrList (incLocatorsFrom (i + 1)) l) c (attached (incLocators (incLocatorsFrom i v)))) =
-  (mapAttrList (incLocatorsFrom (i + 1)) (insert l c (attached (incLocators v))))
-  := match l with
-  | AttrList.nil => by
-    simp [insert, mapAttrList]
-  | AttrList.cons a not_in op_attr tail => by
-    simp [insert]
-    split
-    . rw [incLocators]
-      simp [inc_swap]
-      simp [mapAttrList]
-    . split <;> simp [mapAttrList] <;> exact mapAttrList_inc_insert
+  def mapAttrList_inc_insert
+    { i : Nat }
+    { c : Attr }
+    { lst : List Attr }
+    { l : AttrList lst }
+    { v : Term}
+    : (insert (mapAttrList (incLocatorsFrom (i + 1)) l) c (attached (incLocators (incLocatorsFrom i v)))) =
+    (mapAttrList (incLocatorsFrom (i + 1)) (insert l c (attached (incLocators v))))
+    := match l with
+    | AttrList.nil => by
+      simp [insert, mapAttrList]
+    | AttrList.cons a not_in op_attr tail => by
+      simp [insert]
+      split
+      . rw [incLocators]
+        simp [inc_swap]
+        simp [mapAttrList]
+      . split <;> simp [mapAttrList] <;> exact mapAttrList_inc_insert
+end MapAttrList
 
+-- incLocators preserves parallel reduction
 def preduce_incLocatorsFrom
   { t t' : Term}
   ( i : Nat)
@@ -1225,7 +1242,7 @@ def preduce_incLocatorsFrom
       (mapAttrList (incLocatorsFrom (i+1)) l)
       (preduce_incLocatorsFrom i ss')
       (by simp [eq, incLocatorsFrom])
-      (mapAttrList_lookup_attached (incLocatorsFrom (i + 1)) lookup_eq)
+      (MapAttrList.mapAttrList_lookup_attached (incLocatorsFrom (i + 1)) lookup_eq)
     simp [inc_subst_swap]
     assumption
   | @pdot_cφ s s' c lst l ss' eq lookup_eq is_attr => by
@@ -1233,7 +1250,7 @@ def preduce_incLocatorsFrom
     rw [eq] at is_attr
     have is_attr' : IsAttr "φ" (incLocatorsFrom i (obj l)) := by
       simp [incLocatorsFrom]
-      exact mapAttrList_isAttr "φ" l (incLocatorsFrom (i + 1)) is_attr
+      exact MapAttrList.mapAttrList_isAttr "φ" l (incLocatorsFrom (i + 1)) is_attr
     rw [← eq] at is_attr'
     exact @pdot_cφ
         (incLocatorsFrom i s)
@@ -1243,7 +1260,7 @@ def preduce_incLocatorsFrom
         (mapAttrList (incLocatorsFrom (i + 1)) l)
         (preduce_incLocatorsFrom i ss')
         (by rw [eq, incLocatorsFrom])
-        (mapAttrList_lookup_none (incLocatorsFrom (i + 1)) lookup_eq)
+        (MapAttrList.mapAttrList_lookup_none (incLocatorsFrom (i + 1)) lookup_eq)
         (is_attr')
   | @papp_c s s' v v' c lst l ss' vv' eq lookup_eq => by
     simp [incLocatorsFrom]
@@ -1258,10 +1275,11 @@ def preduce_incLocatorsFrom
       (preduce_incLocatorsFrom i ss')
       (preduce_incLocatorsFrom i vv')
       (by rw [eq, incLocatorsFrom])
-      (mapAttrList_lookup_void (incLocatorsFrom (i + 1)) lookup_eq)
-    simp [mapAttrList_inc_insert] at this
+      (MapAttrList.mapAttrList_lookup_void (incLocatorsFrom (i + 1)) lookup_eq)
+    simp [MapAttrList.mapAttrList_inc_insert] at this
     exact this
 
+-- [KS22, Lemma 3.5]
 def substitution_lemma
   ( i : Nat )
   { t t' u u' : Term }
@@ -1358,7 +1376,7 @@ def substitution_lemma
           (mapAttrList (substitute (i+1, incLocators u')) l)
           (substitution_lemma i ss' uu' (by assumption))
           (by rw [eq, substitute])
-          (mapAttrList_lookup_attached (substitute (i + 1, incLocators u')) lookup_eq)
+          (MapAttrList.mapAttrList_lookup_attached (substitute (i + 1, incLocators u')) lookup_eq)
       have : substitute (0, substitute (i, u') s') (substitute (i + 1, incLocators u') t_c) = substitute (i, u') (substitute (0, s') t_c) := (subst_swap i 0 (Nat.zero_le i) t_c s' u' ((by assumption))).symm
       simp [this] at dot_subst
       simp [substitute]
@@ -1367,7 +1385,7 @@ def substitution_lemma
       rw [eq] at is_attr
       have is_attr' : IsAttr "φ" (substitute (i, u') (obj l)) := by
         simp [substitute]
-        exact mapAttrList_isAttr "φ" l (substitute (i + 1, incLocators u')) is_attr
+        exact MapAttrList.mapAttrList_isAttr "φ" l (substitute (i + 1, incLocators u')) is_attr
       rw [← eq] at is_attr'
       simp [substitute]
       exact @pdot_cφ
@@ -1378,11 +1396,11 @@ def substitution_lemma
         (mapAttrList (substitute (i+1, incLocators u')) l)
         (substitution_lemma i ss' uu' (by assumption))
         (by rw [eq, substitute])
-        (mapAttrList_lookup_none (substitute (i + 1, incLocators u')) lookup_eq)
+        (MapAttrList.mapAttrList_lookup_none (substitute (i + 1, incLocators u')) lookup_eq)
         (is_attr')
     | @papp_c s s' v v' c lst l ss' vv' eq lookup_eq => by
       simp [substitute]
-      rw [← mapAttrList_subst_insert]
+      rw [← MapAttrList.mapAttrList_subst_insert]
       exact @papp_c
         (substitute (i, u) s)
         (substitute (i, u') s')
@@ -1394,5 +1412,5 @@ def substitution_lemma
         (substitution_lemma i ss' uu' (by assumption))
         (substitution_lemma i vv' uu' ((by assumption)))
         (by rw [eq, substitute])
-        (mapAttrList_lookup_void (substitute (i + 1, incLocators u')) lookup_eq)
+        (MapAttrList.mapAttrList_lookup_void (substitute (i + 1, incLocators u')) lookup_eq)
 decreasing_by sorry
