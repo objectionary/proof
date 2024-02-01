@@ -676,6 +676,129 @@ def mapAttrList_isAttr
   | @IsAttr.is_attr lst a _in _ => by
     exact @IsAttr.is_attr lst a _in (mapAttrList f l)
 
+instance : Min (Option Nat) where
+  min
+  | some k1, some k2 => some (min k1 k2)
+  | some k, none => some k
+  | none, some k => some k
+  | none, none => none
+
+def min_free_loc
+  (zeroth_level : Nat)
+  : Term → Option Nat
+  | loc k => if k < zeroth_level then none
+    else some (k - zeroth_level)
+  | dot t _ => min_free_loc zeroth_level t
+  | app t _ u => min (min_free_loc zeroth_level t) (min_free_loc zeroth_level u)
+  | obj o => match o with
+    | AttrList.nil => none
+    | AttrList.cons _ _ void tail => min_free_loc zeroth_level (obj tail)
+    | AttrList.cons _ _ (attached t) tail =>
+      min
+      (min_free_loc (zeroth_level + 1) t)
+      (min_free_loc zeroth_level (obj tail))
+
+def le_nat_option_nat : Nat → Option Nat → Prop
+  | n, some k => n ≤ k
+  | _, none   => True
+
+def le_min_option
+  { j : Nat}
+  { option_n1 option_n2 : Option Nat}
+  ( le_min : le_nat_option_nat j (min option_n1 option_n2))
+  : le_nat_option_nat j option_n1 ∧ le_nat_option_nat j option_n2 := by
+  match option_n1, option_n2 with
+  | some n1, some n2 =>
+    simp [le_nat_option_nat] at *
+    simp [Nat.min_def] at le_min
+    split at le_min
+    . constructor
+      . assumption
+      . apply Nat.le_trans le_min (by assumption)
+    . constructor
+      . exact Nat.le_of_lt (Nat.lt_of_le_of_lt le_min (Nat.gt_of_not_le (by assumption)))
+      . assumption
+  | some n, none => simp [le_nat_option_nat] at * ; assumption
+  | none, some n => simp [le_nat_option_nat] at * ; assumption
+  | none, none   => simp [le_nat_option_nat] at *
+
+-- zeroth_level -- c какого момента включительно начинаются свободные локаторы
+-- min_free_loc zeroth_level v -- самый маленький свободный локатор в v, учитывая что свободными мы считаем локаторы которые начинаются с zeroth_level
+def subst_inc_cancel
+  (v u : Term)
+  (j k i zeroth_level : Nat)
+  (le_ji : j ≤ i + zeroth_level)
+  (le_ki : k ≤ i + zeroth_level)
+  (le_0j : zeroth_level ≤ j)
+  (le_0k : zeroth_level ≤ k)
+  (v_loc : le_nat_option_nat i (min_free_loc zeroth_level v))
+  : v = substitute (j, u) (incLocatorsFrom k v)
+  := match v with
+  | loc n => by
+    simp [min_free_loc] at v_loc
+    split at v_loc
+    . rename_i n_is_not_free
+      simp [incLocatorsFrom, Nat.lt_of_lt_of_le n_is_not_free le_0k]
+      simp [substitute, Nat.lt_of_lt_of_le n_is_not_free le_0j]
+    . rename_i n_is_free
+      simp [le_nat_option_nat] at v_loc
+      have n_is_free : zeroth_level ≤ n := Nat.ge_of_not_lt n_is_free
+      have le_in: i + zeroth_level ≤ n :=
+        (Nat.sub_add_cancel n_is_free) ▸ Nat.add_le_add_right v_loc zeroth_level
+      have le_kn : k ≤ n := Nat.le_trans le_ki le_in
+      have nlt_nk: ¬ n < k := λ x => Nat.lt_irrefl n (Nat.lt_of_lt_of_le x le_kn)
+      simp [incLocatorsFrom, nlt_nk]
+      have lt_jn1 : j < n + 1 := Nat.lt_succ_of_le (Nat.le_trans le_ji le_in)
+      have nlt_n1j : ¬ n + 1 < j := λ x => Nat.lt_irrefl j (Nat.lt_trans lt_jn1 x)
+      have neq_n1j : ¬ n + 1 = j := λ x => Nat.lt_irrefl j (x ▸ lt_jn1)
+      simp [substitute, nlt_n1j, neq_n1j, Nat.add_sub_cancel]
+  | dot t _ => by
+    simp [incLocatorsFrom, substitute]
+    apply subst_inc_cancel _ _ _ _ _ _ le_ji le_ki le_0j le_0k
+      (by simp [min_free_loc] at v_loc ; exact v_loc)
+  | app t _ u => by
+    simp [min_free_loc] at v_loc
+    have v_loc := le_min_option v_loc
+    simp [incLocatorsFrom, substitute]
+    constructor <;> apply subst_inc_cancel _ _ _ _ _ _ le_ji le_ki le_0j le_0k
+    . exact v_loc.left
+    . exact v_loc.right
+  | obj o => by
+    simp [incLocatorsFrom, substitute, mapAttrList_compose]
+    let rec traverse_bindings
+    { lst : List Attr}
+    ( bindings : AttrList lst)
+    ( free_locs : le_nat_option_nat i (min_free_loc zeroth_level (obj bindings)))
+    : bindings = mapAttrList (fun t => substitute (j + 1, incLocators u) (incLocatorsFrom (k + 1) t)) bindings
+    := by match bindings with
+      | AttrList.nil =>
+        simp [mapAttrList]
+      | AttrList.cons _ _ void tail =>
+        simp [mapAttrList]
+        exact traverse_bindings tail (by simp [min_free_loc] at free_locs ; assumption)
+      | AttrList.cons _ _ (attached term) tail =>
+        simp [mapAttrList]
+        constructor
+        . simp [min_free_loc] at free_locs
+          have free_locs_term := (le_min_option free_locs).left
+          exact subst_inc_cancel
+            term
+            _
+            (j + 1)
+            (k + 1)
+            i
+            (zeroth_level + 1)
+            (by rw [← Nat.add_assoc] ; exact Nat.succ_le_succ le_ji)
+            (by rw [← Nat.add_assoc] ; exact Nat.succ_le_succ le_ki)
+            (Nat.succ_le_succ le_0j)
+            (Nat.succ_le_succ le_0k)
+            (free_locs_term)
+        . simp [min_free_loc] at free_locs
+          have free_locs := le_min_option free_locs
+          exact traverse_bindings tail free_locs.right
+    exact traverse_bindings o v_loc
+decreasing_by sorry
+
 -- A.9 (Increment swap)
 def inc_swap
   ( i j : Nat)
@@ -875,7 +998,14 @@ def subst_swap
                   simp [Nat.sub_add_cancel le_k1] at temp
                   exact temp
                 simp [substitute, eq_ki1]
-                admit
+                exact subst_inc_cancel
+                  v _
+                  j 0 i 0
+                  le_ji
+                  (Nat.zero_le i)
+                  (Nat.zero_le j)
+                  (Nat.zero_le 0)
+                  sorry
               . rename_i neq_k1i
                 have lt_ik1: i < k - 1 := Nat.lt_of_le_of_ne (Nat.ge_of_not_lt (nlt_k1i)) (λ x => neq_k1i x.symm)
                 have lt_i1k : i + 1 < k := by
