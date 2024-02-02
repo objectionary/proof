@@ -541,6 +541,84 @@ namespace PReduce
                 simp [lookup, neq]
                 exact lookup_void_premise lookup_void premise_tail
               )
+
+  inductive Pair : Prop → Type → Type where
+    | pair
+      : { p : Prop }
+      → { t : Type }
+      → (prop : p)
+      → (val : t)
+      → Pair p t
+
+  def lookup_attached_premise
+    { lst : List Attr }
+    { l1 l2 : AttrList lst }
+    { a : Attr }
+    { u : Term }
+    (lookup_attached : lookup l1 a = some (attached u))
+    (premise : Premise l1 l2)
+    : Σ u' : Term, Pair (lookup l2 a = some (attached u')) (PReduce u u')
+    := match lst with
+      | [] => match l1, l2 with | AttrList.nil, AttrList.nil => match premise with
+        | Premise.nil => by
+          simp [lookup]
+          contradiction
+      -- | b :: bs => match l1, l2 with
+        -- | AttrList.cons _ not_in1 _ tail1, AttrList.cons _ not_in2 _ tail2 => match premise with
+        --   | Premise.consVoid _ premise_tail => by
+        --     simp [lookup]
+        --     exact dite
+        --       (b = a)
+        --       (λ eq => by
+        --         simp [lookup, eq] at lookup_attached
+        --       )
+        --       (λ neq => by
+        --         simp [lookup, neq]
+        --         simp [lookup, neq] at lookup_attached
+        --         exact lookup_attached_premise (lookup_attached) premise_tail
+        --       )
+        --   | Premise.consAttached _ _ t2 preduce premise_tail => by
+        --     simp [lookup]
+        --     exact dite
+        --       (b = a)
+        --       (λ eq => by
+        --         simp [eq]
+        --         exact ⟨t2, Pair.pair rfl preduce⟩
+        --       )
+        --       (λ neq => by
+        --         simp [neq]
+        --         simp [lookup, neq] at lookup_attached
+        --         exact lookup_attached_premise (lookup_attached) premise_tail
+        --       )
+      | b :: bs => match premise with
+        | Premise.consVoid _ premise_tail => by
+          simp [lookup]
+          exact dite
+            (b = a)
+            (λ eq => by
+              simp [lookup, eq] at lookup_attached
+            )
+            (λ neq => by
+              simp [lookup, neq]
+              simp [lookup, neq] at lookup_attached
+              exact lookup_attached_premise (lookup_attached) premise_tail
+            )
+        | Premise.consAttached _ t1 t2 preduce premise_tail => by
+          simp [lookup]
+          exact dite
+            (b = a)
+            (λ eq => by
+              simp [eq]
+              simp [lookup, eq] at lookup_attached
+              simp [lookup_attached] at preduce
+              exact ⟨t2, Pair.pair rfl preduce⟩
+            )
+            (λ neq => by
+              simp [neq]
+              simp [lookup, neq] at lookup_attached
+              exact lookup_attached_premise (lookup_attached) premise_tail
+            )
+
 open PReduce
 
 inductive RedMany : Term → Term → Type where
@@ -1724,7 +1802,18 @@ def half_diamond
         generalize h : complete_development lt = foo
         simp [eq, h] at pred
         cases pred with
-          | pcongOBJ l newAttrs premise => sorry -- relies on substitution lemma
+          | pcongOBJ l newAttrs premise =>
+          simp [complete_development, h]
+          let ⟨u, Pair.pair lookup_attached tc_to_u⟩ := lookup_attached_premise lookup_eq premise
+          simp [lookup_attached, eq]
+          let min_free_locs
+            : le_nat_option_nat 0 (min_free_loc 0 (obj newAttrs))
+            := by
+              simp [le_nat_option_nat]
+              split
+              . exact Nat.zero_le _
+              . simp
+          exact substitution_lemma 0 tc_to_u (pcongOBJ l newAttrs premise) min_free_locs
 
     | @pdot_cφ lt lt' c lst l preduce eq lookup_none is_attr => by
         let pred
@@ -1756,7 +1845,10 @@ def half_diamond
                 := lookup_void_premise lookup_eq premise
               simp [lookup_void]
               -- need to turn x ⇛ y into incLocators x ⇛ incLocators y
-              exact pcongOBJ _ _ (singlePremiseInsert sorry premise)
+              exact pcongOBJ
+                _
+                _
+                (singlePremiseInsert (preduce_incLocatorsFrom 0 preduce_u') premise)
 
 inductive BothPReduce : Term → Term → Term → Type where
   | reduce : { u v w : Term } → (u ⇛ w) → (v ⇛ w) → BothPReduce u v w
@@ -1766,8 +1858,6 @@ inductive BothPReduceClosure : Term → Term → Term → Type where
 
 inductive BothReduceTo : Term → Term → Term → Type where
   | reduce : { u v w : Term } → (u ⇝ w) → (v ⇝ w) → BothReduceTo u v w
--- inductive BothReduceGeneric (f : Term → Term → Type) : Term → Term → Term → Type where
---   | reduce : { u v w : Term } → (f : Term → Term → Type) → (f u w) → (f v w) → BothReduceClosure f u v w
 
 def diamond_preduce
   { t u v : Term }
