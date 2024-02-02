@@ -1279,138 +1279,144 @@ def preduce_incLocatorsFrom
     simp [MapAttrList.mapAttrList_inc_insert] at this
     exact this
 
--- [KS22, Lemma 3.5]
-def substitution_lemma
-  ( i : Nat )
-  { t t' u u' : Term }
-  (tt' : t ⇛ t')
-  (uu' : u ⇛ u')
-  (min_free_locs_u' : le_nat_option_nat i (min_free_loc 0 u'))
-  : substitute (i, u) t ⇛ substitute (i, u') t'
-  := match tt' with
-    | @pcongOBJ attrs bnds bnds' premise =>
-      let rec fold_premise
-      { lst : List Attr }
-      { al al' : AttrList lst }
-      (premise : Premise al al')
-      : substitute (i, u) (obj al) ⇛ substitute (i, u') (obj al')
-      := match lst with
-        | [] => match al, al' with
-          | AttrList.nil, AttrList.nil => by
-            simp [substitute, mapAttrList]
-            exact prefl (obj AttrList.nil)
-        | a :: as => match al, al' with
-          | AttrList.cons _ not_in op_attr tail, AttrList.cons _ _ op_attr' tail' => match premise with
-            | Premise.consVoid _ premiseTail => by
+def get_premise
+  { attrs : List Attr }
+  { bnds bnds' : AttrList attrs }
+  (preduce : obj bnds ⇛ obj bnds')
+  : Premise bnds bnds'
+  := match preduce with
+    | PReduce.pcongOBJ _ _ premise => premise
+
+  -- [KS22, Lemma 3.5]
+  def substitution_lemma
+    ( i : Nat )
+    { t t' u u' : Term }
+    (tt' : t ⇛ t')
+    (uu' : u ⇛ u')
+    (min_free_locs_u' : le_nat_option_nat i (min_free_loc 0 u'))
+    : substitute (i, u) t ⇛ substitute (i, u') t'
+    := match tt' with
+      | @pcongOBJ attrs bnds bnds' premise =>
+        let rec fold_premise
+        { lst : List Attr }
+        { al al' : AttrList lst }
+        (premise : Premise al al')
+        : substitute (i, u) (obj al) ⇛ substitute (i, u') (obj al')
+        := match lst with
+          | [] => match al, al' with
+            | AttrList.nil, AttrList.nil => by
               simp [substitute, mapAttrList]
-              have h := fold_premise premiseTail
-              simp [substitute] at h
-              match h with
-                | PReduce.pcongOBJ _ _ subst_premise =>
-                  exact PReduce.pcongOBJ _ _ (Premise.consVoid a subst_premise)
-            | @Premise.consAttached _ t1 t2 preduce_t1_t2 _ l1 l2 not_in premiseTail => by
-              simp [substitute, mapAttrList]
-              have h1 := substitution_lemma (i + 1) preduce_t1_t2 (preduce_incLocatorsFrom 0 uu') (by rw [← incLocators] ; exact min_free_loc_inc min_free_locs_u')
-              have h2 := fold_premise premiseTail
-              simp [substitute] at h2
-              match h2 with
-                | PReduce.pcongOBJ _ _ subst_premise =>
-                  have premise := @Premise.consAttached
-                    a
-                    (substitute (i + 1, incLocators u) t1)
-                    (substitute (i + 1, incLocators u') t2)
-                    h1
-                    as
-                    (mapAttrList (substitute (i + 1, incLocators u)) l1)
-                    (mapAttrList (substitute (i + 1, incLocators u')) l2)
-                    not_in
-                    subst_premise
-                  exact PReduce.pcongOBJ _ _ premise
-      fold_premise premise
-    | pcong_ρ n => by
+              exact prefl (obj AttrList.nil)
+          | a :: as => match al, al' with
+            | AttrList.cons _ not_in op_attr tail, AttrList.cons _ _ op_attr' tail' => match premise with
+              | Premise.consVoid _ premiseTail => by
+                simp [substitute, mapAttrList]
+                let h := fold_premise premiseTail
+                simp [substitute] at h
+                have subst_premise := get_premise h
+                exact PReduce.pcongOBJ _ _ (Premise.consVoid a subst_premise)
+              | @Premise.consAttached _ t1 t2 preduce_t1_t2 _ l1 l2 not_in premiseTail => by
+                simp [substitute, mapAttrList]
+                have h1 := substitution_lemma (i + 1) preduce_t1_t2 (preduce_incLocatorsFrom 0 uu') (by rw [← incLocators] ; exact min_free_loc_inc min_free_locs_u')
+                have h2 := fold_premise premiseTail
+                simp [substitute] at h2
+                have subst_premise := get_premise h2
+                have premise := @Premise.consAttached
+                  a
+                  (substitute (i + 1, incLocators u) t1)
+                  (substitute (i + 1, incLocators u') t2)
+                  h1
+                  as
+                  (mapAttrList (substitute (i + 1, incLocators u)) l1)
+                  (mapAttrList (substitute (i + 1, incLocators u')) l2)
+                  not_in
+                  subst_premise
+                exact PReduce.pcongOBJ _ _ premise
+        fold_premise premise
+      | pcong_ρ n => by
+          simp [substitute]
+          exact dite (n < i)
+            (λ less => by
+              simp [less]
+              exact pcong_ρ n
+            )
+            (λ not_less =>
+              dite (n = i)
+                (λ eq => by
+                  have obvious : ¬ i < i := Nat.lt_irrefl i
+                  simp [not_less, eq, obvious]
+                  exact uu'
+                )
+                (λ not_eq => by
+                  simp [not_less, not_eq]
+                  exact pcong_ρ (n - 1)
+                )
+            )
+      | pcongDOT lt lt' a preduce => by
+          simp [substitute]
+          exact pcongDOT
+            (substitute (i, u) lt)
+            (substitute (i, u') lt')
+            a
+            (substitution_lemma i preduce uu' (by assumption))
+      | pcongAPP lt lt' lu lu' a preduce_t preduce_u => by
+          simp [substitute]
+          exact pcongAPP
+            (substitute (i, u) lt)
+            (substitute (i, u') lt')
+            (substitute (i, u) lu)
+            (substitute (i, u') lu')
+            a
+            (substitution_lemma i preduce_t uu' (by assumption))
+            (substitution_lemma i preduce_u uu' (by assumption))
+      | @pdot_c s s' t_c c lst l ss' eq lookup_eq => by
+        have ih := substitution_lemma i ss' uu'
+        have dot_subst : dot (substitute (i, u) s) c ⇛
+          substitute (0, substitute (i, u') s') (substitute (i+1, incLocators u') t_c)
+          := @PReduce.pdot_c
+            (substitute (i, u) s)
+            (substitute (i, u') s')
+            (substitute (i+1, incLocators u') t_c)
+            c
+            lst
+            (mapAttrList (substitute (i+1, incLocators u')) l)
+            (substitution_lemma i ss' uu' (by assumption))
+            (by rw [eq, substitute])
+            (MapAttrList.mapAttrList_lookup_attached (substitute (i + 1, incLocators u')) lookup_eq)
+        have : substitute (0, substitute (i, u') s') (substitute (i + 1, incLocators u') t_c) = substitute (i, u') (substitute (0, s') t_c) := (subst_swap i 0 (Nat.zero_le i) t_c s' u' ((by assumption))).symm
+        simp [this] at dot_subst
         simp [substitute]
-        exact dite (n < i)
-          (λ less => by
-            simp [less]
-            exact pcong_ρ n
-          )
-          (λ not_less =>
-            dite (n = i)
-              (λ eq => by
-                have obvious : ¬ i < i := Nat.lt_irrefl i
-                simp [not_less, eq, obvious]
-                exact uu'
-              )
-              (λ not_eq => by
-                simp [not_less, not_eq]
-                exact pcong_ρ (n - 1)
-              )
-          )
-    | pcongDOT lt lt' a preduce => by
+        exact dot_subst
+      | @pdot_cφ s s' c lst l ss' eq lookup_eq is_attr => by
+        rw [eq] at is_attr
+        have is_attr' : IsAttr "φ" (substitute (i, u') (obj l)) := by
+          simp [substitute]
+          exact MapAttrList.mapAttrList_isAttr "φ" l (substitute (i + 1, incLocators u')) is_attr
+        rw [← eq] at is_attr'
         simp [substitute]
-        exact pcongDOT
-          (substitute (i, u) lt)
-          (substitute (i, u') lt')
-          a
-          (substitution_lemma i preduce uu' (by assumption))
-    | pcongAPP lt lt' lu lu' a preduce_t preduce_u => by
-        simp [substitute]
-        exact pcongAPP
-          (substitute (i, u) lt)
-          (substitute (i, u') lt')
-          (substitute (i, u) lu)
-          (substitute (i, u') lu')
-          a
-          (substitution_lemma i preduce_t uu' (by assumption))
-          (substitution_lemma i preduce_u uu' (by assumption))
-    | @pdot_c s s' t_c c lst l ss' eq lookup_eq => by
-      have ih := substitution_lemma i ss' uu'
-      have dot_subst : dot (substitute (i, u) s) c ⇛
-        substitute (0, substitute (i, u') s') (substitute (i+1, incLocators u') t_c)
-        := @PReduce.pdot_c
+        exact @pdot_cφ
           (substitute (i, u) s)
           (substitute (i, u') s')
-          (substitute (i+1, incLocators u') t_c)
           c
           lst
           (mapAttrList (substitute (i+1, incLocators u')) l)
           (substitution_lemma i ss' uu' (by assumption))
           (by rw [eq, substitute])
-          (MapAttrList.mapAttrList_lookup_attached (substitute (i + 1, incLocators u')) lookup_eq)
-      have : substitute (0, substitute (i, u') s') (substitute (i + 1, incLocators u') t_c) = substitute (i, u') (substitute (0, s') t_c) := (subst_swap i 0 (Nat.zero_le i) t_c s' u' ((by assumption))).symm
-      simp [this] at dot_subst
-      simp [substitute]
-      exact dot_subst
-    | @pdot_cφ s s' c lst l ss' eq lookup_eq is_attr => by
-      rw [eq] at is_attr
-      have is_attr' : IsAttr "φ" (substitute (i, u') (obj l)) := by
+          (MapAttrList.mapAttrList_lookup_none (substitute (i + 1, incLocators u')) lookup_eq)
+          (is_attr')
+      | @papp_c s s' v v' c lst l ss' vv' eq lookup_eq => by
         simp [substitute]
-        exact MapAttrList.mapAttrList_isAttr "φ" l (substitute (i + 1, incLocators u')) is_attr
-      rw [← eq] at is_attr'
-      simp [substitute]
-      exact @pdot_cφ
-        (substitute (i, u) s)
-        (substitute (i, u') s')
-        c
-        lst
-        (mapAttrList (substitute (i+1, incLocators u')) l)
-        (substitution_lemma i ss' uu' (by assumption))
-        (by rw [eq, substitute])
-        (MapAttrList.mapAttrList_lookup_none (substitute (i + 1, incLocators u')) lookup_eq)
-        (is_attr')
-    | @papp_c s s' v v' c lst l ss' vv' eq lookup_eq => by
-      simp [substitute]
-      rw [← MapAttrList.mapAttrList_subst_insert]
-      exact @papp_c
-        (substitute (i, u) s)
-        (substitute (i, u') s')
-        (substitute (i, u) v)
-        (substitute (i, u') v')
-        c
-        lst
-        (mapAttrList (substitute (i+1, incLocators u')) l)
-        (substitution_lemma i ss' uu' (by assumption))
-        (substitution_lemma i vv' uu' ((by assumption)))
-        (by rw [eq, substitute])
-        (MapAttrList.mapAttrList_lookup_void (substitute (i + 1, incLocators u')) lookup_eq)
+        rw [← MapAttrList.mapAttrList_subst_insert]
+        exact @papp_c
+          (substitute (i, u) s)
+          (substitute (i, u') s')
+          (substitute (i, u) v)
+          (substitute (i, u') v')
+          c
+          lst
+          (mapAttrList (substitute (i+1, incLocators u')) l)
+          (substitution_lemma i ss' uu' (by assumption))
+          (substitution_lemma i vv' uu' ((by assumption)))
+          (by rw [eq, substitute])
+          (MapAttrList.mapAttrList_lookup_void (substitute (i + 1, incLocators u')) lookup_eq)
 decreasing_by sorry
