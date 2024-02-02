@@ -563,33 +563,6 @@ namespace PReduce
         | Premise.nil => by
           simp [lookup]
           contradiction
-      -- | b :: bs => match l1, l2 with
-        -- | AttrList.cons _ not_in1 _ tail1, AttrList.cons _ not_in2 _ tail2 => match premise with
-        --   | Premise.consVoid _ premise_tail => by
-        --     simp [lookup]
-        --     exact dite
-        --       (b = a)
-        --       (λ eq => by
-        --         simp [lookup, eq] at lookup_attached
-        --       )
-        --       (λ neq => by
-        --         simp [lookup, neq]
-        --         simp [lookup, neq] at lookup_attached
-        --         exact lookup_attached_premise (lookup_attached) premise_tail
-        --       )
-        --   | Premise.consAttached _ _ t2 preduce premise_tail => by
-        --     simp [lookup]
-        --     exact dite
-        --       (b = a)
-        --       (λ eq => by
-        --         simp [eq]
-        --         exact ⟨t2, Pair.pair rfl preduce⟩
-        --       )
-        --       (λ neq => by
-        --         simp [neq]
-        --         simp [lookup, neq] at lookup_attached
-        --         exact lookup_attached_premise (lookup_attached) premise_tail
-        --       )
       | b :: bs => match premise with
         | Premise.consVoid _ premise_tail => by
           simp [lookup]
