@@ -1830,7 +1830,7 @@ inductive BothPReduceClosure : Term → Term → Term → Type where
   | reduce : { u v w : Term } → (u ⇛* w) → (v ⇛* w) → BothPReduceClosure u v w
 
 inductive BothReduceTo : Term → Term → Term → Type where
-  | reduce : { u v w : Term } → (u ⇝ w) → (v ⇝ w) → BothReduceTo u v w
+  | reduce : { u v w : Term } → (u ⇝* w) → (v ⇝* w) → BothReduceTo u v w
 
 def diamond_preduce
   { t u v : Term }
@@ -1880,3 +1880,16 @@ def confluence_preduce
       let ⟨_vv, PReduceClosureStep.step u'vv v_to_vv⟩ := confluence_step tu' tv' tail_v
       let ⟨w, BothPReduceClosure.reduce uw vvw⟩ := confluence_preduce tail_u u'vv
       ⟨w, BothPReduceClosure.reduce uw (ParMany.cons v_to_vv vvw)⟩
+
+def confluence
+  { t u v : Term }
+  : (t ⇝* u)
+  → (t ⇝* v)
+  → Σ w : Term, BothReduceTo u v w
+  := λ tu tv =>
+    let tu' := redMany_to_parMany tu
+    let tv' := redMany_to_parMany tv
+    let ⟨w, BothPReduceClosure.reduce uw' vw'⟩ := confluence_preduce tu' tv'
+    let uw := parMany_to_redMany uw'
+    let vw := parMany_to_redMany vw'
+    ⟨w, BothReduceTo.reduce uw vw⟩
