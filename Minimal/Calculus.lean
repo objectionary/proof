@@ -66,6 +66,46 @@ def lookup { lst : List Attr } (l : AttrList lst) (a : Attr) : Option OptionalAt
         if (name == a) then some opAttr
         else lookup tail a
 
+def lookup_none_not_in
+  { lst : List Attr }
+  { l : AttrList lst }
+  { a : Attr }
+  (lookup_none : lookup l a = none)
+  : a ∉ lst
+  := λ a_in_lst => match lst with
+    | [] => by contradiction
+    | b :: bs => match l with
+      | AttrList.cons _ _ opAttr tail =>
+        dite
+        (b = a)
+        (λ eq => by simp [eq, lookup] at lookup_none)
+        (λ neq => by
+          simp [neq, lookup] at lookup_none
+          have temp := lookup_none_not_in lookup_none
+          match a_in_lst with
+            | List.Mem.head _ => contradiction
+            | List.Mem.tail _ memTail => contradiction
+        )
+
+def lookup_none_preserve
+  { lst : List Attr }
+  { l1 : AttrList lst }
+  { a : Attr }
+  (lookup_none : lookup l1 a = none)
+  (l2 : AttrList lst)
+  : (lookup l2 a = none)
+  := match lst with
+    | [] => match l2 with | AttrList.nil => by simp [lookup]
+    | b :: bs => match l1, l2 with
+      | AttrList.cons _ _ opAttr1 tail1, AttrList.cons _ _ opAttr2 tail2 => dite
+        (b = a)
+        (λ eq => by simp [lookup, eq] at lookup_none)
+        (λ neq => by
+          simp [lookup, neq] at lookup_none
+          simp [lookup, neq]
+          exact lookup_none_preserve lookup_none tail2
+        )
+
 def insert
   { lst : List Attr }
   (l : AttrList lst)
@@ -175,6 +215,14 @@ inductive IsAttr : Attr → Term → Type where
     → a ∈ lst
     → (l : AttrList lst)
     → IsAttr a (obj l)
+
+def is_attr_in
+  { lst : List Attr }
+  { a : Attr }
+  { l : AttrList lst }
+  : IsAttr a (obj l)
+  → a ∈ lst
+  := λ (IsAttr.is_attr _ is_in _) => is_in
 
 inductive IsAttached : { lst : List Attr } → Attr → Term → AttrList lst → Type where
   | zeroth_attached
@@ -434,6 +482,116 @@ namespace PReduce
                 | void => Premise.consVoid b premise
                 | attached u' => Premise.consAttached b u' u' (prefl u') premise
               )
+
+  def singlePremiseInsert
+    { lst : List Attr }
+    { l1 l2 : AttrList lst }
+    { a : Attr }
+    { t1 t2 : Term }
+    (preduce : PReduce t1 t2)
+    (premise : Premise l1 l2)
+    : Premise (insert l1 a (attached t1)) (insert l2 a (attached t2))
+    := match premise with
+      | Premise.nil => Premise.nil
+      | Premise.consVoid b tail => dite
+          (b = a)
+          (λ eq => by
+            simp [insert, eq]
+            exact Premise.consAttached b _ _ preduce tail
+          )
+          (λ neq => by
+            simp [insert, neq]
+            exact Premise.consVoid b (singlePremiseInsert preduce tail)
+          )
+      | Premise.consAttached b t' t'' preduce' tail => dite
+          (b = a)
+          (λ eq => by
+            simp [insert, eq]
+            exact Premise.consAttached b _ _ preduce tail
+          )
+          (λ neq => by
+            simp [insert, neq]
+            exact Premise.consAttached b t' t'' preduce' (singlePremiseInsert preduce tail)
+          )
+
+  def lookup_void_premise
+    { lst : List Attr }
+    { l1 l2 : AttrList lst }
+    { a : Attr }
+    (lookup_void : lookup l1 a = some void)
+    (premise : Premise l1 l2)
+    : lookup l2 a = some void
+    := match lst with
+      | [] => match l1, l2 with | AttrList.nil, AttrList.nil => by contradiction
+      | b :: bs => match l1, l2 with
+          | AttrList.cons _ _ _ tail1, AttrList.cons _ _ _ tail2 => match premise with
+            | Premise.consVoid _ premise_tail => dite
+              (b = a)
+              (λ eq => by simp [lookup, eq])
+              (λ neq => by
+                simp [lookup, neq] at lookup_void
+                simp [lookup, neq]
+                exact lookup_void_premise lookup_void premise_tail
+              )
+            | Premise.consAttached _ _ _ _ premise_tail => dite
+              (b = a)
+              (λ eq => by simp [lookup, eq] at lookup_void)
+              (λ neq => by
+                simp [lookup, neq] at lookup_void
+                simp [lookup, neq]
+                exact lookup_void_premise lookup_void premise_tail
+              )
+
+  inductive Pair : Prop → Type → Type where
+    | pair
+      : { p : Prop }
+      → { t : Type }
+      → (prop : p)
+      → (val : t)
+      → Pair p t
+
+  def lookup_attached_premise
+    { lst : List Attr }
+    { l1 l2 : AttrList lst }
+    { a : Attr }
+    { u : Term }
+    (lookup_attached : lookup l1 a = some (attached u))
+    (premise : Premise l1 l2)
+    : Σ u' : Term, Pair (lookup l2 a = some (attached u')) (PReduce u u')
+    := match lst with
+      | [] => match l1, l2 with | AttrList.nil, AttrList.nil => match premise with
+        | Premise.nil => by
+          simp [lookup]
+          contradiction
+      | b :: bs => match premise with
+        | Premise.consVoid _ premise_tail => by
+          simp [lookup]
+          exact dite
+            (b = a)
+            (λ eq => by
+              simp [lookup, eq] at lookup_attached
+            )
+            (λ neq => by
+              simp [lookup, neq]
+              simp [lookup, neq] at lookup_attached
+              exact lookup_attached_premise (lookup_attached) premise_tail
+            )
+        | Premise.consAttached _ t1 t2 preduce premise_tail => by
+          simp [lookup]
+          exact dite
+            (b = a)
+            (λ eq => by
+              simp [eq]
+              simp [lookup, eq] at lookup_attached
+              simp [lookup_attached] at preduce
+              exact ⟨t2, Pair.pair rfl preduce⟩
+            )
+            (λ neq => by
+              simp [neq]
+              simp [lookup, neq] at lookup_attached
+              exact lookup_attached_premise (lookup_attached) premise_tail
+            )
+
 open PReduce
 
 inductive RedMany : Term → Term → Type where
@@ -1420,3 +1578,318 @@ def substitution_lemma
         (by rw [eq, substitute])
         (MapAttrList.mapAttrList_lookup_void (substitute (i + 1, incLocators u')) lookup_eq)
 decreasing_by sorry
+
+
+----------------------------------------------
+-- Complete Development
+
+def complete_development : Term → Term
+  | loc n => loc n
+  | dot t a => match (complete_development t) with
+    | @obj attrs bnds => match (lookup bnds a) with
+      | some (attached t_a) => (substitute (0, (obj bnds)) t_a)
+      | some void => dot (obj bnds) a
+      | none => if ("φ" ∈ attrs) then dot (dot (obj bnds) "φ") a else dot (obj bnds) a
+    | t' => dot t' a
+  | app t a u => match (complete_development t) with
+    | @obj attrs bnds => match (lookup bnds a) with
+      | some void => obj (insert bnds a (attached (incLocators (complete_development u))))
+      | _ => app (obj bnds) a (complete_development u)
+    | _ => app (complete_development t) a (complete_development u)
+  | obj bnds => obj (mapAttrList complete_development bnds)
+decreasing_by sorry
+
+def term_to_development
+  (t : Term)
+  : t ⇛ complete_development t
+  := match t with
+    | loc n => by simp [complete_development]; exact prefl (loc n)
+    | dot t a => by
+        simp [complete_development]
+        split
+        . rename_i cd_is_obj
+          rename_i l
+          rename_i attrs
+          split
+          . rename_i lookup_attached
+            rename_i u
+            have goal := PReduce.pdot_c u a l (term_to_development t) cd_is_obj lookup_attached
+            simp [cd_is_obj] at goal
+            exact goal
+          . have goal := PReduce.pcongDOT t (complete_development t) a (term_to_development t)
+            simp [cd_is_obj] at goal
+            exact goal
+          . rename_i lookup_none
+            exact dite ("φ" ∈ attrs)
+              (λ φ_in => by
+                simp [φ_in]
+                have temp := term_to_development t
+                simp [cd_is_obj] at temp
+                exact PReduce.pdot_cφ a l temp rfl lookup_none (IsAttr.is_attr "φ" φ_in l)
+              )
+              (λ not_in => by
+                simp [not_in]
+                have goal := PReduce.pcongDOT t (complete_development t) a (term_to_development t)
+                simp [cd_is_obj] at goal
+                exact goal
+              )
+        . rename_i cd_not_obj
+          exact PReduce.pcongDOT t (complete_development t) a (term_to_development t)
+    | app t a u => by
+        simp [complete_development]
+        split
+        . rename_i cd_is_obj
+          rename_i l
+          split
+          . rename_i lookup_void
+            exact PReduce.papp_c a l (term_to_development t) (term_to_development u) cd_is_obj lookup_void
+          . rename_i lookup_not_void
+            have goal := PReduce.pcongAPP
+              t
+              (complete_development t)
+              u
+              (complete_development u)
+              a
+              (term_to_development t)
+              (term_to_development u)
+            simp [cd_is_obj] at goal
+            exact goal
+        . exact PReduce.pcongAPP
+            t
+            (complete_development t)
+            u
+            (complete_development u)
+            a
+            (term_to_development t)
+            (term_to_development u)
+
+    | obj bnds => by
+        simp [complete_development]
+        let rec make_premise
+          { attrs : List Attr }
+          (bnds : AttrList attrs)
+          : Premise bnds (mapAttrList complete_development bnds)
+          := match bnds with
+            | AttrList.nil => Premise.nil
+            | AttrList.cons a not_in void tail => by
+                simp [mapAttrList]
+                exact Premise.consVoid a (make_premise tail)
+            | AttrList.cons a not_in (attached u) tail => by
+                simp [mapAttrList]
+                exact Premise.consAttached
+                  a
+                  u
+                  (complete_development u)
+                  (term_to_development u)
+                  (make_premise tail)
+        exact PReduce.pcongOBJ
+          bnds
+          (mapAttrList complete_development bnds)
+          (make_premise bnds)
+
+-- [KS 2022, Proposition 3.8]
+def half_diamond
+  { t t' : Term }
+  (preduce : PReduce t t')
+  : PReduce t' (complete_development t)
+  := match preduce with
+    | pcongOBJ l newAttrs premise => by
+        simp [complete_development]
+        let rec make_premise
+          { lst : List Attr }
+          { l l' : AttrList lst }
+          (premise : Premise l l')
+          : Premise l' (mapAttrList complete_development l)
+          := match lst with
+            | [] => match l, l' with
+              | AttrList.nil, AttrList.nil => Premise.nil
+            | a :: as => match premise with
+              | Premise.consVoid _ premise_tail => by
+                  simp [complete_development, mapAttrList]
+                  exact Premise.consVoid a (make_premise premise_tail)
+              | Premise.consAttached _ t1 t2 preduce premise_tail => by
+                  simp [complete_development, mapAttrList]
+                  exact Premise.consAttached
+                    a
+                    t2
+                    (complete_development t1)
+                    (half_diamond preduce)
+                    (make_premise premise_tail)
+        exact pcongOBJ newAttrs (mapAttrList complete_development l) (make_premise premise)
+    | pcong_ρ n => by
+        simp [complete_development]
+        exact prefl (loc n)
+    | pcongDOT lt lt' a preduce => by
+        simp [complete_development]
+        split
+        . rename_i cd_is_obj
+          rename_i l
+          rename_i attrs
+          have assumption_preduce := half_diamond preduce
+          simp [cd_is_obj] at assumption_preduce
+          split
+          . rename_i lookup_attached
+            rename_i u
+            exact PReduce.pdot_c u a l assumption_preduce rfl lookup_attached
+          . rename_i lookup_void
+            exact PReduce.pcongDOT lt' (obj l) a assumption_preduce
+          . rename_i lookup_none
+            exact dite ("φ" ∈ attrs)
+              (λ φ_in => by
+                simp [φ_in]
+                exact PReduce.pdot_cφ a l assumption_preduce rfl lookup_none (IsAttr.is_attr "φ" φ_in l)
+              )
+              (λ not_in => by
+                simp [not_in]
+                exact PReduce.pcongDOT lt' (obj l) a assumption_preduce
+              )
+        . rename_i cd_not_obj
+          exact PReduce.pcongDOT lt' (complete_development lt) a (half_diamond preduce)
+    | pcongAPP lt lt' lu lu' a preduce_lt preduce_lu => by
+        simp [complete_development]
+        split
+        . rename_i cd_is_obj
+          rename_i l
+          rename_i attrs
+          have assumption_preduce_lt := half_diamond preduce_lt
+          have assumption_preduce_lu := half_diamond preduce_lu
+          simp [cd_is_obj] at assumption_preduce_lt
+          split
+          . rename_i lookup_void
+            exact PReduce.papp_c a l assumption_preduce_lt (assumption_preduce_lu) rfl lookup_void
+          . rename_i lookup_void
+            exact PReduce.pcongAPP lt' (obj l) lu' (complete_development lu) a assumption_preduce_lt assumption_preduce_lu
+        . rename_i cd_not_obj
+          exact PReduce.pcongAPP
+            lt'
+            (complete_development lt)
+            lu'
+            (complete_development lu)
+            a
+            (half_diamond preduce_lt)
+            (half_diamond preduce_lu)
+    | @pdot_c lt lt' t_c c _ l preduce eq lookup_eq => by
+        let pred
+          : lt' ⇛ complete_development lt
+          := half_diamond preduce
+        generalize h : complete_development lt = foo
+        simp [eq, h] at pred
+        cases pred with
+          | pcongOBJ l newAttrs premise =>
+          simp [complete_development, h]
+          let ⟨u, Pair.pair lookup_attached tc_to_u⟩ := lookup_attached_premise lookup_eq premise
+          simp [lookup_attached, eq]
+          let min_free_locs
+            : le_nat_option_nat 0 (min_free_loc 0 (obj newAttrs))
+            := by
+              simp [le_nat_option_nat]
+              split
+              . exact Nat.zero_le _
+              . simp
+          exact substitution_lemma 0 tc_to_u (pcongOBJ l newAttrs premise) min_free_locs
+
+    | @pdot_cφ lt lt' c lst l preduce eq lookup_none is_attr => by
+        let pred
+          : lt' ⇛ complete_development lt
+          := half_diamond preduce
+        generalize h : complete_development lt = foo
+        simp [eq, h] at pred
+        cases pred with
+          | @pcongOBJ _ _ newAttrs premise =>
+              simp [complete_development, h]
+              let lookup_none
+                := lookup_none_preserve lookup_none newAttrs
+              simp [lookup_none]
+              simp [eq] at is_attr
+              let φ_in := is_attr_in is_attr
+              simp [φ_in]
+              let preduce := (pcongOBJ _ _ premise)
+              simp [<-eq] at preduce
+              exact pcongDOT _ _ c (pcongDOT _ _ "φ" preduce)
+    | @papp_c lt lt' lu lu' c _ l preduce_t preduce_u eq lookup_eq => by
+        let preduce_t' := half_diamond preduce_t
+        let preduce_u' := half_diamond preduce_u
+        generalize h : complete_development lt = foo
+        simp [eq, h] at preduce_t'
+        cases preduce_t' with
+          | pcongOBJ _ newAttrs premise =>
+              simp [complete_development, h]
+              let lookup_void
+                := lookup_void_premise lookup_eq premise
+              simp [lookup_void]
+              -- need to turn x ⇛ y into incLocators x ⇛ incLocators y
+              exact pcongOBJ
+                _
+                _
+                (singlePremiseInsert (preduce_incLocatorsFrom 0 preduce_u') premise)
+
+inductive BothPReduce : Term → Term → Term → Type where
+  | reduce : { u v w : Term } → (u ⇛ w) → (v ⇛ w) → BothPReduce u v w
+
+inductive BothPReduceClosure : Term → Term → Term → Type where
+  | reduce : { u v w : Term } → (u ⇛* w) → (v ⇛* w) → BothPReduceClosure u v w
+
+inductive BothReduceTo : Term → Term → Term → Type where
+  | reduce : { u v w : Term } → (u ⇝* w) → (v ⇝* w) → BothReduceTo u v w
+
+def diamond_preduce
+  { t u v : Term }
+  : (t ⇛ u)
+  → (t ⇛ v)
+  → Σ w : Term, BothPReduce u v w
+  := λ tu tv =>
+    ⟨ complete_development t
+    , BothPReduce.reduce (half_diamond tu) (half_diamond tv)
+    ⟩
+
+inductive PReduceClosureStep : Term → Term → Term → Type where
+  | step
+    : { v u' vv : Term }
+    → (u' ⇛* vv)
+    → (v ⇛ vv)
+    → PReduceClosureStep v u' vv
+
+def confluence_step
+  { t u' v v' : Term }
+  : (t ⇛ u')
+  → (t ⇛ v')
+  → (v' ⇛* v)
+  → Σ vv : Term, PReduceClosureStep v u' vv
+  := λ tu tv v_clos =>
+    let ⟨t', BothPReduce.reduce u't' v't'⟩ := diamond_preduce tu tv
+    match v_clos with
+    | ParMany.nil =>
+      ⟨ t'
+      , PReduceClosureStep.step (ParMany.cons u't' ParMany.nil) v't'
+      ⟩
+    | @ParMany.cons _ _v'' _ v'_to_v'' tail =>
+      let ⟨vv, PReduceClosureStep.step t'_to_vv v_to_vv⟩ := confluence_step v't' v'_to_v'' tail
+      ⟨ vv
+      , PReduceClosureStep.step (ParMany.cons u't' t'_to_vv) v_to_vv
+      ⟩
+
+def confluence_preduce
+  { t u v : Term }
+  : (t ⇛* u)
+  → (t ⇛* v)
+  → Σ w : Term, BothPReduceClosure u v w
+  := λ tu tv => match tu, tv with
+    | ParMany.nil, tv => ⟨v, BothPReduceClosure.reduce tv ParMany.nil⟩
+    | tu, ParMany.nil => ⟨u, BothPReduceClosure.reduce ParMany.nil tu⟩
+    | @ParMany.cons _ _u' _ tu' tail_u, @ParMany.cons _ _v' _ tv' tail_v =>
+      let ⟨_vv, PReduceClosureStep.step u'vv v_to_vv⟩ := confluence_step tu' tv' tail_v
+      let ⟨w, BothPReduceClosure.reduce uw vvw⟩ := confluence_preduce tail_u u'vv
+      ⟨w, BothPReduceClosure.reduce uw (ParMany.cons v_to_vv vvw)⟩
+
+def confluence
+  { t u v : Term }
+  : (t ⇝* u)
+  → (t ⇝* v)
+  → Σ w : Term, BothReduceTo u v w
+  := λ tu tv =>
+    let tu' := redMany_to_parMany tu
+    let tv' := redMany_to_parMany tv
+    let ⟨w, BothPReduceClosure.reduce uw' vw'⟩ := confluence_preduce tu' tv'
+    let uw := parMany_to_redMany uw'
+    let vw := parMany_to_redMany vw'
+    ⟨w, BothReduceTo.reduce uw vw⟩
