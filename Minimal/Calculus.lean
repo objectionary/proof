@@ -77,6 +77,68 @@ def incLocatorsFrom (n : Nat) (term : Term) : Term
     | obj o => (obj (mapBindings (incLocatorsFrom (n+1)) o))
 decreasing_by all_goals sorry
 
+mutual
+  def depth (term : Term) : Nat
+    := match term with
+      | loc _ => 1
+      | dot t _ => (depth t) + 1
+      | app t _ u => max (depth t) (depth u) + 1
+      | obj o => (max_depth o) + 1
+
+  def max_depth
+    { lst : List Attr}
+    ( o : Bindings lst)
+    : Nat
+    := match o with
+    | Bindings.nil => 0
+    | Bindings.cons _ _ void tail => max_depth tail
+    | Bindings.cons _ _ (attached term) tail =>
+      max (depth term) (max_depth tail)
+end
+
+def incLocatorsFrom' (n : Nat) (term : Term) : Term
+  := match term with
+    | loc m => if m < n then loc m else loc (m + 1)
+    | dot t a =>
+      have : depth t < depth (dot t a) := by
+        simp [depth]
+        exact Nat.lt_succ_self (depth t)
+      dot (incLocatorsFrom' n t) a
+    | app t a u =>
+      have : depth t < depth (app t a u) := by
+        simp [depth]
+        -- exact Nat.lt_succ_self (depth t)
+        admit
+      have : depth u < depth (app t a u) := by
+        simp [depth]
+        -- exact Nat.lt_succ_self (depth t)
+        admit
+      app (incLocatorsFrom' n t) a (incLocatorsFrom' n u)
+    | obj o =>
+      (obj (mapBindings (incLocatorsFrom' (n+1)) o))
+termination_by _ t => depth t
+
+mutual
+  def incLocatorsFrom (n : Nat) (term : Term) : Term
+    := match term with
+      | loc m => if m < n then loc m else loc (m + 1)
+      | dot t a => dot (incLocatorsFrom n t) a
+      | app t a u => app (incLocatorsFrom n t) a (incLocatorsFrom n u)
+      | obj o => (obj (incLocatorsFrom_map (n + 1) o))
+
+  def incLocatorsFrom_map
+    ( n : Nat)
+    { lst : List Attr}
+    ( o : Bindings lst)
+    : Bindings lst
+    := match o with
+    | Bindings.nil => Bindings.nil
+    | Bindings.cons a not_in void tail =>
+      Bindings.cons a not_in void (incLocatorsFrom_map n tail)
+    | Bindings.cons a not_in (attached term) tail =>
+      Bindings.cons a not_in (attached (incLocatorsFrom n term)) (incLocatorsFrom_map n tail)
+end
+
 def incLocators : Term → Term
   := incLocatorsFrom 0
 
