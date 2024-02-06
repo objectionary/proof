@@ -8,41 +8,53 @@ mutual
     | attached : Term → OptionalAttr
     | void : OptionalAttr
 
-  inductive AttrList : List Attr → Type where
-    | nil : AttrList []
+  inductive Bindings : List Attr → Type where
+    | nil : Bindings []
     | cons
       : { lst : List Attr }
       → (a : Attr)
       → a ∉ lst
       → OptionalAttr
-      → AttrList lst
-      → AttrList (a :: lst)
+      → Bindings lst
+      → Bindings (a :: lst)
 
   inductive Term : Type where
     | loc : Nat → Term
     | dot : Term → Attr → Term
     | app : Term → Attr → Term → Term
-    | obj : { lst : List Attr } → AttrList lst → Term
+    | obj : { lst : List Attr } → Bindings lst → Term
 end
 open OptionalAttr
 open Term
 
-def mapAttrList : (Term → Term) → { lst : List Attr } → AttrList lst → AttrList lst
+def mapBindings : (Term → Term) → { lst : List Attr } → Bindings lst → Bindings lst
   := λ f _ alst =>
     let f' := λ optional_attr => match optional_attr with
       | void => void
       | attached x => attached (f x)
     match alst with
-    | AttrList.nil => AttrList.nil
-    | AttrList.cons a not_in opAttr attrLst =>
-        AttrList.cons a not_in (f' opAttr) (mapAttrList f attrLst)
+    | Bindings.nil => Bindings.nil
+    | Bindings.cons a not_in opAttr attrLst =>
+        Bindings.cons a not_in (f' opAttr) (mapBindings f attrLst)
+
+namespace MapBindings
+  def mapBindings_compose
+    (f g : Term → Term )
+    { lst : List Attr }
+    ( l : Bindings lst)
+    : mapBindings f (mapBindings g l) = mapBindings (λ t => f (g t)) l
+    := match l with
+      | Bindings.nil => rfl
+      | Bindings.cons _ _ u tail => by
+        cases u <;> simp [mapBindings] <;> exact mapBindings_compose f g tail
+end MapBindings
 
 def incLocatorsFrom (n : Nat) (term : Term) : Term
   := match term with
     | loc m => if m < n then loc m else loc (m + 1)
     | dot t a => dot (incLocatorsFrom n t) a
     | app t a u => app (incLocatorsFrom n t) a (incLocatorsFrom n u)
-    | obj o => (obj (mapAttrList (incLocatorsFrom (n+1)) o))
+    | obj o => (obj (mapBindings (incLocatorsFrom (n+1)) o))
 decreasing_by sorry
 
 def incLocators : Term → Term
@@ -50,7 +62,7 @@ def incLocators : Term → Term
 
 def substitute : Nat × Term → Term → Term
   := λ (k, v) term => match term with
-    | obj o => obj (mapAttrList (substitute (k + 1, incLocators v)) o)
+    | obj o => obj (mapBindings (substitute (k + 1, incLocators v)) o)
     | dot t a => dot (substitute (k, v) t) a
     | app t a u => app (substitute (k, v) t) a (substitute (k, v) u)
     | loc n =>
@@ -58,793 +70,6 @@ def substitute : Nat × Term → Term → Term
       else if (n == k) then v
       else loc (n-1)
 decreasing_by sorry
-
-def lookup { lst : List Attr } (l : AttrList lst) (a : Attr) : Option OptionalAttr
-  := match l with
-    | AttrList.nil => none
-    | AttrList.cons name _ opAttr tail =>
-        if (name == a) then some opAttr
-        else lookup tail a
-
-def lookup_none_not_in
-  { lst : List Attr }
-  { l : AttrList lst }
-  { a : Attr }
-  (lookup_none : lookup l a = none)
-  : a ∉ lst
-  := λ a_in_lst => match lst with
-    | [] => by contradiction
-    | b :: bs => match l with
-      | AttrList.cons _ _ opAttr tail =>
-        dite
-        (b = a)
-        (λ eq => by simp [eq, lookup] at lookup_none)
-        (λ neq => by
-          simp [neq, lookup] at lookup_none
-          have temp := lookup_none_not_in lookup_none
-          match a_in_lst with
-            | List.Mem.head _ => contradiction
-            | List.Mem.tail _ memTail => contradiction
-        )
-
-def lookup_none_preserve
-  { lst : List Attr }
-  { l1 : AttrList lst }
-  { a : Attr }
-  (lookup_none : lookup l1 a = none)
-  (l2 : AttrList lst)
-  : (lookup l2 a = none)
-  := match lst with
-    | [] => match l2 with | AttrList.nil => by simp [lookup]
-    | b :: bs => match l1, l2 with
-      | AttrList.cons _ _ opAttr1 tail1, AttrList.cons _ _ opAttr2 tail2 => dite
-        (b = a)
-        (λ eq => by simp [lookup, eq] at lookup_none)
-        (λ neq => by
-          simp [lookup, neq] at lookup_none
-          simp [lookup, neq]
-          exact lookup_none_preserve lookup_none tail2
-        )
-
-def insert
-  { lst : List Attr }
-  (l : AttrList lst)
-  (a : Attr)
-  (u : OptionalAttr)
-  : (AttrList lst)
-  := match l with
-    | AttrList.nil => AttrList.nil
-    | AttrList.cons name not_in opAttr tail =>
-        if name == a then AttrList.cons name not_in u tail
-        else AttrList.cons name not_in opAttr (insert tail a u)
-
-def insertMany
-  { lst lstNew : List Attr }
-  (l : AttrList lst)
-  (newAttrs : AttrList lstNew)
-  : AttrList lst
-  := match newAttrs with
-    | AttrList.nil => l
-    | AttrList.cons name _ opAttr tail =>
-        insertMany (insert l name opAttr) tail
-
-def insertAll
-  { lst : List Attr }
-  (l : AttrList lst)
-  (newAttrs : AttrList lst)
-  : AttrList lst
-  := match (l, newAttrs) with
-    | (AttrList.nil, AttrList.nil) => AttrList.nil
-    | (AttrList.cons a not_in _ tail1, AttrList.cons _ _ opAttr tail2) =>
-        AttrList.cons a not_in opAttr (insertAll tail1 tail2)
-
--- Contains proofs on properties of insertions
-namespace Insert
-  open AttrList
-
-  def insertEmpty
-    { a : Attr }
-    { u : OptionalAttr }
-    : insert nil a u = nil
-    := by rfl
-
-  def insertManyIdentity
-    { lst : List Attr }
-    { l : AttrList lst }
-    : insertMany l nil = l
-    := by rw [insertMany]
-
-  def insertManyEmpty
-    { lst : List Attr }
-    (l : AttrList lst)
-    : insertMany nil l = nil
-    := match l with
-      | nil => insertManyIdentity
-      | cons _ _ _ tail => insertManyEmpty tail
-
-  def insertAllSelf
-    { lst : List Attr }
-    (l : AttrList lst)
-    : insertAll l l = l
-    := match l with
-      | nil => by rfl
-      | cons a not_in op_attr tail => congrArg (cons a not_in op_attr) (insertAllSelf tail)
-
-end Insert
-
-partial def whnf : Term → Term
-  | loc n => loc n
-  | obj o => obj o
-  | app t a u => match (whnf t) with
-    | obj o => match lookup o a with
-      | none => app (obj o) a u
-      | some (attached _) => app (obj o) a u
-      | some void => obj (insert o a (attached (incLocators u)))
-    | t' => app t' a u
-  | dot t a => match (whnf t) with
-    | obj o => match lookup o a with
-      | some (attached u) => whnf (substitute (0, obj o) u)
-      | some void => dot (obj o) a
-      | none => match lookup o "φ" with
-        | some _ => dot (dot (obj o) "φ") a
-        | none => dot (obj o) a
-    | t' => dot t' a
-
-partial def nf : Term → Term
-  | loc n => loc n
-  | obj o => obj (mapAttrList nf o)
-  | app t a u => match (whnf t) with
-    | obj o => match lookup o a with
-      | none => app (nf (obj o)) a (nf u)
-      | some (attached _) => app (nf (obj o)) a (nf u)
-      | some void => nf (obj (insert o a (attached (incLocators u))))
-    | t' => app (nf t') a (nf u)
-  | dot t a => match (whnf t) with
-    | obj o => match lookup o a with
-      | some (attached u) => nf (substitute (0, obj o) u)
-      | some void => dot (nf (obj o)) a
-      | none => match lookup o "φ" with
-        | some _ => nf (dot (dot (obj o) "φ") a)
-        | none => dot (nf (obj o)) a
-    | t' => dot (nf t') a
-
-inductive IsAttr : Attr → Term → Type where
-  | is_attr
-    : { lst : List Attr }
-    → (a : Attr)
-    → a ∈ lst
-    → (l : AttrList lst)
-    → IsAttr a (obj l)
-
-def is_attr_in
-  { lst : List Attr }
-  { a : Attr }
-  { l : AttrList lst }
-  : IsAttr a (obj l)
-  → a ∈ lst
-  := λ (IsAttr.is_attr _ is_in _) => is_in
-
-inductive IsAttached : { lst : List Attr } → Attr → Term → AttrList lst → Type where
-  | zeroth_attached
-    : { lst : List Attr }
-    → (a : Attr)
-    → (not_in : a ∉ lst)
-    → (t : Term)
-    → (l : AttrList lst)
-    → IsAttached a t (AttrList.cons a not_in (attached t) l)
-  | next_attached
-    : { lst : List Attr }
-    → (a : Attr)
-    → (t : Term)
-    → (l : AttrList lst)
-    → (b : Attr)
-    → (a ≠ b)
-    → (not_in : b ∉ lst)
-    → (u : OptionalAttr)
-    → IsAttached a t l
-    → IsAttached a t (AttrList.cons b not_in u l)
-
-def isAttachedIsIn
-  { lst : List Attr }
-  { a : Attr }
-  { t : Term }
-  { l : AttrList lst }
-  : IsAttached a t l
-  → a ∈ lst
-  | @IsAttached.zeroth_attached lst' _ _ _ _ => List.Mem.head lst'
-  | IsAttached.next_attached _ _ _ b _ _ _ isAttached' => List.Mem.tail b (isAttachedIsIn isAttached')
-
-namespace Insert
-
-  def insertAttachedStep
-    { a b : Attr }
-    { neq : a ≠ b }
-    { t : Term }
-    { lst : List Attr }
-    { not_in : b ∉ lst }
-    { u : OptionalAttr }
-    { l : AttrList lst }
-    (_ : IsAttached a t l)
-    : insert (AttrList.cons b not_in u l) a (attached t)
-        = AttrList.cons b not_in u (insert l a (attached t))
-    := by simp [insert, neq];
-          split
-          . have neq' := neq.symm
-            contradiction
-          . simp
-
-  def insertAttached
-    { a : Attr }
-    { t : Term }
-    { lst : List Attr }
-    { l : AttrList lst }
-    : IsAttached a t l
-    → insert l a (attached t) = l
-      | IsAttached.zeroth_attached _ _ _ _ => by simp [insert]
-      | IsAttached.next_attached _ _ l b neq not_in u isAttached =>
-          let step := @insertAttachedStep a b neq t _ not_in u _ isAttached
-          Eq.trans step (congrArg (AttrList.cons b not_in u) (insertAttached isAttached))
-
-  def insertTwice
-    {lst : List Attr}
-    (l : AttrList lst)
-    (a : Attr)
-    (t t' : Term)
-    : insert (insert l a (attached t')) a (attached t) = insert l a (attached t)
-    := match lst with
-      | [] => match l with
-        | AttrList.nil => by simp [insert]
-      | b :: bs => match l with
-        | AttrList.cons _ not_in _ tail => dite (a = b)
-          (λ eq => by simp [insert, eq])
-          (λ neq =>
-            let neq' : b ≠ a := λ eq => neq eq.symm
-            by  simp [insert, neq']
-                exact insertTwice tail a t t'
-          )
-
-  def insert_new_isAttached
-    { lst : List Attr }
-    { l : AttrList lst }
-    { a : Attr }
-    { t t' : Term}
-    : IsAttached a t l → IsAttached a t' (insert l a (attached t'))
-    := λ isAttached => match isAttached with
-      | IsAttached.zeroth_attached _ not_in _ _=> by
-        simp [insert]
-        exact IsAttached.zeroth_attached _ _ _ _
-      | IsAttached.next_attached _ _ l b neq not_in u new_isAttached => by
-        have hypothesis : IsAttached a t' (insert l a (attached t'))
-          := insert_new_isAttached new_isAttached
-        simp [insert, neq.symm]
-        exact IsAttached.next_attached a t' (insert l a (attached t')) b neq not_in u hypothesis
-
-end Insert
-
-namespace Reduce
-
-  inductive Reduce : Term → Term → Type where
-    | congOBJ
-      : { t : Term }
-      → { t' : Term }
-      → (b : Attr)
-      → { lst : List Attr }
-      → (l : AttrList lst)
-      → Reduce t t'
-      → IsAttached b t l
-      → Reduce (obj l) (obj (insert l b (attached t')))
-    | congDOT : ∀ t t' a, Reduce t t' → Reduce (dot t a) (dot t' a)
-    | congAPPₗ : ∀ t t' u a, Reduce t t' → Reduce (app t a u) (app t' a u)
-    | congAPPᵣ : ∀ t u u' a, Reduce u u' → Reduce (app t a u) (app t a u')
-    | dot_c
-      : { t : Term }
-      → (t_c : Term)
-      → (c : Attr)
-      → { lst : List Attr }
-      → (l : AttrList lst)
-      → t = obj l
-      → lookup l c = some (attached t_c)
-      → Reduce (dot t c) (substitute (0, t) t_c)
-    | dot_cφ
-      : { t : Term }
-      → (c : Attr)
-      → { lst : List Attr }
-      → (l : AttrList lst)
-      → t = obj l
-      → lookup l c = none
-      → IsAttr "φ" t
-      → Reduce (dot t c) (dot (dot t "φ") c)
-    | app_c
-      : (t u : Term)
-      → (c : Attr)
-      → { lst : List Attr }
-      → (l : AttrList lst)
-      → t = obj l
-      → lookup l c = some void
-      → Reduce (app t c u) (obj (insert l c (attached (incLocators u))))
-
-open Reduce
-
-namespace PReduce
-  mutual
-    -- | tᵢ => tᵢ' for all i with ⟦ ... αᵢ ↦ tᵢ ... ⟧
-    --   α's are given by `lst`
-    inductive Premise : { lst : List Attr } → (l1 : AttrList lst) → (l2 : AttrList lst) → Type where
-      | nil : Premise AttrList.nil AttrList.nil
-      | consVoid
-        : (a : Attr)
-        → { lst : List Attr }
-        → { l1 : AttrList lst }
-        → { l2 : AttrList lst }
-        → { not_in : a ∉ lst }
-        → Premise l1 l2
-        → Premise (AttrList.cons a not_in void l1) (AttrList.cons a not_in void l2)
-      | consAttached
-        : (a : Attr)
-        → (t1 : Term)
-        → (t2 : Term)
-        → PReduce t1 t2
-        → { lst : List Attr }
-        → { l1 : AttrList lst }
-        → { l2 : AttrList lst }
-        → { not_in : a ∉ lst }
-        → Premise l1 l2
-        → Premise (AttrList.cons a not_in (attached t1) l1) (AttrList.cons a not_in (attached t2) l2)
-
-    inductive PReduce : Term → Term → Type where
-      | pcongOBJ
-        : { lst : List Attr }
-        → (l : AttrList lst)
-        → (newAttrs : AttrList lst)
-        → Premise l newAttrs
-        → PReduce (obj l) (obj newAttrs)
-      | pcong_ρ : ∀ n, PReduce (loc n) (loc n)
-      | pcongDOT : ∀ t t' a, PReduce t t' → PReduce (dot t a) (dot t' a)
-      | pcongAPP : ∀ t t' u u' a, PReduce t t' → PReduce u u' → PReduce (app t a u) (app t' a u')
-      | pdot_c
-        : { t t' : Term }
-        → (t_c : Term)
-        → (c : Attr)
-        → { lst : List Attr }
-        → (l : AttrList lst)
-        → PReduce t t'
-        → t' = obj l
-        → lookup l c = some (attached t_c)
-        → PReduce (dot t c) (substitute (0, t') t_c)
-      | pdot_cφ
-        : { t t' : Term }
-        → (c : Attr)
-        → { lst : List Attr }
-        → (l : AttrList lst)
-        → PReduce t t'
-        → t' = obj l
-        → lookup l c = none
-        → IsAttr "φ" t'
-        → PReduce (dot t c) (dot (dot t' "φ") c)
-      | papp_c
-        : { t t' u u' : Term }
-        → (c : Attr)
-        → { lst : List Attr }
-        → (l : AttrList lst)
-        → PReduce t t'
-        → PReduce u u'
-        → t' = obj l
-        → lookup l c = some void
-        → PReduce (app t c u) (obj (insert l c (attached (incLocators u'))))
-  end
-
--- [KS22, Proposition 3.3 (Reflexivity of parallel reduction)]
-  mutual
-    def reflexivePremise
-      { lst : List Attr }
-      (l : AttrList lst)
-      : Premise l l
-      := match l with
-        | AttrList.nil => Premise.nil
-        | AttrList.cons name not_in opAttr tail =>
-            match opAttr with
-              | void => Premise.consVoid name (reflexivePremise tail)
-              | attached t => Premise.consAttached name t t (prefl t) (reflexivePremise tail)
-
-    def prefl : (t : Term) → PReduce t t
-      := λ term => match term with
-        | loc n => PReduce.pcong_ρ n
-        | dot t a => PReduce.pcongDOT t t a (prefl t)
-        | app t a u => PReduce.pcongAPP t t u u a (prefl t) (prefl u)
-        | @obj lst l =>
-            let premise := reflexivePremise l
-            PReduce.pcongOBJ _ _ premise
-  end
-
-  def singlePremise
-    { lst : List Attr }
-    : (l : AttrList lst)
-    → (a : Attr)
-    → (t : Term)
-    → (t' : Term)
-    → IsAttached a t l
-    → PReduce t t'
-    → Premise l (insert l a (attached t'))
-    := λ l a t t' isAttached preduce => match lst with
-      | [] => match l with
-        | AttrList.nil => Premise.nil
-      | b :: bs => match isAttached with
-        | IsAttached.zeroth_attached _ _ _ tail => match l with
-          | AttrList.cons _ _ _ _ => by
-              simp [insert]
-              exact Premise.consAttached b t t' preduce (reflexivePremise tail)
-        | IsAttached.next_attached _ _ tail _ neq not_in u newIsAttached => match l with
-          | AttrList.cons _ _ _ _ => by
-              have neq' : b ≠ a := λ eq => neq eq.symm
-              simp [insert, neq']
-              have premise := (singlePremise tail a t t' newIsAttached preduce)
-              exact (match u with
-                | void => Premise.consVoid b premise
-                | attached u' => Premise.consAttached b u' u' (prefl u') premise
-              )
-
-  def singlePremiseInsert
-    { lst : List Attr }
-    { l1 l2 : AttrList lst }
-    { a : Attr }
-    { t1 t2 : Term }
-    (preduce : PReduce t1 t2)
-    (premise : Premise l1 l2)
-    : Premise (insert l1 a (attached t1)) (insert l2 a (attached t2))
-    := match premise with
-      | Premise.nil => Premise.nil
-      | Premise.consVoid b tail => dite
-          (b = a)
-          (λ eq => by
-            simp [insert, eq]
-            exact Premise.consAttached b _ _ preduce tail
-          )
-          (λ neq => by
-            simp [insert, neq]
-            exact Premise.consVoid b (singlePremiseInsert preduce tail)
-          )
-      | Premise.consAttached b t' t'' preduce' tail => dite
-          (b = a)
-          (λ eq => by
-            simp [insert, eq]
-            exact Premise.consAttached b _ _ preduce tail
-          )
-          (λ neq => by
-            simp [insert, neq]
-            exact Premise.consAttached b t' t'' preduce' (singlePremiseInsert preduce tail)
-          )
-
-  def lookup_void_premise
-    { lst : List Attr }
-    { l1 l2 : AttrList lst }
-    { a : Attr }
-    (lookup_void : lookup l1 a = some void)
-    (premise : Premise l1 l2)
-    : lookup l2 a = some void
-    := match lst with
-      | [] => match l1, l2 with | AttrList.nil, AttrList.nil => by contradiction
-      | b :: bs => match l1, l2 with
-          | AttrList.cons _ _ _ tail1, AttrList.cons _ _ _ tail2 => match premise with
-            | Premise.consVoid _ premise_tail => dite
-              (b = a)
-              (λ eq => by simp [lookup, eq])
-              (λ neq => by
-                simp [lookup, neq] at lookup_void
-                simp [lookup, neq]
-                exact lookup_void_premise lookup_void premise_tail
-              )
-            | Premise.consAttached _ _ _ _ premise_tail => dite
-              (b = a)
-              (λ eq => by simp [lookup, eq] at lookup_void)
-              (λ neq => by
-                simp [lookup, neq] at lookup_void
-                simp [lookup, neq]
-                exact lookup_void_premise lookup_void premise_tail
-              )
-
-  inductive Pair : Prop → Type → Type where
-    | pair
-      : { p : Prop }
-      → { t : Type }
-      → (prop : p)
-      → (val : t)
-      → Pair p t
-
-  def lookup_attached_premise
-    { lst : List Attr }
-    { l1 l2 : AttrList lst }
-    { a : Attr }
-    { u : Term }
-    (lookup_attached : lookup l1 a = some (attached u))
-    (premise : Premise l1 l2)
-    : Σ u' : Term, Pair (lookup l2 a = some (attached u')) (PReduce u u')
-    := match lst with
-      | [] => match l1, l2 with | AttrList.nil, AttrList.nil => match premise with
-        | Premise.nil => by
-          simp [lookup]
-          contradiction
-      | b :: bs => match premise with
-        | Premise.consVoid _ premise_tail => by
-          simp [lookup]
-          exact dite
-            (b = a)
-            (λ eq => by
-              simp [lookup, eq] at lookup_attached
-            )
-            (λ neq => by
-              simp [lookup, neq]
-              simp [lookup, neq] at lookup_attached
-              exact lookup_attached_premise (lookup_attached) premise_tail
-            )
-        | Premise.consAttached _ t1 t2 preduce premise_tail => by
-          simp [lookup]
-          exact dite
-            (b = a)
-            (λ eq => by
-              simp [eq]
-              simp [lookup, eq] at lookup_attached
-              simp [lookup_attached] at preduce
-              exact ⟨t2, Pair.pair rfl preduce⟩
-            )
-            (λ neq => by
-              simp [neq]
-              simp [lookup, neq] at lookup_attached
-              exact lookup_attached_premise (lookup_attached) premise_tail
-            )
-
-open PReduce
-
-inductive RedMany : Term → Term → Type where
-  | nil : { m : Term } → RedMany m m
-  | cons : { l m n : Term} → Reduce l m → RedMany m n → RedMany l n
-
-inductive ParMany : Term → Term → Type where
-  | nil : { m : Term } → ParMany m m
-  | cons : { l m n : Term} → PReduce l m → ParMany m n → ParMany l n
-
-scoped infix:20 " ⇝ " => Reduce
-scoped infix:20 " ⇛ " => PReduce
-scoped infix:20 " ⇝* " => RedMany
-scoped infix:20 " ⇛* " => ParMany
-
--- [KS22, Proposition 3.4 (1), Eqivalence of ⇛ and ⇝]
-def reg_to_par {t t' : Term} : (t ⇝ t') → (t ⇛ t')
-  | .congOBJ b l red isAttached =>
-      .pcongOBJ
-        l
-        (insert l b (attached _))
-        (PReduce.singlePremise l b _ _ isAttached (reg_to_par red))
-  | .congDOT t t' a red =>
-      .pcongDOT t t' a (reg_to_par red)
-  | .congAPPₗ t t' u a red =>
-      .pcongAPP t t' u u a (reg_to_par red) (prefl u)
-  | .congAPPᵣ t u u' a red =>
-      .pcongAPP t t u u' a (prefl t) (reg_to_par red)
-  | @Reduce.dot_c t t_c c _ l eq lookup_eq =>
-      .pdot_c t_c c l (prefl t) eq lookup_eq
-  | @Reduce.dot_cφ t c _ l eq lookup_c isAttr_φ =>
-      .pdot_cφ c l (prefl t) eq lookup_c isAttr_φ
-  | Reduce.app_c t u c l eq lookup_eq =>
-      PReduce.papp_c c l (prefl t) (prefl u) eq lookup_eq
-
--- [KS22, Lemma A.3 (Transitivity of ⇝*)]
-def red_trans { t t' t'' : Term } : (t ⇝* t') → (t' ⇝* t'') → (t ⇝* t'')
-  | RedMany.nil, reds => reds
-  | RedMany.cons lm mn_many, reds => RedMany.cons lm (red_trans mn_many reds)
-
-def notEqByMem
-  { lst : List Attr }
-  { a b : Attr }
-  (a_is_in : a ∈ lst)
-  (b_not_in : b ∉ lst)
-  : a ≠ b
-  := λ eq =>
-    let memEq : List.Mem a lst = List.Mem b lst :=
-      congrArg (λ x => Membership.mem x lst) eq
-    b_not_in (Eq.mp memEq a_is_in)
-
-def mapRedManyObj
-  { lst : List Attr}
-  (a : Attr)
-  { not_in_a : a ∉ lst }
-  (u_a  : OptionalAttr)
-  { l1 l2 : AttrList lst }
-  : (obj l1 ⇝* obj l2)
-  → (obj (AttrList.cons a not_in_a u_a l1) ⇝* obj (AttrList.cons a not_in_a u_a l2))
-  := λ redmany => match redmany with
-    | RedMany.nil => RedMany.nil
-    | RedMany.cons (@congOBJ t t' c _ _ red_tt' isAttached) reds =>
-      have one_step : (obj (AttrList.cons a not_in_a u_a l1) ⇝
-        obj (AttrList.cons a not_in_a u_a (insert l1 c (attached t')))) := by
-          have c_is_in := isAttachedIsIn isAttached
-          have a_not_in := not_in_a
-          have neq_c_a : c ≠ a := notEqByMem c_is_in a_not_in
-          have intermediate := congOBJ c (AttrList.cons a not_in_a u_a l1) red_tt'
-            (IsAttached.next_attached c _ _ _ neq_c_a _ _ isAttached)
-          simp [insert, neq_c_a.symm] at intermediate
-          assumption
-      (RedMany.cons one_step (mapRedManyObj _ _ reds))
-
--- [KS22, Lemma A.4 (1), Congruence for ⇝* in OBJ]
-def congOBJClos
-  { t t' : Term }
-  { b : Attr }
-  { lst : List Attr }
-  { l : AttrList lst }
-  : (t ⇝* t')
-  → IsAttached b t l
-  → (obj l ⇝* obj (insert l b (attached t')))
-  := λ red_tt' isAttached => match red_tt' with
-    | RedMany.nil => Eq.ndrec (RedMany.nil) (congrArg obj (Eq.symm (Insert.insertAttached isAttached)))
-    | @RedMany.cons t t_i t' red redMany =>
-      have ind_hypothesis : obj (insert l b (attached t_i)) ⇝* obj (insert (insert l b (attached t_i)) b (attached t'))
-        := (congOBJClos redMany (Insert.insert_new_isAttached isAttached))
-      RedMany.cons
-        (congOBJ b l red isAttached)
-        (Eq.ndrec ind_hypothesis
-        (congrArg obj (Insert.insertTwice l b t' t_i)))
-
--- [KS22, Lemma A.4 (2), Congruence for ⇝* in DOT]
-def congDotClos
-  { t t' : Term }
-  { a : Attr }
-  : (t ⇝* t') → ((dot t a) ⇝* (dot t' a))
-  | RedMany.nil => RedMany.nil
-  | @RedMany.cons l m n lm mn_many =>
-    RedMany.cons (congDOT l m a lm) (congDotClos mn_many)
-
--- [KS22, Lemma A.4 (3), Congruence for ⇝* in APPₗ]
-def congAPPₗClos
-  { t t' u : Term }
-  { a : Attr }
-  : (t ⇝* t') → ((app t a u) ⇝* (app t' a u))
-  | RedMany.nil => RedMany.nil
-  | @RedMany.cons l m n lm mn_many =>
-    RedMany.cons (congAPPₗ l m u a lm) (congAPPₗClos mn_many)
-
--- [KS22, Lemma A.4 (4), Congruence for ⇝* in APPᵣ]
-def congAPPᵣClos
-  { t u u' : Term }
-  { a : Attr }
-  : (u ⇝* u') → ((app t a u) ⇝* (app t a u'))
-  | RedMany.nil => RedMany.nil
-  | @RedMany.cons l m n lm mn_many =>
-    RedMany.cons (congAPPᵣ t l m a lm) (congAPPᵣClos mn_many)
-
--- [KS22, Proposition 3.4 (3), Eqivalence of ⇛ and ⇝]
-def par_to_redMany {t t' : Term} : (t ⇛ t') → (t ⇝* t')
-  | @PReduce.pcongOBJ lst l l' premise =>
-    let rec fold_premise
-      { lst : List Attr }
-      { al al' : AttrList lst }
-      (premise : Premise al al')
-      : (obj al) ⇝* (obj al')
-      := match lst with
-        | [] => match al, al' with
-          | AttrList.nil, AttrList.nil => RedMany.nil
-        | a :: as => match al, al' with
-          | AttrList.cons _ not_in u tail, AttrList.cons _ _ u' tail' => match premise with
-            | Premise.consVoid _ premiseTail => mapRedManyObj a void (fold_premise premiseTail)
-            | @Premise.consAttached _ t1 t2 preduce _ l1 l2 not_in premiseTail => by
-                suffices temp : obj (insert (AttrList.cons a not_in (attached t1) l1) a (attached t2)) ⇝*
-                  obj (AttrList.cons a _ (attached t2) l2) from
-                  (red_trans
-                    (congOBJClos (par_to_redMany preduce) (IsAttached.zeroth_attached a _ t1 l1))
-                    (temp))
-                simp [insert]
-                exact mapRedManyObj a (attached t2) (fold_premise premiseTail)
-    fold_premise premise
-  | .pcong_ρ n => RedMany.nil
-  | .pcongDOT t t' a prtt' => congDotClos (par_to_redMany prtt')
-  | .pcongAPP t t' u u' a prtt' pruu' => red_trans
-    (congAPPₗClos (par_to_redMany prtt'))
-    (congAPPᵣClos (par_to_redMany pruu'))
-  | PReduce.pdot_c t_c c l preduce eq lookup_eq =>
-    let tc_t'c_many := congDotClos (par_to_redMany preduce)
-    let tc_dispatch := Reduce.dot_c t_c c l eq lookup_eq
-    let tc_dispatch_clos := RedMany.cons tc_dispatch RedMany.nil
-    red_trans tc_t'c_many tc_dispatch_clos
-  | PReduce.pdot_cφ c l preduce eq lookup_eq isAttr =>
-    let tc_t'c_many := congDotClos (par_to_redMany preduce)
-    let tφc_dispatch := dot_cφ c l eq lookup_eq isAttr
-    let tφc_dispatch_clos := RedMany.cons tφc_dispatch RedMany.nil
-    red_trans tc_t'c_many tφc_dispatch_clos
-  | @PReduce.papp_c t t' u u' c lst l prtt' pruu' path_t'_obj_lst path_lst_c_void =>
-    let tu_t'u_many := congAPPₗClos (par_to_redMany prtt')
-    let t'u_t'u'_many := congAPPᵣClos (par_to_redMany pruu')
-    let tu_t'u'_many := red_trans tu_t'u_many t'u_t'u'_many
-    let tu_app := app_c t' u' c l path_t'_obj_lst path_lst_c_void
-    let tu_app_clos := RedMany.cons tu_app RedMany.nil
-    red_trans tu_t'u'_many tu_app_clos
-
--- [KS22, Proposition 3.4 (4), Eqivalence of ⇛ and ⇝]
-def parMany_to_redMany {t t' : Term} : (t ⇛* t') → (t ⇝* t')
-  | ParMany.nil => RedMany.nil
-  | ParMany.cons red reds => red_trans (par_to_redMany red) (parMany_to_redMany reds)
-
--- [KS22, Proposition 3.4 (2), Eqivalence of ⇛ and ⇝]
-def redMany_to_parMany {t t' : Term} : (t ⇝* t') → (t ⇛* t')
-  | RedMany.nil => ParMany.nil
-  | RedMany.cons red reds => ParMany.cons (reg_to_par red) (redMany_to_parMany reds)
-
--------------------------------------------------------
--- properties of mapAttrList
-namespace MapAttrList
-  def mapAttrList_compose
-    (f g : Term → Term )
-    { lst : List Attr }
-    ( l : AttrList lst)
-    : mapAttrList f (mapAttrList g l) = mapAttrList (λ t => f (g t)) l
-    := match l with
-      | AttrList.nil => rfl
-      | AttrList.cons _ _ u tail => by
-        cases u <;> simp [mapAttrList] <;> exact mapAttrList_compose f g tail
-
-  def mapAttrList_lookup_attached
-    ( f : Term → Term)
-    { lst : List Attr}
-    { l : AttrList lst}
-    { t_c : Term}
-    { c : Attr}
-    : lookup l c = some (attached t_c) →
-      lookup (mapAttrList f l) c = some (attached (f t_c))
-    := λ lookup_eq => by match l with
-      | AttrList.nil => contradiction
-      | AttrList.cons name _ u tail =>
-        simp [lookup] at *
-        split
-        . rename_i eq
-          simp [eq] at lookup_eq
-          simp [lookup_eq]
-        . rename_i neq
-          simp [neq] at lookup_eq
-          exact mapAttrList_lookup_attached f lookup_eq
-
-  def mapAttrList_lookup_void
-    ( f : Term → Term)
-    { lst : List Attr}
-    { l : AttrList lst}
-    { c : Attr}
-    : lookup l c = some void → lookup (mapAttrList f l) c = some void
-    := λ lookup_eq => by match l with
-      | AttrList.nil => contradiction
-      | AttrList.cons name _ u tail =>
-        simp [lookup] at *
-        split
-        . rename_i eq
-          simp [eq] at lookup_eq
-          simp [lookup_eq]
-        . rename_i neq
-          simp [neq] at lookup_eq
-          exact mapAttrList_lookup_void f lookup_eq
-
-  def mapAttrList_lookup_none
-    ( f : Term → Term)
-    { lst : List Attr}
-    { l : AttrList lst}
-    { c : Attr}
-    : lookup l c = none →
-      lookup (mapAttrList f l) c = none
-    := λ lookup_eq => by match l with
-      | AttrList.nil => rfl
-      | AttrList.cons name _ u tail =>
-        simp [lookup] at *
-        split
-        . rename_i eq
-          simp [eq] at lookup_eq
-        . rename_i neq
-          simp [neq] at lookup_eq
-          exact mapAttrList_lookup_none f lookup_eq
-
-  def mapAttrList_isAttr
-    ( c : Attr)
-    { lst : List Attr}
-    ( l : AttrList lst)
-    ( f : Term → Term)
-    : IsAttr c (obj l) → IsAttr c (obj (mapAttrList f l))
-    | @IsAttr.is_attr lst a _in _ => by
-      exact @IsAttr.is_attr lst a _in (mapAttrList f l)
-end MapAttrList
 
 instance : Min (Option Nat) where
   min
@@ -862,9 +87,9 @@ def min_free_loc
   | dot t _ => min_free_loc zeroth_level t
   | app t _ u => min (min_free_loc zeroth_level t) (min_free_loc zeroth_level u)
   | obj o => match o with
-    | AttrList.nil => none
-    | AttrList.cons _ _ void tail => min_free_loc zeroth_level (obj tail)
-    | AttrList.cons _ _ (attached t) tail =>
+    | Bindings.nil => none
+    | Bindings.cons _ _ void tail => min_free_loc zeroth_level (obj tail)
+    | Bindings.cons _ _ (attached t) tail =>
       min
       (min_free_loc (zeroth_level + 1) t)
       (min_free_loc zeroth_level (obj tail))
@@ -948,18 +173,18 @@ def min_free_loc_inc
     simp [incLocatorsFrom]
     let rec traverse_bindings
     { lst : List Attr}
-    ( bindings : AttrList lst)
+    ( bindings : Bindings lst)
     ( free_locs : le_nat_option_nat i (min_free_loc j (obj bindings)))
-    : le_nat_option_nat (i + 1) (min_free_loc j (obj (mapAttrList (incLocatorsFrom (j + 1)) bindings)))
+    : le_nat_option_nat (i + 1) (min_free_loc j (obj (mapBindings (incLocatorsFrom (j + 1)) bindings)))
     := by match bindings with
-      | AttrList.nil =>
-        simp [mapAttrList]
+      | Bindings.nil =>
+        simp [mapBindings]
         simp [min_free_loc, le_nat_option_nat]
-      | AttrList.cons _ _ void tail =>
-        simp [mapAttrList, min_free_loc]
+      | Bindings.cons _ _ void tail =>
+        simp [mapBindings, min_free_loc]
         exact traverse_bindings tail (by simp [min_free_loc] at free_locs ; exact free_locs)
-      | AttrList.cons _ _ (attached term) tail =>
-        simp [mapAttrList, min_free_loc]
+      | Bindings.cons _ _ (attached term) tail =>
+        simp [mapBindings, min_free_loc]
         apply le_min_option_reverse
         constructor
         . simp [min_free_loc] at free_locs
@@ -1011,20 +236,20 @@ def subst_inc_cancel
     . exact v_loc.left
     . exact v_loc.right
   | obj o => by
-    simp [incLocatorsFrom, substitute, MapAttrList.mapAttrList_compose]
+    simp [incLocatorsFrom, substitute, MapBindings.mapBindings_compose]
     let rec traverse_bindings
     { lst : List Attr}
-    ( bindings : AttrList lst)
+    ( bindings : Bindings lst)
     ( free_locs : le_nat_option_nat i (min_free_loc zeroth_level (obj bindings)))
-    : bindings = mapAttrList (fun t => substitute (j + 1, incLocators u) (incLocatorsFrom (k + 1) t)) bindings
+    : bindings = mapBindings (fun t => substitute (j + 1, incLocators u) (incLocatorsFrom (k + 1) t)) bindings
     := by match bindings with
-      | AttrList.nil =>
-        simp [mapAttrList]
-      | AttrList.cons _ _ void tail =>
-        simp [mapAttrList]
+      | Bindings.nil =>
+        simp [mapBindings]
+      | Bindings.cons _ _ void tail =>
+        simp [mapBindings]
         exact traverse_bindings tail (by simp [min_free_loc] at free_locs ; assumption)
-      | AttrList.cons _ _ (attached term) tail =>
-        simp [mapAttrList]
+      | Bindings.cons _ _ (attached term) tail =>
+        simp [mapBindings]
         constructor
         . simp [min_free_loc] at free_locs
           have free_locs_term := (le_min_option free_locs).left
@@ -1045,6 +270,726 @@ def subst_inc_cancel
           exact traverse_bindings tail free_locs.right
     exact traverse_bindings o v_loc
 decreasing_by sorry
+
+def lookup { lst : List Attr } (l : Bindings lst) (a : Attr) : Option OptionalAttr
+  := match l with
+    | Bindings.nil => none
+    | Bindings.cons name _ opAttr tail =>
+        if (name == a) then some opAttr
+        else lookup tail a
+
+def lookup_none_not_in
+  { lst : List Attr }
+  { l : Bindings lst }
+  { a : Attr }
+  (lookup_none : lookup l a = none)
+  : a ∉ lst
+  := λ a_in_lst => match lst with
+    | [] => by contradiction
+    | b :: bs => match l with
+      | Bindings.cons _ _ opAttr tail =>
+        dite
+        (b = a)
+        (λ eq => by simp [eq, lookup] at lookup_none)
+        (λ neq => by
+          simp [neq, lookup] at lookup_none
+          have temp := lookup_none_not_in lookup_none
+          match a_in_lst with
+            | List.Mem.head _ => contradiction
+            | List.Mem.tail _ memTail => contradiction
+        )
+
+def lookup_none_preserve
+  { lst : List Attr }
+  { l1 : Bindings lst }
+  { a : Attr }
+  (lookup_none : lookup l1 a = none)
+  (l2 : Bindings lst)
+  : (lookup l2 a = none)
+  := match lst with
+    | [] => match l2 with | Bindings.nil => by simp [lookup]
+    | b :: bs => match l1, l2 with
+      | Bindings.cons _ _ opAttr1 tail1, Bindings.cons _ _ opAttr2 tail2 => dite
+        (b = a)
+        (λ eq => by simp [lookup, eq] at lookup_none)
+        (λ neq => by
+          simp [lookup, neq] at lookup_none
+          simp [lookup, neq]
+          exact lookup_none_preserve lookup_none tail2
+        )
+
+def insert
+  { lst : List Attr }
+  (l : Bindings lst)
+  (a : Attr)
+  (u : OptionalAttr)
+  : (Bindings lst)
+  := match l with
+    | Bindings.nil => Bindings.nil
+    | Bindings.cons name not_in opAttr tail =>
+        if name == a then Bindings.cons name not_in u tail
+        else Bindings.cons name not_in opAttr (insert tail a u)
+
+partial def whnf : Term → Term
+  | loc n => loc n
+  | obj o => obj o
+  | app t a u => match (whnf t) with
+    | obj o => match lookup o a with
+      | none => app (obj o) a u
+      | some (attached _) => app (obj o) a u
+      | some void => obj (insert o a (attached (incLocators u)))
+    | t' => app t' a u
+  | dot t a => match (whnf t) with
+    | obj o => match lookup o a with
+      | some (attached u) => whnf (substitute (0, obj o) u)
+      | some void => dot (obj o) a
+      | none => match lookup o "φ" with
+        | some _ => dot (dot (obj o) "φ") a
+        | none => dot (obj o) a
+    | t' => dot t' a
+
+partial def nf : Term → Term
+  | loc n => loc n
+  | obj o => obj (mapBindings nf o)
+  | app t a u => match (whnf t) with
+    | obj o => match lookup o a with
+      | none => app (nf (obj o)) a (nf u)
+      | some (attached _) => app (nf (obj o)) a (nf u)
+      | some void => nf (obj (insert o a (attached (incLocators u))))
+    | t' => app (nf t') a (nf u)
+  | dot t a => match (whnf t) with
+    | obj o => match lookup o a with
+      | some (attached u) => nf (substitute (0, obj o) u)
+      | some void => dot (nf (obj o)) a
+      | none => match lookup o "φ" with
+        | some _ => nf (dot (dot (obj o) "φ") a)
+        | none => dot (nf (obj o)) a
+    | t' => dot (nf t') a
+
+inductive IsAttr : Attr → Term → Type where
+  | is_attr
+    : { lst : List Attr }
+    → (a : Attr)
+    → a ∈ lst
+    → (l : Bindings lst)
+    → IsAttr a (obj l)
+
+def is_attr_in
+  { lst : List Attr }
+  { a : Attr }
+  { l : Bindings lst }
+  : IsAttr a (obj l)
+  → a ∈ lst
+  := λ (IsAttr.is_attr _ is_in _) => is_in
+
+inductive IsAttached : { lst : List Attr } → Attr → Term → Bindings lst → Type where
+  | zeroth_attached
+    : { lst : List Attr }
+    → (a : Attr)
+    → (not_in : a ∉ lst)
+    → (t : Term)
+    → (l : Bindings lst)
+    → IsAttached a t (Bindings.cons a not_in (attached t) l)
+  | next_attached
+    : { lst : List Attr }
+    → (a : Attr)
+    → (t : Term)
+    → (l : Bindings lst)
+    → (b : Attr)
+    → (a ≠ b)
+    → (not_in : b ∉ lst)
+    → (u : OptionalAttr)
+    → IsAttached a t l
+    → IsAttached a t (Bindings.cons b not_in u l)
+
+def isAttachedIsIn
+  { lst : List Attr }
+  { a : Attr }
+  { t : Term }
+  { l : Bindings lst }
+  : IsAttached a t l
+  → a ∈ lst
+  | @IsAttached.zeroth_attached lst' _ _ _ _ => List.Mem.head lst'
+  | IsAttached.next_attached _ _ _ b _ _ _ isAttached' => List.Mem.tail b (isAttachedIsIn isAttached')
+
+namespace Insert
+
+  def insertAttachedStep
+    { a b : Attr }
+    { neq : a ≠ b }
+    { t : Term }
+    { lst : List Attr }
+    { not_in : b ∉ lst }
+    { u : OptionalAttr }
+    { l : Bindings lst }
+    (_ : IsAttached a t l)
+    : insert (Bindings.cons b not_in u l) a (attached t)
+        = Bindings.cons b not_in u (insert l a (attached t))
+    := by simp [insert, neq];
+          split
+          . have neq' := neq.symm
+            contradiction
+          . simp
+
+  def insertAttached
+    { a : Attr }
+    { t : Term }
+    { lst : List Attr }
+    { l : Bindings lst }
+    : IsAttached a t l
+    → insert l a (attached t) = l
+      | IsAttached.zeroth_attached _ _ _ _ => by simp [insert]
+      | IsAttached.next_attached _ _ l b neq not_in u isAttached =>
+          let step := @insertAttachedStep a b neq t _ not_in u _ isAttached
+          Eq.trans step (congrArg (Bindings.cons b not_in u) (insertAttached isAttached))
+
+  def insertTwice
+    {lst : List Attr}
+    (l : Bindings lst)
+    (a : Attr)
+    (t t' : Term)
+    : insert (insert l a (attached t')) a (attached t) = insert l a (attached t)
+    := match lst with
+      | [] => match l with
+        | Bindings.nil => by simp [insert]
+      | b :: bs => match l with
+        | Bindings.cons _ not_in _ tail => dite (a = b)
+          (λ eq => by simp [insert, eq])
+          (λ neq =>
+            let neq' : b ≠ a := λ eq => neq eq.symm
+            by  simp [insert, neq']
+                exact insertTwice tail a t t'
+          )
+
+  def insert_new_isAttached
+    { lst : List Attr }
+    { l : Bindings lst }
+    { a : Attr }
+    { t t' : Term}
+    : IsAttached a t l → IsAttached a t' (insert l a (attached t'))
+    := λ isAttached => match isAttached with
+      | IsAttached.zeroth_attached _ not_in _ _=> by
+        simp [insert]
+        exact IsAttached.zeroth_attached _ _ _ _
+      | IsAttached.next_attached _ _ l b neq not_in u new_isAttached => by
+        have hypothesis : IsAttached a t' (insert l a (attached t'))
+          := insert_new_isAttached new_isAttached
+        simp [insert, neq.symm]
+        exact IsAttached.next_attached a t' (insert l a (attached t')) b neq not_in u hypothesis
+
+end Insert
+
+inductive Reduce : Term → Term → Type where
+  | congOBJ
+    : { t : Term }
+    → { t' : Term }
+    → (b : Attr)
+    → { lst : List Attr }
+    → (l : Bindings lst)
+    → Reduce t t'
+    → IsAttached b t l
+    → Reduce (obj l) (obj (insert l b (attached t')))
+  | congDOT : ∀ t t' a, Reduce t t' → Reduce (dot t a) (dot t' a)
+  | congAPPₗ : ∀ t t' u a, Reduce t t' → Reduce (app t a u) (app t' a u)
+  | congAPPᵣ : ∀ t u u' a, Reduce u u' → Reduce (app t a u) (app t a u')
+  | dot_c
+    : { t : Term }
+    → (t_c : Term)
+    → (c : Attr)
+    → { lst : List Attr }
+    → (l : Bindings lst)
+    → t = obj l
+    → lookup l c = some (attached t_c)
+    → Reduce (dot t c) (substitute (0, t) t_c)
+  | dot_cφ
+    : { t : Term }
+    → (c : Attr)
+    → { lst : List Attr }
+    → (l : Bindings lst)
+    → t = obj l
+    → lookup l c = none
+    → IsAttr "φ" t
+    → Reduce (dot t c) (dot (dot t "φ") c)
+  | app_c
+    : (t u : Term)
+    → (c : Attr)
+    → { lst : List Attr }
+    → (l : Bindings lst)
+    → t = obj l
+    → lookup l c = some void
+    → Reduce (app t c u) (obj (insert l c (attached (incLocators u))))
+
+namespace PReduce
+  mutual
+    -- | tᵢ => tᵢ' for all i with ⟦ ... αᵢ ↦ tᵢ ... ⟧
+    --   α's are given by `lst`
+    inductive Premise : { lst : List Attr } → (l1 : Bindings lst) → (l2 : Bindings lst) → Type where
+      | nil : Premise Bindings.nil Bindings.nil
+      | consVoid
+        : (a : Attr)
+        → { lst : List Attr }
+        → { l1 : Bindings lst }
+        → { l2 : Bindings lst }
+        → { not_in : a ∉ lst }
+        → Premise l1 l2
+        → Premise (Bindings.cons a not_in void l1) (Bindings.cons a not_in void l2)
+      | consAttached
+        : (a : Attr)
+        → (t1 : Term)
+        → (t2 : Term)
+        → PReduce t1 t2
+        → { lst : List Attr }
+        → { l1 : Bindings lst }
+        → { l2 : Bindings lst }
+        → { not_in : a ∉ lst }
+        → Premise l1 l2
+        → Premise (Bindings.cons a not_in (attached t1) l1) (Bindings.cons a not_in (attached t2) l2)
+
+    inductive PReduce : Term → Term → Type where
+      | pcongOBJ
+        : { lst : List Attr }
+        → (l : Bindings lst)
+        → (newAttrs : Bindings lst)
+        → Premise l newAttrs
+        → PReduce (obj l) (obj newAttrs)
+      | pcong_ρ : ∀ n, PReduce (loc n) (loc n)
+      | pcongDOT : ∀ t t' a, PReduce t t' → PReduce (dot t a) (dot t' a)
+      | pcongAPP : ∀ t t' u u' a, PReduce t t' → PReduce u u' → PReduce (app t a u) (app t' a u')
+      | pdot_c
+        : { t t' : Term }
+        → (t_c : Term)
+        → (c : Attr)
+        → { lst : List Attr }
+        → (l : Bindings lst)
+        → PReduce t t'
+        → t' = obj l
+        → lookup l c = some (attached t_c)
+        → PReduce (dot t c) (substitute (0, t') t_c)
+      | pdot_cφ
+        : { t t' : Term }
+        → (c : Attr)
+        → { lst : List Attr }
+        → (l : Bindings lst)
+        → PReduce t t'
+        → t' = obj l
+        → lookup l c = none
+        → IsAttr "φ" t'
+        → PReduce (dot t c) (dot (dot t' "φ") c)
+      | papp_c
+        : { t t' u u' : Term }
+        → (c : Attr)
+        → { lst : List Attr }
+        → (l : Bindings lst)
+        → PReduce t t'
+        → PReduce u u'
+        → t' = obj l
+        → lookup l c = some void
+        → PReduce (app t c u) (obj (insert l c (attached (incLocators u'))))
+  end
+
+-- [KS22, Proposition 3.3 (Reflexivity of parallel reduction)]
+  mutual
+    def reflexivePremise
+      { lst : List Attr }
+      (l : Bindings lst)
+      : Premise l l
+      := match l with
+        | Bindings.nil => Premise.nil
+        | Bindings.cons name not_in opAttr tail =>
+            match opAttr with
+              | void => Premise.consVoid name (reflexivePremise tail)
+              | attached t => Premise.consAttached name t t (prefl t) (reflexivePremise tail)
+
+    def prefl : (t : Term) → PReduce t t
+      := λ term => match term with
+        | loc n => PReduce.pcong_ρ n
+        | dot t a => PReduce.pcongDOT t t a (prefl t)
+        | app t a u => PReduce.pcongAPP t t u u a (prefl t) (prefl u)
+        | @obj lst l =>
+            let premise := reflexivePremise l
+            PReduce.pcongOBJ _ _ premise
+  end
+
+  def singlePremise
+    { lst : List Attr }
+    (l : Bindings lst)
+    (a : Attr)
+    (t : Term)
+    (t' : Term)
+    (isAttached : IsAttached a t l)
+    (preduce : PReduce t t')
+    : Premise l (insert l a (attached t'))
+    := match lst with
+      | [] => match l with
+        | Bindings.nil => Premise.nil
+      | b :: bs => match isAttached with
+        | IsAttached.zeroth_attached _ _ _ tail => match l with
+          | Bindings.cons _ _ _ _ => by
+              simp [insert]
+              exact Premise.consAttached b t t' preduce (reflexivePremise tail)
+        | IsAttached.next_attached _ _ tail _ neq not_in u newIsAttached => match l with
+          | Bindings.cons _ _ _ _ => by
+              have neq' : b ≠ a := λ eq => neq eq.symm
+              simp [insert, neq']
+              have premise := (singlePremise tail a t t' newIsAttached preduce)
+              exact (match u with
+                | void => Premise.consVoid b premise
+                | attached u' => Premise.consAttached b u' u' (prefl u') premise
+              )
+
+  def singlePremiseInsert
+    { lst : List Attr }
+    { l1 l2 : Bindings lst }
+    { a : Attr }
+    { t1 t2 : Term }
+    (preduce : PReduce t1 t2)
+    (premise : Premise l1 l2)
+    : Premise (insert l1 a (attached t1)) (insert l2 a (attached t2))
+    := match premise with
+      | Premise.nil => Premise.nil
+      | Premise.consVoid b tail => dite
+          (b = a)
+          (λ eq => by
+            simp [insert, eq]
+            exact Premise.consAttached b _ _ preduce tail
+          )
+          (λ neq => by
+            simp [insert, neq]
+            exact Premise.consVoid b (singlePremiseInsert preduce tail)
+          )
+      | Premise.consAttached b t' t'' preduce' tail => dite
+          (b = a)
+          (λ eq => by
+            simp [insert, eq]
+            exact Premise.consAttached b _ _ preduce tail
+          )
+          (λ neq => by
+            simp [insert, neq]
+            exact Premise.consAttached b t' t'' preduce' (singlePremiseInsert preduce tail)
+          )
+
+  def lookup_void_premise
+    { lst : List Attr }
+    { l1 l2 : Bindings lst }
+    { a : Attr }
+    (lookup_void : lookup l1 a = some void)
+    (premise : Premise l1 l2)
+    : lookup l2 a = some void
+    := match lst with
+      | [] => match l1, l2 with | Bindings.nil, Bindings.nil => by contradiction
+      | b :: bs => match l1, l2 with
+          | Bindings.cons _ _ _ tail1, Bindings.cons _ _ _ tail2 => match premise with
+            | Premise.consVoid _ premise_tail => dite
+              (b = a)
+              (λ eq => by simp [lookup, eq])
+              (λ neq => by
+                simp [lookup, neq] at lookup_void
+                simp [lookup, neq]
+                exact lookup_void_premise lookup_void premise_tail
+              )
+            | Premise.consAttached _ _ _ _ premise_tail => dite
+              (b = a)
+              (λ eq => by simp [lookup, eq] at lookup_void)
+              (λ neq => by
+                simp [lookup, neq] at lookup_void
+                simp [lookup, neq]
+                exact lookup_void_premise lookup_void premise_tail
+              )
+
+  inductive Pair : Prop → Type → Type where
+    | pair
+      : { p : Prop }
+      → { t : Type }
+      → (prop : p)
+      → (val : t)
+      → Pair p t
+
+  def lookup_attached_premise
+    { lst : List Attr }
+    { l1 l2 : Bindings lst }
+    { a : Attr }
+    { u : Term }
+    (lookup_attached : lookup l1 a = some (attached u))
+    (premise : Premise l1 l2)
+    : Σ u' : Term, Pair (lookup l2 a = some (attached u')) (PReduce u u')
+    := match lst with
+      | [] => match l1, l2 with | Bindings.nil, Bindings.nil => match premise with
+        | Premise.nil => by
+          simp [lookup]
+          contradiction
+      | b :: bs => match premise with
+        | Premise.consVoid _ premise_tail => by
+          simp [lookup]
+          exact dite
+            (b = a)
+            (λ eq => by
+              simp [lookup, eq] at lookup_attached
+            )
+            (λ neq => by
+              simp [lookup, neq]
+              simp [lookup, neq] at lookup_attached
+              exact lookup_attached_premise (lookup_attached) premise_tail
+            )
+        | Premise.consAttached _ t1 t2 preduce premise_tail => by
+          simp [lookup]
+          exact dite
+            (b = a)
+            (λ eq => by
+              simp [eq]
+              simp [lookup, eq] at lookup_attached
+              simp [lookup_attached] at preduce
+              exact ⟨t2, Pair.pair rfl preduce⟩
+            )
+            (λ neq => by
+              simp [neq]
+              simp [lookup, neq] at lookup_attached
+              exact lookup_attached_premise (lookup_attached) premise_tail
+            )
+end PReduce
+open PReduce
+
+inductive RedMany : Term → Term → Type where
+  | nil : { m : Term } → RedMany m m
+  | cons : { l m n : Term} → Reduce l m → RedMany m n → RedMany l n
+
+inductive ParMany : Term → Term → Type where
+  | nil : { m : Term } → ParMany m m
+  | cons : { l m n : Term} → PReduce l m → ParMany m n → ParMany l n
+
+infix:20 " ⇝ " => Reduce
+infix:20 " ⇛ " => PReduce
+infix:20 " ⇝* " => RedMany
+infix:20 " ⇛* " => ParMany
+
+-- [KS22, Proposition 3.4 (1), Eqivalence of ⇛ and ⇝]
+def reg_to_par {t t' : Term} : (t ⇝ t') → (t ⇛ t')
+  | .congOBJ b l red isAttached =>
+      .pcongOBJ
+        l
+        (insert l b (attached _))
+        (PReduce.singlePremise l b _ _ isAttached (reg_to_par red))
+  | .congDOT t t' a red =>
+      .pcongDOT t t' a (reg_to_par red)
+  | .congAPPₗ t t' u a red =>
+      .pcongAPP t t' u u a (reg_to_par red) (prefl u)
+  | .congAPPᵣ t u u' a red =>
+      .pcongAPP t t u u' a (prefl t) (reg_to_par red)
+  | @Reduce.dot_c t t_c c _ l eq lookup_eq =>
+      .pdot_c t_c c l (prefl t) eq lookup_eq
+  | @Reduce.dot_cφ t c _ l eq lookup_c isAttr_φ =>
+      .pdot_cφ c l (prefl t) eq lookup_c isAttr_φ
+  | Reduce.app_c t u c l eq lookup_eq =>
+      PReduce.papp_c c l (prefl t) (prefl u) eq lookup_eq
+
+-- [KS22, Lemma A.3 (Transitivity of ⇝*)]
+def red_trans { t t' t'' : Term } : (t ⇝* t') → (t' ⇝* t'') → (t ⇝* t'')
+  | RedMany.nil, reds => reds
+  | RedMany.cons lm mn_many, reds => RedMany.cons lm (red_trans mn_many reds)
+
+def notEqByMem
+  { lst : List Attr }
+  { a b : Attr }
+  (a_is_in : a ∈ lst)
+  (b_not_in : b ∉ lst)
+  : a ≠ b
+  := λ eq =>
+    let memEq : List.Mem a lst = List.Mem b lst :=
+      congrArg (λ x => Membership.mem x lst) eq
+    b_not_in (Eq.mp memEq a_is_in)
+
+def consBindingsRedMany
+  { lst : List Attr}
+  (a : Attr)
+  { not_in_a : a ∉ lst }
+  (u_a  : OptionalAttr)
+  { l1 l2 : Bindings lst }
+  : (obj l1 ⇝* obj l2)
+  → (obj (Bindings.cons a not_in_a u_a l1) ⇝* obj (Bindings.cons a not_in_a u_a l2))
+  := λ redmany => match redmany with
+    | RedMany.nil => RedMany.nil
+    | RedMany.cons (@Reduce.congOBJ t t' c _ _ red_tt' isAttached) reds =>
+      have one_step : (obj (Bindings.cons a not_in_a u_a l1) ⇝
+        obj (Bindings.cons a not_in_a u_a (insert l1 c (attached t')))) := by
+          have c_is_in := isAttachedIsIn isAttached
+          have a_not_in := not_in_a
+          have neq_c_a : c ≠ a := notEqByMem c_is_in a_not_in
+          have intermediate := Reduce.congOBJ c (Bindings.cons a not_in_a u_a l1) red_tt'
+            (IsAttached.next_attached c _ _ _ neq_c_a _ _ isAttached)
+          simp [insert, neq_c_a.symm] at intermediate
+          assumption
+      (RedMany.cons one_step (consBindingsRedMany _ _ reds))
+
+-- [KS22, Lemma A.4 (1), Congruence for ⇝* in OBJ]
+def congOBJClos
+  { t t' : Term }
+  { b : Attr }
+  { lst : List Attr }
+  { l : Bindings lst }
+  : (t ⇝* t')
+  → IsAttached b t l
+  → (obj l ⇝* obj (insert l b (attached t')))
+  := λ red_tt' isAttached => match red_tt' with
+    | RedMany.nil => Eq.ndrec (RedMany.nil) (congrArg obj (Eq.symm (Insert.insertAttached isAttached)))
+    | @RedMany.cons t t_i t' red redMany =>
+      have ind_hypothesis : obj (insert l b (attached t_i)) ⇝* obj (insert (insert l b (attached t_i)) b (attached t'))
+        := (congOBJClos redMany (Insert.insert_new_isAttached isAttached))
+      RedMany.cons
+        (Reduce.congOBJ b l red isAttached)
+        (Eq.ndrec ind_hypothesis
+        (congrArg obj (Insert.insertTwice l b t' t_i)))
+
+-- [KS22, Lemma A.4 (2), Congruence for ⇝* in DOT]
+def congDotClos
+  { t t' : Term }
+  { a : Attr }
+  : (t ⇝* t') → ((dot t a) ⇝* (dot t' a))
+  | RedMany.nil => RedMany.nil
+  | @RedMany.cons l m n lm mn_many =>
+    RedMany.cons (Reduce.congDOT l m a lm) (congDotClos mn_many)
+
+-- [KS22, Lemma A.4 (3), Congruence for ⇝* in APPₗ]
+def congAPPₗClos
+  { t t' u : Term }
+  { a : Attr }
+  : (t ⇝* t') → ((app t a u) ⇝* (app t' a u))
+  | RedMany.nil => RedMany.nil
+  | @RedMany.cons l m n lm mn_many =>
+    RedMany.cons (Reduce.congAPPₗ l m u a lm) (congAPPₗClos mn_many)
+
+-- [KS22, Lemma A.4 (4), Congruence for ⇝* in APPᵣ]
+def congAPPᵣClos
+  { t u u' : Term }
+  { a : Attr }
+  : (u ⇝* u') → ((app t a u) ⇝* (app t a u'))
+  | RedMany.nil => RedMany.nil
+  | @RedMany.cons l m n lm mn_many =>
+    RedMany.cons (Reduce.congAPPᵣ t l m a lm) (congAPPᵣClos mn_many)
+
+-- [KS22, Proposition 3.4 (3), Eqivalence of ⇛ and ⇝]
+def par_to_redMany {t t' : Term} : (t ⇛ t') → (t ⇝* t')
+  | @PReduce.pcongOBJ lst l l' premise =>
+    let rec fold_premise
+      { lst : List Attr }
+      { al al' : Bindings lst }
+      (premise : Premise al al')
+      : (obj al) ⇝* (obj al')
+      := match lst with
+        | [] => match al, al' with
+          | Bindings.nil, Bindings.nil => RedMany.nil
+        | a :: as => match al, al' with
+          | Bindings.cons _ not_in u tail, Bindings.cons _ _ u' tail' => match premise with
+            | Premise.consVoid _ premiseTail => consBindingsRedMany a void (fold_premise premiseTail)
+            | @Premise.consAttached _ t1 t2 preduce _ l1 l2 not_in premiseTail => by
+                suffices temp : obj (insert (Bindings.cons a not_in (attached t1) l1) a (attached t2)) ⇝*
+                  obj (Bindings.cons a _ (attached t2) l2) from
+                  (red_trans
+                    (congOBJClos (par_to_redMany preduce) (IsAttached.zeroth_attached a _ t1 l1))
+                    (temp))
+                simp [insert]
+                exact consBindingsRedMany a (attached t2) (fold_premise premiseTail)
+    fold_premise premise
+  | .pcong_ρ n => RedMany.nil
+  | .pcongDOT t t' a prtt' => congDotClos (par_to_redMany prtt')
+  | .pcongAPP t t' u u' a prtt' pruu' => red_trans
+    (congAPPₗClos (par_to_redMany prtt'))
+    (congAPPᵣClos (par_to_redMany pruu'))
+  | PReduce.pdot_c t_c c l preduce eq lookup_eq =>
+    let tc_t'c_many := congDotClos (par_to_redMany preduce)
+    let tc_dispatch := Reduce.dot_c t_c c l eq lookup_eq
+    let tc_dispatch_clos := RedMany.cons tc_dispatch RedMany.nil
+    red_trans tc_t'c_many tc_dispatch_clos
+  | PReduce.pdot_cφ c l preduce eq lookup_eq isAttr =>
+    let tc_t'c_many := congDotClos (par_to_redMany preduce)
+    let tφc_dispatch := Reduce.dot_cφ c l eq lookup_eq isAttr
+    let tφc_dispatch_clos := RedMany.cons tφc_dispatch RedMany.nil
+    red_trans tc_t'c_many tφc_dispatch_clos
+  | @PReduce.papp_c t t' u u' c lst l prtt' pruu' path_t'_obj_lst path_lst_c_void =>
+    let tu_t'u_many := congAPPₗClos (par_to_redMany prtt')
+    let t'u_t'u'_many := congAPPᵣClos (par_to_redMany pruu')
+    let tu_t'u'_many := red_trans tu_t'u_many t'u_t'u'_many
+    let tu_app := Reduce.app_c t' u' c l path_t'_obj_lst path_lst_c_void
+    let tu_app_clos := RedMany.cons tu_app RedMany.nil
+    red_trans tu_t'u'_many tu_app_clos
+
+-- [KS22, Proposition 3.4 (4), Eqivalence of ⇛ and ⇝]
+def parMany_to_redMany {t t' : Term} : (t ⇛* t') → (t ⇝* t')
+  | ParMany.nil => RedMany.nil
+  | ParMany.cons red reds => red_trans (par_to_redMany red) (parMany_to_redMany reds)
+
+-- [KS22, Proposition 3.4 (2), Eqivalence of ⇛ and ⇝]
+def redMany_to_parMany {t t' : Term} : (t ⇝* t') → (t ⇛* t')
+  | RedMany.nil => ParMany.nil
+  | RedMany.cons red reds => ParMany.cons (reg_to_par red) (redMany_to_parMany reds)
+
+-------------------------------------------------------
+-- properties of mapBindings
+namespace MapBindings
+
+  def mapBindings_lookup_attached
+    ( f : Term → Term)
+    { lst : List Attr}
+    { l : Bindings lst}
+    { t_c : Term}
+    { c : Attr}
+    : lookup l c = some (attached t_c) →
+      lookup (mapBindings f l) c = some (attached (f t_c))
+    := λ lookup_eq => by match l with
+      | Bindings.nil => contradiction
+      | Bindings.cons name _ u tail =>
+        simp [lookup] at *
+        split
+        . rename_i eq
+          simp [eq] at lookup_eq
+          simp [lookup_eq]
+        . rename_i neq
+          simp [neq] at lookup_eq
+          exact mapBindings_lookup_attached f lookup_eq
+
+  def mapBindings_lookup_void
+    ( f : Term → Term)
+    { lst : List Attr}
+    { l : Bindings lst}
+    { c : Attr}
+    : lookup l c = some void → lookup (mapBindings f l) c = some void
+    := λ lookup_eq => by match l with
+      | Bindings.nil => contradiction
+      | Bindings.cons name _ u tail =>
+        simp [lookup] at *
+        split
+        . rename_i eq
+          simp [eq] at lookup_eq
+          simp [lookup_eq]
+        . rename_i neq
+          simp [neq] at lookup_eq
+          exact mapBindings_lookup_void f lookup_eq
+
+  def mapBindings_lookup_none
+    ( f : Term → Term)
+    { lst : List Attr}
+    { l : Bindings lst}
+    { c : Attr}
+    : lookup l c = none →
+      lookup (mapBindings f l) c = none
+    := λ lookup_eq => by match l with
+      | Bindings.nil => rfl
+      | Bindings.cons name _ u tail =>
+        simp [lookup] at *
+        split
+        . rename_i eq
+          simp [eq] at lookup_eq
+        . rename_i neq
+          simp [neq] at lookup_eq
+          exact mapBindings_lookup_none f lookup_eq
+
+  def mapBindings_isAttr
+    ( c : Attr)
+    { lst : List Attr}
+    ( l : Bindings lst)
+    ( f : Term → Term)
+    : IsAttr c (obj l) → IsAttr c (obj (mapBindings f l))
+    | @IsAttr.is_attr lst a _in _ => by
+      exact @IsAttr.is_attr lst a _in (mapBindings f l)
+end MapBindings
 
 -- [KS22, Lemma A.9, Increment swap]
 def inc_swap
@@ -1082,7 +1027,7 @@ def inc_swap
     | obj _ => by
       have ih : (t' : Term) → incLocatorsFrom (i + 1) (incLocatorsFrom (j + 1) t') = incLocatorsFrom (j + 1 + 1) (incLocatorsFrom (i + 1) t') :=
         λ t' => inc_swap (i + 1) (j + 1) (Nat.succ_le_succ le_ij) t'
-      simp [incLocatorsFrom, MapAttrList.mapAttrList_compose, ih]
+      simp [incLocatorsFrom, MapBindings.mapBindings_compose, ih]
 decreasing_by sorry
 
 -- [KS22, Lemma A.8, Increment and substitution swap]
@@ -1135,7 +1080,7 @@ def subst_inc_swap
     | obj o => by
       have ih := λ t' => subst_inc_swap (i + 1) (j + 1) (Nat.succ_le_succ le_ji) t' (incLocators u)
       have ih_func : (fun t' => substitute (i + 1 + 1, incLocatorsFrom (j + 1) (incLocators u)) (incLocatorsFrom (j + 1) t')) = (fun t' => incLocatorsFrom (j + 1) (substitute (i + 1, (incLocators u)) t')) := funext ih
-      simp [substitute, incLocatorsFrom, MapAttrList.mapAttrList_compose]
+      simp [substitute, incLocatorsFrom, MapBindings.mapBindings_compose]
       simp [incLocators]
       simp [inc_swap]
       rw [← incLocators]
@@ -1192,7 +1137,7 @@ def inc_subst_swap
     | obj o => by
       have ih := λ t' => inc_subst_swap (i + 1) (j + 1) (Nat.succ_le_succ le_ji) t' (incLocators u)
       have ih_func := funext ih
-      simp [substitute, incLocatorsFrom, MapAttrList.mapAttrList_compose]
+      simp [substitute, incLocatorsFrom, MapBindings.mapBindings_compose]
       simp [incLocators]
       simp [inc_swap]
       rw [← incLocators]
@@ -1277,17 +1222,17 @@ def subst_swap
       constructor <;> apply subst_swap _ _ le_ji _ _ _ free_locs_v
     | obj o => by
       simp [substitute]
-      simp [MapAttrList.mapAttrList_compose]
+      simp [MapBindings.mapBindings_compose]
       let rec traverse_bindings
       { lst : List Attr}
-      ( bindings : AttrList lst)
-      : mapAttrList (fun t => substitute (i + 1, incLocators v) (substitute (j + 1, incLocators u) t)) bindings = mapAttrList (fun t =>
+      ( bindings : Bindings lst)
+      : mapBindings (fun t => substitute (i + 1, incLocators v) (substitute (j + 1, incLocators u) t)) bindings = mapBindings (fun t =>
       substitute (j + 1, incLocators (substitute (i, v) u)) (substitute (i + 1 + 1, incLocators (incLocators v)) t)) bindings
       := by match bindings with
-        | AttrList.nil =>
-          simp [mapAttrList]
-        | AttrList.cons _ _ u tail =>
-          simp [mapAttrList]
+        | Bindings.nil =>
+          simp [mapBindings]
+        | Bindings.cons _ _ u tail =>
+          simp [mapBindings]
           split
           . constructor
             . rfl
@@ -1309,137 +1254,137 @@ def subst_swap
       exact traverse_bindings o
 decreasing_by sorry
 
-namespace MapAttrList
-  def mapAttrList_subst_insert
+namespace MapBindings
+  def mapBindings_subst_insert
     { i : Nat }
     { c : Attr }
     { lst : List Attr }
-    { l : AttrList lst }
+    { l : Bindings lst }
     { u v : Term}
-    : (insert (mapAttrList (substitute (i + 1, incLocators u)) l) c (attached (incLocators (substitute (i, u) v)))) =
-    (mapAttrList (substitute (i + 1, incLocators u)) (insert l c (attached (incLocators v))))
+    : (insert (mapBindings (substitute (i + 1, incLocators u)) l) c (attached (incLocators (substitute (i, u) v)))) =
+    (mapBindings (substitute (i + 1, incLocators u)) (insert l c (attached (incLocators v))))
     := match l with
-    | AttrList.nil => by
-      simp [insert, mapAttrList]
-    | AttrList.cons a not_in op_attr tail => by
+    | Bindings.nil => by
+      simp [insert, mapBindings]
+    | Bindings.cons a not_in op_attr tail => by
       simp [insert]
       split
       . rw [incLocators]
         simp [← subst_inc_swap]
-        rw [mapAttrList]
-      . split <;> simp [mapAttrList] <;> exact mapAttrList_subst_insert
+        rw [mapBindings]
+      . split <;> simp [mapBindings] <;> exact mapBindings_subst_insert
 
-  def mapAttrList_inc_insert
+  def mapBindings_inc_insert
     { i : Nat }
     { c : Attr }
     { lst : List Attr }
-    { l : AttrList lst }
+    { l : Bindings lst }
     { v : Term}
-    : (insert (mapAttrList (incLocatorsFrom (i + 1)) l) c (attached (incLocators (incLocatorsFrom i v)))) =
-    (mapAttrList (incLocatorsFrom (i + 1)) (insert l c (attached (incLocators v))))
+    : (insert (mapBindings (incLocatorsFrom (i + 1)) l) c (attached (incLocators (incLocatorsFrom i v)))) =
+    (mapBindings (incLocatorsFrom (i + 1)) (insert l c (attached (incLocators v))))
     := match l with
-    | AttrList.nil => by
-      simp [insert, mapAttrList]
-    | AttrList.cons a not_in op_attr tail => by
+    | Bindings.nil => by
+      simp [insert, mapBindings]
+    | Bindings.cons a not_in op_attr tail => by
       simp [insert]
       split
       . rw [incLocators]
         simp [inc_swap]
-        simp [mapAttrList]
-      . split <;> simp [mapAttrList] <;> exact mapAttrList_inc_insert
-end MapAttrList
+        simp [mapBindings]
+      . split <;> simp [mapBindings] <;> exact mapBindings_inc_insert
+end MapBindings
 
 -- incLocators preserves parallel reduction
 def preduce_incLocatorsFrom
   { t t' : Term}
   ( i : Nat)
   : ( t ⇛ t') → (incLocatorsFrom i t ⇛ incLocatorsFrom i t')
-  | pcongOBJ bnds bnds' premise => by
+  | .pcongOBJ bnds bnds' premise => by
     simp [incLocatorsFrom]
     let rec make_premise
       { lst : List Attr }
-      { bnds bnds' : AttrList lst }
+      { bnds bnds' : Bindings lst }
       (premise : Premise bnds bnds')
-      : Premise (mapAttrList (incLocatorsFrom (i + 1)) bnds) (mapAttrList (incLocatorsFrom (i + 1)) bnds')
+      : Premise (mapBindings (incLocatorsFrom (i + 1)) bnds) (mapBindings (incLocatorsFrom (i + 1)) bnds')
       := match lst with
         | [] => match bnds, bnds' with
-          | AttrList.nil, AttrList.nil => by
-            simp [mapAttrList]
+          | Bindings.nil, Bindings.nil => by
+            simp [mapBindings]
             exact Premise.nil
         | a :: as => match premise with
           | Premise.consVoid a tail => by
-            simp [mapAttrList]
+            simp [mapBindings]
             exact Premise.consVoid a (make_premise tail)
           | Premise.consAttached a t1 t2 preduce tail => by
-            simp [mapAttrList]
+            simp [mapBindings]
             exact Premise.consAttached
               a
               _
               _
               (preduce_incLocatorsFrom (i+1) preduce)
               (make_premise tail)
-    exact pcongOBJ _ _ (make_premise premise)
-  | pcong_ρ n =>  prefl (incLocatorsFrom i (loc n))
-  | pcongAPP t t' u u' a tt' uu' => by
+    exact PReduce.pcongOBJ _ _ (make_premise premise)
+  | .pcong_ρ n =>  prefl (incLocatorsFrom i (loc n))
+  | .pcongAPP t t' u u' a tt' uu' => by
     simp [incLocatorsFrom]
-    apply pcongAPP
+    apply PReduce.pcongAPP
     . exact preduce_incLocatorsFrom i tt'
     . exact preduce_incLocatorsFrom i uu'
-  | pcongDOT t t' a tt' => by
+  | .pcongDOT t t' a tt' => by
     simp [incLocatorsFrom]
-    apply pcongDOT
+    apply PReduce.pcongDOT
     exact preduce_incLocatorsFrom i tt'
-  | @pdot_c s s' t_c c lst l ss' eq lookup_eq => by
+  | @PReduce.pdot_c s s' t_c c lst l ss' eq lookup_eq => by
     simp [incLocatorsFrom]
-    have := @pdot_c
+    have := @PReduce.pdot_c
       (incLocatorsFrom i s)
       (incLocatorsFrom i s')
       _
       c
       lst
-      (mapAttrList (incLocatorsFrom (i+1)) l)
+      (mapBindings (incLocatorsFrom (i+1)) l)
       (preduce_incLocatorsFrom i ss')
       (by simp [eq, incLocatorsFrom])
-      (MapAttrList.mapAttrList_lookup_attached (incLocatorsFrom (i + 1)) lookup_eq)
+      (MapBindings.mapBindings_lookup_attached (incLocatorsFrom (i + 1)) lookup_eq)
     simp [inc_subst_swap]
     assumption
-  | @pdot_cφ s s' c lst l ss' eq lookup_eq is_attr => by
+  | @PReduce.pdot_cφ s s' c lst l ss' eq lookup_eq is_attr => by
     simp [incLocatorsFrom]
     rw [eq] at is_attr
     have is_attr' : IsAttr "φ" (incLocatorsFrom i (obj l)) := by
       simp [incLocatorsFrom]
-      exact MapAttrList.mapAttrList_isAttr "φ" l (incLocatorsFrom (i + 1)) is_attr
+      exact MapBindings.mapBindings_isAttr "φ" l (incLocatorsFrom (i + 1)) is_attr
     rw [← eq] at is_attr'
-    exact @pdot_cφ
+    exact @PReduce.pdot_cφ
         (incLocatorsFrom i s)
         (incLocatorsFrom i s')
         c
         lst
-        (mapAttrList (incLocatorsFrom (i + 1)) l)
+        (mapBindings (incLocatorsFrom (i + 1)) l)
         (preduce_incLocatorsFrom i ss')
         (by rw [eq, incLocatorsFrom])
-        (MapAttrList.mapAttrList_lookup_none (incLocatorsFrom (i + 1)) lookup_eq)
+        (MapBindings.mapBindings_lookup_none (incLocatorsFrom (i + 1)) lookup_eq)
         (is_attr')
-  | @papp_c s s' v v' c lst l ss' vv' eq lookup_eq => by
+  | @PReduce.papp_c s s' v v' c lst l ss' vv' eq lookup_eq => by
     simp [incLocatorsFrom]
-    have := @papp_c
+    have := @PReduce.papp_c
       (incLocatorsFrom i s)
       (incLocatorsFrom i s')
       (incLocatorsFrom i v)
       (incLocatorsFrom i v')
       c
       lst
-      (mapAttrList (incLocatorsFrom (i + 1)) l)
+      (mapBindings (incLocatorsFrom (i + 1)) l)
       (preduce_incLocatorsFrom i ss')
       (preduce_incLocatorsFrom i vv')
       (by rw [eq, incLocatorsFrom])
-      (MapAttrList.mapAttrList_lookup_void (incLocatorsFrom (i + 1)) lookup_eq)
-    simp [MapAttrList.mapAttrList_inc_insert] at this
+      (MapBindings.mapBindings_lookup_void (incLocatorsFrom (i + 1)) lookup_eq)
+    simp [MapBindings.mapBindings_inc_insert] at this
     exact this
 
 def get_premise
   { attrs : List Attr }
-  { bnds bnds' : AttrList attrs }
+  { bnds bnds' : Bindings attrs }
   (preduce : obj bnds ⇛ obj bnds')
   : Premise bnds bnds'
   := match preduce with
@@ -1454,27 +1399,27 @@ def substitution_lemma
   (min_free_locs_u' : le_nat_option_nat i (min_free_loc 0 u'))
   : substitute (i, u) t ⇛ substitute (i, u') t'
   := match tt' with
-    | @pcongOBJ attrs bnds bnds' premise =>
+    | @PReduce.pcongOBJ attrs bnds bnds' premise =>
       let rec fold_premise
       { lst : List Attr }
-      { al al' : AttrList lst }
+      { al al' : Bindings lst }
       (premise : Premise al al')
       : substitute (i, u) (obj al) ⇛ substitute (i, u') (obj al')
       := match lst with
         | [] => match al, al' with
-          | AttrList.nil, AttrList.nil => by
-            simp [substitute, mapAttrList]
-            exact prefl (obj AttrList.nil)
+          | Bindings.nil, Bindings.nil => by
+            simp [substitute, mapBindings]
+            exact prefl (obj Bindings.nil)
         | a :: as => match al, al' with
-          | AttrList.cons _ not_in op_attr tail, AttrList.cons _ _ op_attr' tail' => match premise with
+          | Bindings.cons _ not_in op_attr tail, Bindings.cons _ _ op_attr' tail' => match premise with
             | Premise.consVoid _ premiseTail => by
-              simp [substitute, mapAttrList]
+              simp [substitute, mapBindings]
               let h := fold_premise premiseTail
               simp [substitute] at h
               have subst_premise := get_premise h
               exact PReduce.pcongOBJ _ _ (Premise.consVoid a subst_premise)
             | @Premise.consAttached _ t1 t2 preduce_t1_t2 _ l1 l2 not_in premiseTail => by
-              simp [substitute, mapAttrList]
+              simp [substitute, mapBindings]
               have h1 := substitution_lemma (i + 1) preduce_t1_t2 (preduce_incLocatorsFrom 0 uu') (by rw [← incLocators] ; exact min_free_loc_inc min_free_locs_u')
               have h2 := fold_premise premiseTail
               simp [substitute] at h2
@@ -1485,18 +1430,18 @@ def substitution_lemma
                 (substitute (i + 1, incLocators u') t2)
                 h1
                 as
-                (mapAttrList (substitute (i + 1, incLocators u)) l1)
-                (mapAttrList (substitute (i + 1, incLocators u')) l2)
+                (mapBindings (substitute (i + 1, incLocators u)) l1)
+                (mapBindings (substitute (i + 1, incLocators u')) l2)
                 not_in
                 subst_premise
               exact PReduce.pcongOBJ _ _ premise
       fold_premise premise
-    | pcong_ρ n => by
+    | .pcong_ρ n => by
         simp [substitute]
         exact dite (n < i)
           (λ less => by
             simp [less]
-            exact pcong_ρ n
+            exact PReduce.pcong_ρ n
           )
           (λ not_less =>
             dite (n = i)
@@ -1507,19 +1452,19 @@ def substitution_lemma
               )
               (λ not_eq => by
                 simp [not_less, not_eq]
-                exact pcong_ρ (n - 1)
+                exact PReduce.pcong_ρ (n - 1)
               )
           )
-    | pcongDOT lt lt' a preduce => by
+    | .pcongDOT lt lt' a preduce => by
         simp [substitute]
-        exact pcongDOT
+        exact PReduce.pcongDOT
           (substitute (i, u) lt)
           (substitute (i, u') lt')
           a
           (substitution_lemma i preduce uu' (by assumption))
-    | pcongAPP lt lt' lu lu' a preduce_t preduce_u => by
+    | .pcongAPP lt lt' lu lu' a preduce_t preduce_u => by
         simp [substitute]
-        exact pcongAPP
+        exact PReduce.pcongAPP
           (substitute (i, u) lt)
           (substitute (i, u') lt')
           (substitute (i, u) lu)
@@ -1527,7 +1472,7 @@ def substitution_lemma
           a
           (substitution_lemma i preduce_t uu' (by assumption))
           (substitution_lemma i preduce_u uu' (by assumption))
-    | @pdot_c s s' t_c c lst l ss' eq lookup_eq => by
+    | @PReduce.pdot_c s s' t_c c lst l ss' eq lookup_eq => by
       have ih := substitution_lemma i ss' uu'
       have dot_subst : dot (substitute (i, u) s) c ⇛
         substitute (0, substitute (i, u') s') (substitute (i+1, incLocators u') t_c)
@@ -1537,46 +1482,46 @@ def substitution_lemma
           (substitute (i+1, incLocators u') t_c)
           c
           lst
-          (mapAttrList (substitute (i+1, incLocators u')) l)
+          (mapBindings (substitute (i+1, incLocators u')) l)
           (substitution_lemma i ss' uu' (by assumption))
           (by rw [eq, substitute])
-          (MapAttrList.mapAttrList_lookup_attached (substitute (i + 1, incLocators u')) lookup_eq)
+          (MapBindings.mapBindings_lookup_attached (substitute (i + 1, incLocators u')) lookup_eq)
       have : substitute (0, substitute (i, u') s') (substitute (i + 1, incLocators u') t_c) = substitute (i, u') (substitute (0, s') t_c) := (subst_swap i 0 (Nat.zero_le i) t_c s' u' ((by assumption))).symm
       simp [this] at dot_subst
       simp [substitute]
       exact dot_subst
-    | @pdot_cφ s s' c lst l ss' eq lookup_eq is_attr => by
+    | @PReduce.pdot_cφ s s' c lst l ss' eq lookup_eq is_attr => by
       rw [eq] at is_attr
       have is_attr' : IsAttr "φ" (substitute (i, u') (obj l)) := by
         simp [substitute]
-        exact MapAttrList.mapAttrList_isAttr "φ" l (substitute (i + 1, incLocators u')) is_attr
+        exact MapBindings.mapBindings_isAttr "φ" l (substitute (i + 1, incLocators u')) is_attr
       rw [← eq] at is_attr'
       simp [substitute]
-      exact @pdot_cφ
+      exact @PReduce.pdot_cφ
         (substitute (i, u) s)
         (substitute (i, u') s')
         c
         lst
-        (mapAttrList (substitute (i+1, incLocators u')) l)
+        (mapBindings (substitute (i+1, incLocators u')) l)
         (substitution_lemma i ss' uu' (by assumption))
         (by rw [eq, substitute])
-        (MapAttrList.mapAttrList_lookup_none (substitute (i + 1, incLocators u')) lookup_eq)
+        (MapBindings.mapBindings_lookup_none (substitute (i + 1, incLocators u')) lookup_eq)
         (is_attr')
-    | @papp_c s s' v v' c lst l ss' vv' eq lookup_eq => by
+    | @PReduce.papp_c s s' v v' c lst l ss' vv' eq lookup_eq => by
       simp [substitute]
-      rw [← MapAttrList.mapAttrList_subst_insert]
-      exact @papp_c
+      rw [← MapBindings.mapBindings_subst_insert]
+      exact @PReduce.papp_c
         (substitute (i, u) s)
         (substitute (i, u') s')
         (substitute (i, u) v)
         (substitute (i, u') v')
         c
         lst
-        (mapAttrList (substitute (i+1, incLocators u')) l)
+        (mapBindings (substitute (i+1, incLocators u')) l)
         (substitution_lemma i ss' uu' (by assumption))
         (substitution_lemma i vv' uu' ((by assumption)))
         (by rw [eq, substitute])
-        (MapAttrList.mapAttrList_lookup_void (substitute (i + 1, incLocators u')) lookup_eq)
+        (MapBindings.mapBindings_lookup_void (substitute (i + 1, incLocators u')) lookup_eq)
 decreasing_by sorry
 
 
@@ -1596,7 +1541,7 @@ def complete_development : Term → Term
       | some void => obj (insert bnds a (attached (incLocators (complete_development u))))
       | _ => app (obj bnds) a (complete_development u)
     | _ => app (complete_development t) a (complete_development u)
-  | obj bnds => obj (mapAttrList complete_development bnds)
+  | obj bnds => obj (mapBindings complete_development bnds)
 decreasing_by sorry
 
 def term_to_development
@@ -1667,15 +1612,15 @@ def term_to_development
         simp [complete_development]
         let rec make_premise
           { attrs : List Attr }
-          (bnds : AttrList attrs)
-          : Premise bnds (mapAttrList complete_development bnds)
+          (bnds : Bindings attrs)
+          : Premise bnds (mapBindings complete_development bnds)
           := match bnds with
-            | AttrList.nil => Premise.nil
-            | AttrList.cons a not_in void tail => by
-                simp [mapAttrList]
+            | Bindings.nil => Premise.nil
+            | Bindings.cons a not_in void tail => by
+                simp [mapBindings]
                 exact Premise.consVoid a (make_premise tail)
-            | AttrList.cons a not_in (attached u) tail => by
-                simp [mapAttrList]
+            | Bindings.cons a not_in (attached u) tail => by
+                simp [mapBindings]
                 exact Premise.consAttached
                   a
                   u
@@ -1684,7 +1629,7 @@ def term_to_development
                   (make_premise tail)
         exact PReduce.pcongOBJ
           bnds
-          (mapAttrList complete_development bnds)
+          (mapBindings complete_development bnds)
           (make_premise bnds)
 
 -- [KS 2022, Proposition 3.8]
@@ -1693,33 +1638,33 @@ def half_diamond
   (preduce : PReduce t t')
   : PReduce t' (complete_development t)
   := match preduce with
-    | pcongOBJ l newAttrs premise => by
+    | .pcongOBJ l newAttrs premise => by
         simp [complete_development]
         let rec make_premise
           { lst : List Attr }
-          { l l' : AttrList lst }
+          { l l' : Bindings lst }
           (premise : Premise l l')
-          : Premise l' (mapAttrList complete_development l)
+          : Premise l' (mapBindings complete_development l)
           := match lst with
             | [] => match l, l' with
-              | AttrList.nil, AttrList.nil => Premise.nil
+              | Bindings.nil, Bindings.nil => Premise.nil
             | a :: as => match premise with
               | Premise.consVoid _ premise_tail => by
-                  simp [complete_development, mapAttrList]
+                  simp [complete_development, mapBindings]
                   exact Premise.consVoid a (make_premise premise_tail)
               | Premise.consAttached _ t1 t2 preduce premise_tail => by
-                  simp [complete_development, mapAttrList]
+                  simp [complete_development, mapBindings]
                   exact Premise.consAttached
                     a
                     t2
                     (complete_development t1)
                     (half_diamond preduce)
                     (make_premise premise_tail)
-        exact pcongOBJ newAttrs (mapAttrList complete_development l) (make_premise premise)
-    | pcong_ρ n => by
+        exact PReduce.pcongOBJ newAttrs (mapBindings complete_development l) (make_premise premise)
+    | .pcong_ρ n => by
         simp [complete_development]
         exact prefl (loc n)
-    | pcongDOT lt lt' a preduce => by
+    | .pcongDOT lt lt' a preduce => by
         simp [complete_development]
         split
         . rename_i cd_is_obj
@@ -1745,7 +1690,7 @@ def half_diamond
               )
         . rename_i cd_not_obj
           exact PReduce.pcongDOT lt' (complete_development lt) a (half_diamond preduce)
-    | pcongAPP lt lt' lu lu' a preduce_lt preduce_lu => by
+    | .pcongAPP lt lt' lu lu' a preduce_lt preduce_lu => by
         simp [complete_development]
         split
         . rename_i cd_is_obj
@@ -1768,7 +1713,7 @@ def half_diamond
             a
             (half_diamond preduce_lt)
             (half_diamond preduce_lu)
-    | @pdot_c lt lt' t_c c _ l preduce eq lookup_eq => by
+    | @PReduce.pdot_c lt lt' t_c c _ l preduce eq lookup_eq => by
         let pred
           : lt' ⇛ complete_development lt
           := half_diamond preduce
@@ -1786,9 +1731,9 @@ def half_diamond
               split
               . exact Nat.zero_le _
               . simp
-          exact substitution_lemma 0 tc_to_u (pcongOBJ l newAttrs premise) min_free_locs
+          exact substitution_lemma 0 tc_to_u (.pcongOBJ l newAttrs premise) min_free_locs
 
-    | @pdot_cφ lt lt' c lst l preduce eq lookup_none is_attr => by
+    | @PReduce.pdot_cφ lt lt' c lst l preduce eq lookup_none is_attr => by
         let pred
           : lt' ⇛ complete_development lt
           := half_diamond preduce
@@ -1803,10 +1748,10 @@ def half_diamond
               simp [eq] at is_attr
               let φ_in := is_attr_in is_attr
               simp [φ_in]
-              let preduce := (pcongOBJ _ _ premise)
+              let preduce := (PReduce.pcongOBJ _ _ premise)
               simp [<-eq] at preduce
-              exact pcongDOT _ _ c (pcongDOT _ _ "φ" preduce)
-    | @papp_c lt lt' lu lu' c _ l preduce_t preduce_u eq lookup_eq => by
+              exact .pcongDOT _ _ c (.pcongDOT _ _ "φ" preduce)
+    | @PReduce.papp_c lt lt' lu lu' c _ l preduce_t preduce_u eq lookup_eq => by
         let preduce_t' := half_diamond preduce_t
         let preduce_u' := half_diamond preduce_u
         generalize h : complete_development lt = foo
@@ -1817,8 +1762,7 @@ def half_diamond
               let lookup_void
                 := lookup_void_premise lookup_eq premise
               simp [lookup_void]
-              -- need to turn x ⇛ y into incLocators x ⇛ incLocators y
-              exact pcongOBJ
+              exact .pcongOBJ
                 _
                 _
                 (singlePremiseInsert (preduce_incLocatorsFrom 0 preduce_u') premise)
