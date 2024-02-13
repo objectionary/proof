@@ -1,4 +1,17 @@
+/-!
+# Confluence of minimal φ-calculus
+
+This file contains a formalization of minimal φ-calculus and the proof of its confluence.
+
+## References
+
+* [Nikolai Kudasov and Violetta Sim. 2023. Formalizing 𝜑-Calculus: A Purely Object-Oriented Calculus of Decorated Objects.][KS22]
+* [Jean L. Krivine. 1993. Lambda-Calculus, Types and Models. Ellis Horwood, USA.][Krivine93]
+-/
+
 set_option autoImplicit false
+
+/-! ### Defition of minimal φ-calculus -/
 
 @[reducible]
 def Attr := String
@@ -27,6 +40,8 @@ end
 open OptionalAttr
 open Term
 
+/-! ### Defition of increment, substitution, its properties, and auxiliary definitions that involve terms -/
+
 def mapBindings : (Term → Term) → { lst : List Attr } → Bindings lst → Bindings lst
   := λ f _ alst =>
     let f' := λ optional_attr => match optional_attr with
@@ -49,6 +64,7 @@ namespace MapBindings
         cases u <;> simp [mapBindings] <;> exact mapBindings_compose f g tail
 end MapBindings
 
+/-- Locator increment [KS22, Definition 2.5] -/
 def incLocatorsFrom (n : Nat) (term : Term) : Term
   := match term with
     | loc m => if m < n then loc m else loc (m + 1)
@@ -60,6 +76,7 @@ decreasing_by sorry
 def incLocators : Term → Term
   := incLocatorsFrom 0
 
+/-- Locator substitution [KS22, Fig. 1] -/
 def substitute : Nat × Term → Term → Term
   := λ (k, v) term => match term with
     | obj o => obj (mapBindings (substitute (k + 1, incLocators v)) o)
@@ -78,7 +95,7 @@ instance : Min (Option Nat) where
   | none, some k => some k
   | none, none => none
 
--- Definition. Minimal free locator in a term, if free locators exist, if we consider free locators start at `zeroth_level`.
+/-- Minimal free locator in a term, if free locators exist, assuming free locators start at `zeroth_level`. -/
 def min_free_loc
   (zeroth_level : Nat)
   : Term → Option Nat
@@ -134,7 +151,7 @@ def le_min_option_reverse
   | none, some n => simp [le_nat_option_nat] at * ; assumption
   | none, none   => simp [le_nat_option_nat] at *
 
--- IncLocatorsFrom increments minimal free locator if it acts only on free locators
+/-- `IncLocatorsFrom` increments minimal free locator if it acts only on free locators. -/
 def min_free_loc_inc
   { i j : Nat}
   { v : Term}
@@ -195,7 +212,7 @@ def min_free_loc_inc
           exact traverse_bindings tail free_locs.right
     exact traverse_bindings o free_locs_v
 
--- `substitute (j, _)` and `incLocatorsFrom k` cancel each other, if they act free locators
+/-- `substitute` and `incLocatorsFrom` cancel effect of each other, if they act only on free locators. -/
 def subst_inc_cancel
   (v u : Term)
   (j k i zeroth_level : Nat)
@@ -479,6 +496,77 @@ namespace Insert
 
 end Insert
 
+namespace MapBindings
+
+  def mapBindings_lookup_attached
+    ( f : Term → Term)
+    { lst : List Attr}
+    { l : Bindings lst}
+    { t_c : Term}
+    { c : Attr}
+    : lookup l c = some (attached t_c) →
+      lookup (mapBindings f l) c = some (attached (f t_c))
+    := λ lookup_eq => by match l with
+      | Bindings.nil => contradiction
+      | Bindings.cons name _ u tail =>
+        simp [lookup] at *
+        split
+        . rename_i eq
+          simp [eq] at lookup_eq
+          simp [lookup_eq]
+        . rename_i neq
+          simp [neq] at lookup_eq
+          exact mapBindings_lookup_attached f lookup_eq
+
+  def mapBindings_lookup_void
+    ( f : Term → Term)
+    { lst : List Attr}
+    { l : Bindings lst}
+    { c : Attr}
+    : lookup l c = some void → lookup (mapBindings f l) c = some void
+    := λ lookup_eq => by match l with
+      | Bindings.nil => contradiction
+      | Bindings.cons name _ u tail =>
+        simp [lookup] at *
+        split
+        . rename_i eq
+          simp [eq] at lookup_eq
+          simp [lookup_eq]
+        . rename_i neq
+          simp [neq] at lookup_eq
+          exact mapBindings_lookup_void f lookup_eq
+
+  def mapBindings_lookup_none
+    ( f : Term → Term)
+    { lst : List Attr}
+    { l : Bindings lst}
+    { c : Attr}
+    : lookup l c = none →
+      lookup (mapBindings f l) c = none
+    := λ lookup_eq => by match l with
+      | Bindings.nil => rfl
+      | Bindings.cons name _ u tail =>
+        simp [lookup] at *
+        split
+        . rename_i eq
+          simp [eq] at lookup_eq
+        . rename_i neq
+          simp [neq] at lookup_eq
+          exact mapBindings_lookup_none f lookup_eq
+
+  def mapBindings_isAttr
+    ( c : Attr)
+    { lst : List Attr}
+    ( l : Bindings lst)
+    ( f : Term → Term)
+    : IsAttr c (obj l) → IsAttr c (obj (mapBindings f l))
+    | @IsAttr.is_attr lst a _in _ => by
+      exact @IsAttr.is_attr lst a _in (mapBindings f l)
+end MapBindings
+
+/-! ### Defition of regular and parallel reduction -/
+
+/-- Evaluation [KS22, Fig. 1] -/
 inductive Reduce : Term → Term → Type where
   | congOBJ
     : { t : Term }
@@ -545,6 +633,7 @@ namespace PReduce
         → Premise l1 l2
         → Premise (Bindings.cons a not_in (attached t1) l1) (Bindings.cons a not_in (attached t2) l2)
 
+    /-- Parallel reduction [KS22, Fig. 2] -/
     inductive PReduce : Term → Term → Type where
       | pcongOBJ
         : { lst : List Attr }
@@ -587,7 +676,6 @@ namespace PReduce
         → PReduce (app t c u) (obj (insert l c (attached (incLocators u'))))
   end
 
--- [KS22, Proposition 3.3 (Reflexivity of parallel reduction)]
   mutual
     def reflexivePremise
       { lst : List Attr }
@@ -600,6 +688,7 @@ namespace PReduce
               | void => Premise.consVoid name (reflexivePremise tail)
               | attached t => Premise.consAttached name t t (prefl t) (reflexivePremise tail)
 
+/-- Reflexivity of parallel reduction [KS22, Proposition 3.3] -/
     def prefl : (t : Term) → PReduce t t
       := λ term => match term with
         | loc n => PReduce.pcong_ρ n
@@ -761,7 +850,10 @@ infix:20 " ⇛ " => PReduce
 infix:20 " ⇝* " => RedMany
 infix:20 " ⇛* " => ParMany
 
--- [KS22, Proposition 3.4 (1), Eqivalence of ⇛ and ⇝]
+
+/-! ### Equivalence of `⇛` and `⇝` -/
+
+/-- Equivalence of `⇛` and `⇝` [KS22, Proposition 3.4 (1)] -/
 def reg_to_par {t t' : Term} : (t ⇝ t') → (t ⇛ t')
   | .congOBJ b l red isAttached =>
       .pcongOBJ
@@ -781,7 +873,7 @@ def reg_to_par {t t' : Term} : (t ⇝ t') → (t ⇛ t')
   | Reduce.app_c t u c l eq lookup_eq =>
       PReduce.papp_c c l (prefl t) (prefl u) eq lookup_eq
 
--- [KS22, Lemma A.3 (Transitivity of ⇝*)]
+/-- Transitivity of `⇝*` [KS22, Lemma A.3] -/
 def red_trans { t t' t'' : Term } : (t ⇝* t') → (t' ⇝* t'') → (t ⇝* t'')
   | RedMany.nil, reds => reds
   | RedMany.cons lm mn_many, reds => RedMany.cons lm (red_trans mn_many reds)
@@ -819,7 +911,7 @@ def consBindingsRedMany
           assumption
       (RedMany.cons one_step (consBindingsRedMany _ _ reds))
 
--- [KS22, Lemma A.4 (1), Congruence for ⇝* in OBJ]
+/-- Congruence for `⇝*` in OBJ [KS22, Lemma A.4 (1)] -/
 def congOBJClos
   { t t' : Term }
   { b : Attr }
@@ -838,7 +930,7 @@ def congOBJClos
         (Eq.ndrec ind_hypothesis
         (congrArg obj (Insert.insertTwice l b t' t_i)))
 
--- [KS22, Lemma A.4 (2), Congruence for ⇝* in DOT]
+/-- Congruence for `⇝*` in DOT [KS22, Lemma A.4 (2)] -/
 def congDotClos
   { t t' : Term }
   { a : Attr }
@@ -847,7 +939,7 @@ def congDotClos
   | @RedMany.cons l m n lm mn_many =>
     RedMany.cons (Reduce.congDOT l m a lm) (congDotClos mn_many)
 
--- [KS22, Lemma A.4 (3), Congruence for ⇝* in APPₗ]
+/-- Congruence for `⇝*` in APPₗ [KS22, Lemma A.4 (3)] -/
 def congAPPₗClos
   { t t' u : Term }
   { a : Attr }
@@ -856,7 +948,7 @@ def congAPPₗClos
   | @RedMany.cons l m n lm mn_many =>
     RedMany.cons (Reduce.congAPPₗ l m u a lm) (congAPPₗClos mn_many)
 
--- [KS22, Lemma A.4 (4), Congruence for ⇝* in APPᵣ]
+/-- Congruence for `⇝*` in APPᵣ [KS22, Lemma A.4 (4)] -/
 def congAPPᵣClos
   { t u u' : Term }
   { a : Attr }
@@ -865,7 +957,7 @@ def congAPPᵣClos
   | @RedMany.cons l m n lm mn_many =>
     RedMany.cons (Reduce.congAPPᵣ t l m a lm) (congAPPᵣClos mn_many)
 
--- [KS22, Proposition 3.4 (3), Eqivalence of ⇛ and ⇝]
+/-- Equivalence of `⇛` and `⇝` [KS22, Proposition 3.4 (3)] -/
 def par_to_redMany {t t' : Term} : (t ⇛ t') → (t ⇝* t')
   | @PReduce.pcongOBJ lst l l' premise =>
     let rec fold_premise
@@ -911,87 +1003,18 @@ def par_to_redMany {t t' : Term} : (t ⇛ t') → (t ⇝* t')
     let tu_app_clos := RedMany.cons tu_app RedMany.nil
     red_trans tu_t'u'_many tu_app_clos
 
--- [KS22, Proposition 3.4 (4), Eqivalence of ⇛ and ⇝]
+/-- Equivalence of `⇛` and `⇝` [KS22, Proposition 3.4 (4)] -/
 def parMany_to_redMany {t t' : Term} : (t ⇛* t') → (t ⇝* t')
   | ParMany.nil => RedMany.nil
   | ParMany.cons red reds => red_trans (par_to_redMany red) (parMany_to_redMany reds)
 
--- [KS22, Proposition 3.4 (2), Eqivalence of ⇛ and ⇝]
+/-- Equivalence of `⇛` and `⇝` [KS22, Proposition 3.4 (2)] -/
 def redMany_to_parMany {t t' : Term} : (t ⇝* t') → (t ⇛* t')
   | RedMany.nil => ParMany.nil
   | RedMany.cons red reds => ParMany.cons (reg_to_par red) (redMany_to_parMany reds)
 
--------------------------------------------------------
--- properties of mapBindings
-namespace MapBindings
-
-  def mapBindings_lookup_attached
-    ( f : Term → Term)
-    { lst : List Attr}
-    { l : Bindings lst}
-    { t_c : Term}
-    { c : Attr}
-    : lookup l c = some (attached t_c) →
-      lookup (mapBindings f l) c = some (attached (f t_c))
-    := λ lookup_eq => by match l with
-      | Bindings.nil => contradiction
-      | Bindings.cons name _ u tail =>
-        simp [lookup] at *
-        split
-        . rename_i eq
-          simp [eq] at lookup_eq
-          simp [lookup_eq]
-        . rename_i neq
-          simp [neq] at lookup_eq
-          exact mapBindings_lookup_attached f lookup_eq
-
-  def mapBindings_lookup_void
-    ( f : Term → Term)
-    { lst : List Attr}
-    { l : Bindings lst}
-    { c : Attr}
-    : lookup l c = some void → lookup (mapBindings f l) c = some void
-    := λ lookup_eq => by match l with
-      | Bindings.nil => contradiction
-      | Bindings.cons name _ u tail =>
-        simp [lookup] at *
-        split
-        . rename_i eq
-          simp [eq] at lookup_eq
-          simp [lookup_eq]
-        . rename_i neq
-          simp [neq] at lookup_eq
-          exact mapBindings_lookup_void f lookup_eq
-
-  def mapBindings_lookup_none
-    ( f : Term → Term)
-    { lst : List Attr}
-    { l : Bindings lst}
-    { c : Attr}
-    : lookup l c = none →
-      lookup (mapBindings f l) c = none
-    := λ lookup_eq => by match l with
-      | Bindings.nil => rfl
-      | Bindings.cons name _ u tail =>
-        simp [lookup] at *
-        split
-        . rename_i eq
-          simp [eq] at lookup_eq
-        . rename_i neq
-          simp [neq] at lookup_eq
-          exact mapBindings_lookup_none f lookup_eq
-
-  def mapBindings_isAttr
-    ( c : Attr)
-    { lst : List Attr}
-    ( l : Bindings lst)
-    ( f : Term → Term)
-    : IsAttr c (obj l) → IsAttr c (obj (mapBindings f l))
-    | @IsAttr.is_attr lst a _in _ => by
-      exact @IsAttr.is_attr lst a _in (mapBindings f l)
-end MapBindings
-
--- [KS22, Lemma A.9, Increment swap]
+/-! ### Substitution Lemma -/
+/-- Increment swap [KS22, Lemma A.9] -/
 def inc_swap
   ( i j : Nat)
   ( le_ij : i ≤ j)
@@ -1030,7 +1053,7 @@ def inc_swap
       simp [incLocatorsFrom, MapBindings.mapBindings_compose, ih]
 decreasing_by sorry
 
--- [KS22, Lemma A.8, Increment and substitution swap]
+/-- Increment and substitution swap [KS22, Lemma A.8] -/
 def subst_inc_swap
   ( i j : Nat)
   ( le_ji : j ≤ i)
@@ -1087,7 +1110,7 @@ def subst_inc_swap
       simp [ih_func]
 decreasing_by sorry
 
--- [Increment and substitution swap, dual to A.8]
+/-- Increment and substitution swap, dual to A.8 -/
 def inc_subst_swap
   ( i j : Nat)
   ( le_ji : j ≤ i)
@@ -1144,7 +1167,7 @@ def inc_subst_swap
       simp [ih_func]
 decreasing_by sorry
 
--- [KS22, Lemma A.7, Substitutions swap]
+/-- Substitutions swap [KS22, Lemma A.7] -/
 def subst_swap
   ( i j : Nat)
   ( le_ji : j ≤ i)
@@ -1294,7 +1317,8 @@ namespace MapBindings
       . split <;> simp [mapBindings] <;> exact mapBindings_inc_insert
 end MapBindings
 
--- incLocators preserves parallel reduction
+
+/-- Increment of locators preserves parallel reduction. -/
 def preduce_incLocatorsFrom
   { t t' : Term}
   ( i : Nat)
@@ -1390,7 +1414,7 @@ def get_premise
   := match preduce with
     | PReduce.pcongOBJ _ _ premise => premise
 
--- [KS22, Lemma 3.5]
+/-- Substitution Lemma [KS22, Lemma 3.5] -/
 def substitution_lemma
   ( i : Nat )
   { t t' u u' : Term }
@@ -1525,9 +1549,9 @@ def substitution_lemma
 decreasing_by sorry
 
 
-----------------------------------------------
--- Complete Development
+/-! ### Complete Development -/
 
+/-- Complete Development [KS22, Definition 3.6] -/
 def complete_development : Term → Term
   | loc n => loc n
   | dot t a => match (complete_development t) with
@@ -1544,6 +1568,7 @@ def complete_development : Term → Term
   | obj bnds => obj (mapBindings complete_development bnds)
 decreasing_by sorry
 
+/-- Term reduces (`⇛`) to its complete development [KS22, Proposition 3.7] -/
 def term_to_development
   (t : Term)
   : t ⇛ complete_development t
@@ -1632,7 +1657,7 @@ def term_to_development
           (mapBindings complete_development bnds)
           (make_premise bnds)
 
--- [KS 2022, Proposition 3.8]
+/-- Half Diamond [KS22, Proposition 3.8] -/
 def half_diamond
   { t t' : Term }
   (preduce : PReduce t t')
@@ -1767,6 +1792,8 @@ def half_diamond
                 _
                 (singlePremiseInsert (preduce_incLocatorsFrom 0 preduce_u') premise)
 
+/-! ### Confluence -/
+
 inductive BothPReduce : Term → Term → Term → Type where
   | reduce : { u v w : Term } → (u ⇛ w) → (v ⇛ w) → BothPReduce u v w
 
@@ -1776,6 +1803,7 @@ inductive BothPReduceClosure : Term → Term → Term → Type where
 inductive BothReduceTo : Term → Term → Term → Type where
   | reduce : { u v w : Term } → (u ⇝* w) → (v ⇝* w) → BothReduceTo u v w
 
+/-- Diamond property of `⇛` [KS22, Corollary 3.9] -/
 def diamond_preduce
   { t u v : Term }
   : (t ⇛ u)
@@ -1812,6 +1840,8 @@ def confluence_step
       , PReduceClosureStep.step (ParMany.cons u't' t'_to_vv) v_to_vv
       ⟩
 
+
+/-- Confluence of `⇛` [KS22, Corollary 3.10], [Krivine93, Lemma 1.17] -/
 def confluence_preduce
   { t u v : Term }
   : (t ⇛* u)
@@ -1825,6 +1855,7 @@ def confluence_preduce
       let ⟨w, BothPReduceClosure.reduce uw vvw⟩ := confluence_preduce tail_u u'vv
       ⟨w, BothPReduceClosure.reduce uw (ParMany.cons v_to_vv vvw)⟩
 
+/-- Confluence of `⇝` [KS22, Theorem 3.11] -/
 def confluence
   { t u v : Term }
   : (t ⇝* u)
