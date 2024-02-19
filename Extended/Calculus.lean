@@ -259,7 +259,7 @@ mutual
       → { t u u' : Term }
       → { ctx : Context }
       → { attrs : List Attr }
-      → (bnds : Bindings attrs)
+      → { bnds : Bindings attrs }
       → IsAttached a u bnds
       → ReduceCtx ctx u u' -- Φ ⊢ u ⇝ u'
       → ReduceCtx
@@ -390,9 +390,9 @@ def cong_obj_insert_clos
   : (RedMany ctx (obj (insert bnds a t)) (obj (insert bnds a t')))
   := match reds with
     | RedMany.nil => RedMany.nil
-    | @RedMany.cons _ t_i _ _ red reds' => by
+    | @RedMany.cons _ t_i _ _ red reds' =>
       let is_attached_ti : IsAttached a t (insert bnds a t) := Insert.insert_new_attached
-      exact RedMany.cons (congObj is_attached_ti red) (cong_obj_insert_clos reds')
+      RedMany.cons (congObj is_attached_ti red) (cong_obj_insert_clos reds')
 
 def cong_appₗ_clos
   { t t' : Term }
@@ -404,3 +404,22 @@ def cong_appₗ_clos
   := match reds with
     | RedMany.nil => RedMany.nil
     | RedMany.cons red reds' => RedMany.cons (congAppL red) (cong_appₗ_clos reds')
+
+def cong_appᵣ_clos
+  { a : Attr }
+  { t u u' : Term }
+  { attrs : List Attr }
+  { bnds : Bindings attrs }
+  { ctx : Context }
+  (reds : RedMany ctx u u')
+  (is_attached : IsAttached a u bnds)
+  : (RedMany ctx (app t bnds) (app t (insert bnds a u')))
+  := match reds with
+    | RedMany.nil => by
+      rw [Insert.insert_attached is_attached]
+      exact RedMany.nil
+    | @RedMany.cons _ u_i _ _ red reds' =>
+      let ind_hypothesis
+        : RedMany ctx (app t (insert bnds a u_i)) (app t (insert bnds a u'))
+        := cong_appᵣ_clos reds' (Insert.attached_after_insert is_attached.attached_is_in)
+      RedMany.cons (congAppR is_attached red) ind_hypothesis
