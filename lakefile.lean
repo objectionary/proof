@@ -15,3 +15,5 @@ require «doc-gen4» from git "https://github.com/leanprover/doc-gen4" @ "main"
 lean_lib PhiCalculus
 
 lean_lib Minimal
+
+require checkdecls from git "https://github.com/PatrickMassot/checkdecls.git"

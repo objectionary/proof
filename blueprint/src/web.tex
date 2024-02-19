@@ -1,0 +1,30 @@
+\documentclass{report}
+
+\usepackage{amssymb, amsthm, amsmath}
+\usepackage{hyperref}
+\usepackage[showmore, dep_graph]{blueprint}
+
+\usepackage{graphicx}
+
+% \input{macros/common}
+% \input{macros/web}
+
+\home{https://objectionary.github.io/proof}
+\github{https://github.com/objectionary/proof}
+\dochome{https://objectionary.github.io/proof/docs}
+
+\title{Confluence of minimal φ-calculus}
+\author{}
+
+\newtheorem*{definition}{Definition}
+\newtheorem*{theorem}{Theorem}
+\newtheorem*{lemma}{Lemma}
+\newtheorem*{corollary}{Corollary}
+
+% \newcommand{\mkObject}[1]{\llbracket #1 \rrbracket}
+\newcommand{\mkObject}[1]{[[ #1 ]]}
+\newcommand{\inct}[2]{#2\uparrow{}^{#1}}
+\begin{document}
+\maketitle
+\input{content}
+\end{document}
