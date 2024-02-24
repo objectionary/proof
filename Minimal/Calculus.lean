@@ -53,7 +53,7 @@ def mapBindings : (Term → Term) → { lst : List Attr } → Bindings lst → B
         Bindings.cons a not_in (f' opAttr) (mapBindings f attrLst)
 
 namespace MapBindings
-  def mapBindings_compose
+  theorem mapBindings_compose
     (f g : Term → Term )
     { lst : List Attr }
     ( l : Bindings lst)
@@ -115,7 +115,7 @@ def le_nat_option_nat : Nat → Option Nat → Prop
   | n, some k => n ≤ k
   | _, none   => True
 
-def le_min_option
+theorem le_min_option
   { j : Nat}
   { option_n1 option_n2 : Option Nat}
   ( le_min : le_nat_option_nat j (min option_n1 option_n2))
@@ -135,7 +135,7 @@ def le_min_option
   | none, some n => simp [le_nat_option_nat] at * ; assumption
   | none, none   => simp [le_nat_option_nat] at *
 
-def le_min_option_reverse
+theorem le_min_option_reverse
   { j : Nat}
   { option_n1 option_n2 : Option Nat}
   ( le_and : le_nat_option_nat j option_n1 ∧ le_nat_option_nat j option_n2)
@@ -152,7 +152,7 @@ def le_min_option_reverse
   | none, none   => simp [le_nat_option_nat] at *
 
 /-- `IncLocatorsFrom` increments minimal free locator if it acts only on free locators. -/
-def min_free_loc_inc
+theorem min_free_loc_inc
   { i j : Nat}
   { v : Term}
   ( free_locs_v : le_nat_option_nat i (min_free_loc j v))
@@ -213,7 +213,7 @@ def min_free_loc_inc
     exact traverse_bindings o free_locs_v
 
 /-- `substitute` and `incLocatorsFrom` cancel effect of each other, if they act only on free locators. -/
-def subst_inc_cancel
+theorem subst_inc_cancel
   (v u : Term)
   (j k i zeroth_level : Nat)
   (le_ji : j ≤ i + zeroth_level)
@@ -295,7 +295,7 @@ def lookup { lst : List Attr } (l : Bindings lst) (a : Attr) : Option OptionalAt
         if (name == a) then some opAttr
         else lookup tail a
 
-def lookup_none_not_in
+theorem lookup_none_not_in
   { lst : List Attr }
   { l : Bindings lst }
   { a : Attr }
@@ -316,7 +316,7 @@ def lookup_none_not_in
             | List.Mem.tail _ memTail => contradiction
         )
 
-def lookup_none_preserve
+theorem lookup_none_preserve
   { lst : List Attr }
   { l1 : Bindings lst }
   { a : Attr }
@@ -391,7 +391,7 @@ inductive IsAttr : Attr → Term → Type where
     → (l : Bindings lst)
     → IsAttr a (obj l)
 
-def is_attr_in
+theorem is_attr_in
   { lst : List Attr }
   { a : Attr }
   { l : Bindings lst }
@@ -419,7 +419,7 @@ inductive IsAttached : { lst : List Attr } → Attr → Term → Bindings lst �
     → IsAttached a t l
     → IsAttached a t (Bindings.cons b not_in u l)
 
-def isAttachedIsIn
+theorem isAttachedIsIn
   { lst : List Attr }
   { a : Attr }
   { t : Term }
@@ -431,7 +431,7 @@ def isAttachedIsIn
 
 namespace Insert
 
-  def insertAttachedStep
+  theorem insertAttachedStep
     { a b : Attr }
     { neq : a ≠ b }
     { t : Term }
@@ -448,7 +448,7 @@ namespace Insert
             contradiction
           . simp
 
-  def insertAttached
+  theorem insertAttached
     { a : Attr }
     { t : Term }
     { lst : List Attr }
@@ -460,7 +460,7 @@ namespace Insert
           let step := @insertAttachedStep a b neq t _ not_in u _ isAttached
           Eq.trans step (congrArg (Bindings.cons b not_in u) (insertAttached isAttached))
 
-  def insertTwice
+  theorem insertTwice
     {lst : List Attr}
     (l : Bindings lst)
     (a : Attr)
@@ -498,7 +498,7 @@ end Insert
 
 namespace MapBindings
 
-  def mapBindings_lookup_attached
+  theorem mapBindings_lookup_attached
     ( f : Term → Term)
     { lst : List Attr}
     { l : Bindings lst}
@@ -518,7 +518,7 @@ namespace MapBindings
           simp [neq] at lookup_eq
           exact mapBindings_lookup_attached f lookup_eq
 
-  def mapBindings_lookup_void
+  theorem mapBindings_lookup_void
     ( f : Term → Term)
     { lst : List Attr}
     { l : Bindings lst}
@@ -536,7 +536,7 @@ namespace MapBindings
           simp [neq] at lookup_eq
           exact mapBindings_lookup_void f lookup_eq
 
-  def mapBindings_lookup_none
+  theorem mapBindings_lookup_none
     ( f : Term → Term)
     { lst : List Attr}
     { l : Bindings lst}
@@ -607,74 +607,75 @@ inductive Reduce : Term → Term → Type where
     → lookup l c = some void
     → Reduce (app t c u) (obj (insert l c (attached (incLocators u))))
 
-namespace PReduce
-  mutual
-    -- | tᵢ => tᵢ' for all i with ⟦ ... αᵢ ↦ tᵢ ... ⟧
-    --   α's are given by `lst`
-    inductive Premise : { lst : List Attr } → (l1 : Bindings lst) → (l2 : Bindings lst) → Type where
-      | nil : Premise Bindings.nil Bindings.nil
-      | consVoid
-        : (a : Attr)
-        → { lst : List Attr }
-        → { l1 : Bindings lst }
-        → { l2 : Bindings lst }
-        → { not_in : a ∉ lst }
-        → Premise l1 l2
-        → Premise (Bindings.cons a not_in void l1) (Bindings.cons a not_in void l2)
-      | consAttached
-        : (a : Attr)
-        → (t1 : Term)
-        → (t2 : Term)
-        → PReduce t1 t2
-        → { lst : List Attr }
-        → { l1 : Bindings lst }
-        → { l2 : Bindings lst }
-        → { not_in : a ∉ lst }
-        → Premise l1 l2
-        → Premise (Bindings.cons a not_in (attached t1) l1) (Bindings.cons a not_in (attached t2) l2)
+mutual
+  -- | tᵢ => tᵢ' for all i with ⟦ ... αᵢ ↦ tᵢ ... ⟧
+  --   α's are given by `lst`
+  inductive Premise : { lst : List Attr } → (l1 : Bindings lst) → (l2 : Bindings lst) → Type where
+    | nil : Premise Bindings.nil Bindings.nil
+    | consVoid
+      : (a : Attr)
+      → { lst : List Attr }
+      → { l1 : Bindings lst }
+      → { l2 : Bindings lst }
+      → { not_in : a ∉ lst }
+      → Premise l1 l2
+      → Premise (Bindings.cons a not_in void l1) (Bindings.cons a not_in void l2)
+    | consAttached
+      : (a : Attr)
+      → (t1 : Term)
+      → (t2 : Term)
+      → PReduce t1 t2
+      → { lst : List Attr }
+      → { l1 : Bindings lst }
+      → { l2 : Bindings lst }
+      → { not_in : a ∉ lst }
+      → Premise l1 l2
+      → Premise (Bindings.cons a not_in (attached t1) l1) (Bindings.cons a not_in (attached t2) l2)
 
-    /-- Parallel reduction [KS22, Fig. 2] -/
-    inductive PReduce : Term → Term → Type where
-      | pcongOBJ
-        : { lst : List Attr }
-        → (l : Bindings lst)
-        → (newAttrs : Bindings lst)
-        → Premise l newAttrs
-        → PReduce (obj l) (obj newAttrs)
-      | pcong_ρ : ∀ n, PReduce (loc n) (loc n)
-      | pcongDOT : ∀ t t' a, PReduce t t' → PReduce (dot t a) (dot t' a)
-      | pcongAPP : ∀ t t' u u' a, PReduce t t' → PReduce u u' → PReduce (app t a u) (app t' a u')
-      | pdot_c
-        : { t t' : Term }
-        → (t_c : Term)
-        → (c : Attr)
-        → { lst : List Attr }
-        → (l : Bindings lst)
-        → PReduce t t'
-        → t' = obj l
-        → lookup l c = some (attached t_c)
-        → PReduce (dot t c) (substitute (0, t') t_c)
-      | pdot_cφ
-        : { t t' : Term }
-        → (c : Attr)
-        → { lst : List Attr }
-        → (l : Bindings lst)
-        → PReduce t t'
-        → t' = obj l
-        → lookup l c = none
-        → IsAttr "φ" t'
-        → PReduce (dot t c) (dot (dot t' "φ") c)
-      | papp_c
-        : { t t' u u' : Term }
-        → (c : Attr)
-        → { lst : List Attr }
-        → (l : Bindings lst)
-        → PReduce t t'
-        → PReduce u u'
-        → t' = obj l
-        → lookup l c = some void
-        → PReduce (app t c u) (obj (insert l c (attached (incLocators u'))))
-  end
+  /-- Parallel reduction [KS22, Fig. 2] -/
+  inductive PReduce : Term → Term → Type where
+    | pcongOBJ
+      : { lst : List Attr }
+      → (l : Bindings lst)
+      → (newAttrs : Bindings lst)
+      → Premise l newAttrs
+      → PReduce (obj l) (obj newAttrs)
+    | pcong_ρ : ∀ n, PReduce (loc n) (loc n)
+    | pcongDOT : ∀ t t' a, PReduce t t' → PReduce (dot t a) (dot t' a)
+    | pcongAPP : ∀ t t' u u' a, PReduce t t' → PReduce u u' → PReduce (app t a u) (app t' a u')
+    | pdot_c
+      : { t t' : Term }
+      → (t_c : Term)
+      → (c : Attr)
+      → { lst : List Attr }
+      → (l : Bindings lst)
+      → PReduce t t'
+      → t' = obj l
+      → lookup l c = some (attached t_c)
+      → PReduce (dot t c) (substitute (0, t') t_c)
+    | pdot_cφ
+      : { t t' : Term }
+      → (c : Attr)
+      → { lst : List Attr }
+      → (l : Bindings lst)
+      → PReduce t t'
+      → t' = obj l
+      → lookup l c = none
+      → IsAttr "φ" t'
+      → PReduce (dot t c) (dot (dot t' "φ") c)
+    | papp_c
+      : { t t' u u' : Term }
+      → (c : Attr)
+      → { lst : List Attr }
+      → (l : Bindings lst)
+      → PReduce t t'
+      → PReduce u u'
+      → t' = obj l
+      → lookup l c = some void
+      → PReduce (app t c u) (obj (insert l c (attached (incLocators u'))))
+end
+
+namespace PReduce
 
   mutual
     def reflexivePremise
@@ -757,7 +758,7 @@ namespace PReduce
             exact Premise.consAttached b t' t'' preduce' (singlePremiseInsert preduce tail)
           )
 
-  def lookup_void_premise
+  theorem lookup_void_premise
     { lst : List Attr }
     { l1 l2 : Bindings lst }
     { a : Attr }
@@ -878,7 +879,7 @@ def red_trans { t t' t'' : Term } : (t ⇝* t') → (t' ⇝* t'') → (t ⇝* t'
   | RedMany.nil, reds => reds
   | RedMany.cons lm mn_many, reds => RedMany.cons lm (red_trans mn_many reds)
 
-def notEqByMem
+theorem notEqByMem
   { lst : List Attr }
   { a b : Attr }
   (a_is_in : a ∈ lst)
@@ -1015,7 +1016,7 @@ def redMany_to_parMany {t t' : Term} : (t ⇝* t') → (t ⇛* t')
 
 /-! ### Substitution Lemma -/
 /-- Increment swap [KS22, Lemma A.9] -/
-def inc_swap
+theorem inc_swap
   ( i j : Nat)
   ( le_ij : i ≤ j)
   ( t : Term)
@@ -1054,7 +1055,7 @@ def inc_swap
 decreasing_by all_goals sorry
 
 /-- Increment and substitution swap [KS22, Lemma A.8] -/
-def subst_inc_swap
+theorem subst_inc_swap
   ( i j : Nat)
   ( le_ji : j ≤ i)
   ( t u : Term)
@@ -1111,7 +1112,7 @@ def subst_inc_swap
 decreasing_by all_goals sorry
 
 /-- Increment and substitution swap, dual to A.8 -/
-def inc_subst_swap
+theorem inc_subst_swap
   ( i j : Nat)
   ( le_ji : j ≤ i)
   ( t u : Term)
@@ -1168,7 +1169,7 @@ def inc_subst_swap
 decreasing_by all_goals sorry
 
 /-- Substitutions swap [KS22, Lemma A.7] -/
-def subst_swap
+theorem subst_swap
   ( i j : Nat)
   ( le_ji : j ≤ i)
   ( t u v : Term)
@@ -1278,7 +1279,7 @@ def subst_swap
       exact traverse_bindings o
 
 namespace MapBindings
-  def mapBindings_subst_insert
+  theorem mapBindings_subst_insert
     { i : Nat }
     { c : Attr }
     { lst : List Attr }
@@ -1297,7 +1298,7 @@ namespace MapBindings
         rw [mapBindings]
       . split <;> simp [mapBindings] <;> exact mapBindings_subst_insert
 
-  def mapBindings_inc_insert
+  theorem mapBindings_inc_insert
     { i : Nat }
     { c : Attr }
     { lst : List Attr }
@@ -1335,7 +1336,7 @@ def preduce_incLocatorsFrom
           | Bindings.nil, Bindings.nil => by
             simp [mapBindings]
             exact Premise.nil
-        | a :: as => match premise with
+        | _ :: as => match premise with
           | Premise.consVoid a tail => by
             simp [mapBindings]
             exact Premise.consVoid a (make_premise tail)
