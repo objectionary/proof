@@ -71,7 +71,7 @@ def incLocatorsFrom (n : Nat) (term : Term) : Term
     | dot t a => dot (incLocatorsFrom n t) a
     | app t a u => app (incLocatorsFrom n t) a (incLocatorsFrom n u)
     | obj o => (obj (mapBindings (incLocatorsFrom (n+1)) o))
-decreasing_by sorry
+decreasing_by all_goals sorry
 
 def incLocators : Term → Term
   := incLocatorsFrom 0
@@ -86,7 +86,7 @@ def substitute : Nat × Term → Term → Term
       if (n < k) then (loc n)
       else if (n == k) then v
       else loc (n-1)
-decreasing_by sorry
+decreasing_by all_goals sorry
 
 instance : Min (Option Nat) where
   min
@@ -285,8 +285,8 @@ def subst_inc_cancel
         . simp [min_free_loc] at free_locs
           have free_locs := le_min_option free_locs
           exact traverse_bindings tail free_locs.right
+    decreasing_by all_goals sorry
     exact traverse_bindings o v_loc
-decreasing_by sorry
 
 def lookup { lst : List Attr } (l : Bindings lst) (a : Attr) : Option OptionalAttr
   := match l with
@@ -1051,7 +1051,7 @@ def inc_swap
       have ih : (t' : Term) → incLocatorsFrom (i + 1) (incLocatorsFrom (j + 1) t') = incLocatorsFrom (j + 1 + 1) (incLocatorsFrom (i + 1) t') :=
         λ t' => inc_swap (i + 1) (j + 1) (Nat.succ_le_succ le_ij) t'
       simp [incLocatorsFrom, MapBindings.mapBindings_compose, ih]
-decreasing_by sorry
+decreasing_by all_goals sorry
 
 /-- Increment and substitution swap [KS22, Lemma A.8] -/
 def subst_inc_swap
@@ -1108,7 +1108,7 @@ def subst_inc_swap
       simp [inc_swap]
       rw [← incLocators]
       simp [ih_func]
-decreasing_by sorry
+decreasing_by all_goals sorry
 
 /-- Increment and substitution swap, dual to A.8 -/
 def inc_subst_swap
@@ -1165,7 +1165,7 @@ def inc_subst_swap
       simp [inc_swap]
       rw [← incLocators]
       simp [ih_func]
-decreasing_by sorry
+decreasing_by all_goals sorry
 
 /-- Substitutions swap [KS22, Lemma A.7] -/
 def subst_swap
@@ -1274,8 +1274,8 @@ def subst_swap
               rw [← incLocators] at ih
               exact ih
             . exact traverse_bindings tail
+      decreasing_by all_goals sorry
       exact traverse_bindings o
-decreasing_by sorry
 
 namespace MapBindings
   def mapBindings_subst_insert
@@ -1459,6 +1459,7 @@ def substitution_lemma
                 not_in
                 subst_premise
               exact PReduce.pcongOBJ _ _ premise
+      decreasing_by all_goals sorry
       fold_premise premise
     | .pcong_ρ n => by
         simp [substitute]
@@ -1546,7 +1547,6 @@ def substitution_lemma
         (substitution_lemma i vv' uu' ((by assumption)))
         (by rw [eq, substitute])
         (MapBindings.mapBindings_lookup_void (substitute (i + 1, incLocators u')) lookup_eq)
-decreasing_by sorry
 
 
 /-! ### Complete Development -/
@@ -1566,7 +1566,7 @@ def complete_development : Term → Term
       | _ => app (obj bnds) a (complete_development u)
     | _ => app (complete_development t) a (complete_development u)
   | obj bnds => obj (mapBindings complete_development bnds)
-decreasing_by sorry
+decreasing_by all_goals sorry
 
 /-- Term reduces (`⇛`) to its complete development [KS22, Proposition 3.7] -/
 def term_to_development
