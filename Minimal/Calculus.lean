@@ -10,6 +10,8 @@ This file contains a formalization of minimal φ-calculus and the proof of its c
 -/
 
 set_option autoImplicit false
+set_option linter.all true
+set_option linter.missingDocs false
 
 /-! ### Defition of minimal φ-calculus -/
 
@@ -439,7 +441,6 @@ namespace Insert
     { not_in : b ∉ lst }
     { u : OptionalAttr }
     { l : Bindings lst }
-    (_ : IsAttached a t l)
     : insert (Bindings.cons b not_in u l) a (attached t)
         = Bindings.cons b not_in u (insert l a (attached t))
     := by simp [insert, neq];
@@ -457,7 +458,7 @@ namespace Insert
     → insert l a (attached t) = l
       | IsAttached.zeroth_attached _ _ _ _ => by simp [insert]
       | IsAttached.next_attached _ _ l b neq not_in u isAttached =>
-          let step := @insertAttachedStep a b neq t _ not_in u _ isAttached
+          let step := @insertAttachedStep a b neq t _ not_in u _
           Eq.trans step (congrArg (Bindings.cons b not_in u) (insertAttached isAttached))
 
   theorem insertTwice
@@ -1702,8 +1703,7 @@ def half_diamond
           . rename_i lookup_attached
             rename_i u
             exact PReduce.pdot_c u a l assumption_preduce rfl lookup_attached
-          . rename_i lookup_void
-            exact PReduce.pcongDOT lt' (obj l) a assumption_preduce
+          . exact PReduce.pcongDOT lt' (obj l) a assumption_preduce
           . rename_i lookup_none
             exact dite ("φ" ∈ attrs)
               (λ φ_in => by
