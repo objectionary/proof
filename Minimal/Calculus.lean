@@ -842,10 +842,7 @@ end PReduce
 open PReduce
 
 def RedMany := ReflTransGen Reduce
-
-inductive ParMany : Term → Term → Type where
-  | nil : { m : Term } → ParMany m m
-  | cons : { l m n : Term} → PReduce l m → ParMany m n → ParMany l n
+def ParMany := ReflTransGen PReduce
 
 infix:20 " ⇝ " => Reduce
 infix:20 " ⇛ " => PReduce
@@ -877,7 +874,7 @@ def reg_to_par {t t' : Term} : (t ⇝ t') → (t ⇛ t')
 
 /-- Transitivity of `⇝*` [KS22, Lemma A.3] -/
 def red_trans { t t' t'' : Term } (fi : t ⇝* t') (se : t' ⇝* t'') : (t ⇝* t'')
-  := RTClos.trans fi se
+  := ReflTransGen.trans fi se
 
 theorem notEqByMem
   { lst : List Attr }
@@ -1011,13 +1008,13 @@ def par_to_redMany {t t' : Term} : (t ⇛ t') → (t ⇝* t')
 
 /-- Equivalence of `⇛` and `⇝` [KS22, Proposition 3.4 (4)] -/
 def parMany_to_redMany {t t' : Term} : (t ⇛* t') → (t ⇝* t')
-  | ParMany.nil => ReflTransGen.refl
-  | ParMany.cons red reds => red_trans (par_to_redMany red) (parMany_to_redMany reds)
+  | ReflTransGen.refl => ReflTransGen.refl
+  | ReflTransGen.head red reds => red_trans (par_to_redMany red) (parMany_to_redMany reds)
 
 /-- Equivalence of `⇛` and `⇝` [KS22, Proposition 3.4 (2)] -/
 def redMany_to_parMany {t t' : Term} : (t ⇝* t') → (t ⇛* t')
-  | ReflTransGen.refl => ParMany.nil
-  | ReflTransGen.head red reds => ParMany.cons (reg_to_par red) (redMany_to_parMany reds)
+  | ReflTransGen.refl => ReflTransGen.refl
+  | ReflTransGen.head red reds => ReflTransGen.head (reg_to_par red) (redMany_to_parMany reds)
 
 /-! ### Substitution Lemma -/
 /-- Increment swap [KS22, Lemma A.9] -/
@@ -1799,77 +1796,23 @@ def half_diamond
 
 /-! ### Confluence -/
 
-inductive BothPReduce : Term → Term → Term → Type where
-  | reduce : { u v w : Term } → (u ⇛ w) → (v ⇛ w) → BothPReduce u v w
-
-inductive BothPReduceClosure : Term → Term → Term → Type where
-  | reduce : { u v w : Term } → (u ⇛* w) → (v ⇛* w) → BothPReduceClosure u v w
-
-inductive BothReduceTo : Term → Term → Term → Type where
-  | reduce : { u v w : Term } → (u ⇝* w) → (v ⇝* w) → BothReduceTo u v w
-
 /-- Diamond property of `⇛` [KS22, Corollary 3.9] -/
-def diamond_preduce
-  { t u v : Term }
-  : (t ⇛ u)
-  → (t ⇛ v)
-  → Σ w : Term, BothPReduce u v w
-  := λ tu tv =>
+
+def diamond_preduce : DiamondProperty PReduce
+  := λ t _ _ tu tv =>
     ⟨ complete_development t
-    , BothPReduce.reduce (half_diamond tu) (half_diamond tv)
+    , (half_diamond tu)
+    , (half_diamond tv)
     ⟩
 
-inductive PReduceClosureStep : Term → Term → Term → Type where
-  | step
-    : { v u' vv : Term }
-    → (u' ⇛* vv)
-    → (v ⇛ vv)
-    → PReduceClosureStep v u' vv
-
-def confluence_step
-  { t u' v v' : Term }
-  : (t ⇛ u')
-  → (t ⇛ v')
-  → (v' ⇛* v)
-  → Σ vv : Term, PReduceClosureStep v u' vv
-  := λ tu tv v_clos =>
-    let ⟨t', BothPReduce.reduce u't' v't'⟩ := diamond_preduce tu tv
-    match v_clos with
-    | ParMany.nil =>
-      ⟨ t'
-      , PReduceClosureStep.step (ParMany.cons u't' ParMany.nil) v't'
-      ⟩
-    | @ParMany.cons _ _v'' _ v'_to_v'' tail =>
-      let ⟨vv, PReduceClosureStep.step t'_to_vv v_to_vv⟩ := confluence_step v't' v'_to_v'' tail
-      ⟨ vv
-      , PReduceClosureStep.step (ParMany.cons u't' t'_to_vv) v_to_vv
-      ⟩
-
-
 /-- Confluence of `⇛` [KS22, Corollary 3.10], [Krivine93, Lemma 1.17] -/
-def confluence_preduce
-  { t u v : Term }
-  : (t ⇛* u)
-  → (t ⇛* v)
-  → Σ w : Term, BothPReduceClosure u v w
-  := λ tu tv => match tu, tv with
-    | ParMany.nil, tv => ⟨v, BothPReduceClosure.reduce tv ParMany.nil⟩
-    | tu, ParMany.nil => ⟨u, BothPReduceClosure.reduce ParMany.nil tu⟩
-    | @ParMany.cons _ _u' _ tu' tail_u, @ParMany.cons _ _v' _ tv' tail_v =>
-      let ⟨_vv, PReduceClosureStep.step u'vv v_to_vv⟩ := confluence_step tu' tv' tail_v
-      let ⟨w, BothPReduceClosure.reduce uw vvw⟩ := confluence_preduce tail_u u'vv
-      ⟨w, BothPReduceClosure.reduce uw (ParMany.cons v_to_vv vvw)⟩
+def confluence_preduce : ChurchRosser PReduce
+  := diamond_implies_church_rosser diamond_preduce
 
 /-- Confluence of `⇝` [KS22, Theorem 3.11] -/
-def confluence
-  { t u v : Term }
-  : (t ⇝* u)
-  → (t ⇝* v)
-  → Σ w : Term, BothReduceTo u v w
-  := λ tu tv =>
-    let tu' := redMany_to_parMany tu
-    let tv' := redMany_to_parMany tv
-    let ⟨w, BothPReduceClosure.reduce uw' vw'⟩ := confluence_preduce tu' tv'
-    let uw := parMany_to_redMany uw'
-    let vw := parMany_to_redMany vw'
-    ⟨w, BothReduceTo.reduce uw vw⟩
+def confluence_reduce : ChurchRosser Reduce
+  := λ t u v tu tv =>
+  let (tu', tv') := (redMany_to_parMany tu, redMany_to_parMany tv)
+  let ⟨w, uw', vw'⟩ := confluence_preduce t u v tu' tv'
+  let (uw, vw) := (parMany_to_redMany uw', parMany_to_redMany vw')
+  ⟨w, uw, vw⟩
