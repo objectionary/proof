@@ -1,3 +1,5 @@
+import Minimal.ARS
+
 /-!
 # Confluence of minimal φ-calculus
 
@@ -839,13 +841,8 @@ namespace PReduce
 end PReduce
 open PReduce
 
-inductive RedMany : Term → Term → Type where
-  | nil : { m : Term } → RedMany m m
-  | cons : { l m n : Term} → Reduce l m → RedMany m n → RedMany l n
-
-inductive ParMany : Term → Term → Type where
-  | nil : { m : Term } → ParMany m m
-  | cons : { l m n : Term} → PReduce l m → ParMany m n → ParMany l n
+def RedMany := ReflTransGen Reduce
+def ParMany := ReflTransGen PReduce
 
 infix:20 " ⇝ " => Reduce
 infix:20 " ⇛ " => PReduce
@@ -876,9 +873,8 @@ def reg_to_par {t t' : Term} : (t ⇝ t') → (t ⇛ t')
       PReduce.papp_c c l (prefl t) (prefl u) eq lookup_eq
 
 /-- Transitivity of `⇝*` [KS22, Lemma A.3] -/
-def red_trans { t t' t'' : Term } : (t ⇝* t') → (t' ⇝* t'') → (t ⇝* t'')
-  | RedMany.nil, reds => reds
-  | RedMany.cons lm mn_many, reds => RedMany.cons lm (red_trans mn_many reds)
+def red_trans { t t' t'' : Term } (fi : t ⇝* t') (se : t' ⇝* t'') : (t ⇝* t'')
+  := ReflTransGen.trans fi se
 
 theorem notEqByMem
   { lst : List Attr }
@@ -900,8 +896,8 @@ def consBindingsRedMany
   : (obj l1 ⇝* obj l2)
   → (obj (Bindings.cons a not_in_a u_a l1) ⇝* obj (Bindings.cons a not_in_a u_a l2))
   := λ redmany => match redmany with
-    | RedMany.nil => RedMany.nil
-    | RedMany.cons (@Reduce.congOBJ t t' c _ _ red_tt' isAttached) reds =>
+    | ReflTransGen.refl => ReflTransGen.refl
+    | ReflTransGen.head (@Reduce.congOBJ t t' c _ _ red_tt' isAttached) reds =>
       have one_step : (obj (Bindings.cons a not_in_a u_a l1) ⇝
         obj (Bindings.cons a not_in_a u_a (insert l1 c (attached t')))) := by
           have c_is_in := isAttachedIsIn isAttached
@@ -911,7 +907,8 @@ def consBindingsRedMany
             (IsAttached.next_attached c _ _ _ neq_c_a _ _ isAttached)
           simp [insert, neq_c_a.symm] at intermediate
           assumption
-      (RedMany.cons one_step (consBindingsRedMany _ _ reds))
+      (ReflTransGen.head one_step (consBindingsRedMany _ _ reds))
+decreasing_by sorry
 
 /-- Congruence for `⇝*` in OBJ [KS22, Lemma A.4 (1)] -/
 def congOBJClos
@@ -923,41 +920,45 @@ def congOBJClos
   → IsAttached b t l
   → (obj l ⇝* obj (insert l b (attached t')))
   := λ red_tt' isAttached => match red_tt' with
-    | RedMany.nil => Eq.ndrec (RedMany.nil) (congrArg obj (Eq.symm (Insert.insertAttached isAttached)))
-    | @RedMany.cons t t_i t' red redMany =>
+    | ReflTransGen.refl => Eq.ndrec (ReflTransGen.refl) (congrArg obj (Eq.symm (Insert.insertAttached isAttached)))
+    | ReflTransGen.head red redMany => by
+      rename_i t_i
       have ind_hypothesis : obj (insert l b (attached t_i)) ⇝* obj (insert (insert l b (attached t_i)) b (attached t'))
         := (congOBJClos redMany (Insert.insert_new_isAttached isAttached))
-      RedMany.cons
+      exact (ReflTransGen.head
         (Reduce.congOBJ b l red isAttached)
         (Eq.ndrec ind_hypothesis
-        (congrArg obj (Insert.insertTwice l b t' t_i)))
+        (congrArg obj (Insert.insertTwice l b t' t_i))))
 
 /-- Congruence for `⇝*` in DOT [KS22, Lemma A.4 (2)] -/
 def congDotClos
   { t t' : Term }
   { a : Attr }
   : (t ⇝* t') → ((dot t a) ⇝* (dot t' a))
-  | RedMany.nil => RedMany.nil
-  | @RedMany.cons l m n lm mn_many =>
-    RedMany.cons (Reduce.congDOT l m a lm) (congDotClos mn_many)
+  | ReflTransGen.refl => ReflTransGen.refl
+  | ReflTransGen.head lm mn_many => by
+    rename_i m
+    exact (ReflTransGen.head (Reduce.congDOT t m a lm) (congDotClos mn_many))
 
 /-- Congruence for `⇝*` in APPₗ [KS22, Lemma A.4 (3)] -/
 def congAPPₗClos
   { t t' u : Term }
   { a : Attr }
   : (t ⇝* t') → ((app t a u) ⇝* (app t' a u))
-  | RedMany.nil => RedMany.nil
-  | @RedMany.cons l m n lm mn_many =>
-    RedMany.cons (Reduce.congAPPₗ l m u a lm) (congAPPₗClos mn_many)
+  | ReflTransGen.refl => ReflTransGen.refl
+  | ReflTransGen.head lm mn_many => by
+    rename_i m
+    exact (ReflTransGen.head (Reduce.congAPPₗ t m u a lm) (congAPPₗClos mn_many))
 
 /-- Congruence for `⇝*` in APPᵣ [KS22, Lemma A.4 (4)] -/
 def congAPPᵣClos
   { t u u' : Term }
   { a : Attr }
   : (u ⇝* u') → ((app t a u) ⇝* (app t a u'))
-  | RedMany.nil => RedMany.nil
-  | @RedMany.cons l m n lm mn_many =>
-    RedMany.cons (Reduce.congAPPᵣ t l m a lm) (congAPPᵣClos mn_many)
+  | ReflTransGen.refl => ReflTransGen.refl
+  | ReflTransGen.head lm mn_many => by
+    rename_i m
+    exact ReflTransGen.head (Reduce.congAPPᵣ t u m a lm) (congAPPᵣClos mn_many)
 
 /-- Equivalence of `⇛` and `⇝` [KS22, Proposition 3.4 (3)] -/
 def par_to_redMany {t t' : Term} : (t ⇛ t') → (t ⇝* t')
@@ -969,7 +970,7 @@ def par_to_redMany {t t' : Term} : (t ⇛ t') → (t ⇝* t')
       : (obj al) ⇝* (obj al')
       := match lst with
         | [] => match al, al' with
-          | Bindings.nil, Bindings.nil => RedMany.nil
+          | Bindings.nil, Bindings.nil => ReflTransGen.refl
         | a :: as => match al, al' with
           | Bindings.cons _ not_in u tail, Bindings.cons _ _ u' tail' => match premise with
             | Premise.consVoid _ premiseTail => consBindingsRedMany a void (fold_premise premiseTail)
@@ -982,7 +983,7 @@ def par_to_redMany {t t' : Term} : (t ⇛ t') → (t ⇝* t')
                 simp [insert]
                 exact consBindingsRedMany a (attached t2) (fold_premise premiseTail)
     fold_premise premise
-  | .pcong_ρ n => RedMany.nil
+  | .pcong_ρ n => ReflTransGen.refl
   | .pcongDOT t t' a prtt' => congDotClos (par_to_redMany prtt')
   | .pcongAPP t t' u u' a prtt' pruu' => red_trans
     (congAPPₗClos (par_to_redMany prtt'))
@@ -990,30 +991,30 @@ def par_to_redMany {t t' : Term} : (t ⇛ t') → (t ⇝* t')
   | PReduce.pdot_c t_c c l preduce eq lookup_eq =>
     let tc_t'c_many := congDotClos (par_to_redMany preduce)
     let tc_dispatch := Reduce.dot_c t_c c l eq lookup_eq
-    let tc_dispatch_clos := RedMany.cons tc_dispatch RedMany.nil
+    let tc_dispatch_clos := ReflTransGen.head tc_dispatch ReflTransGen.refl
     red_trans tc_t'c_many tc_dispatch_clos
   | PReduce.pdot_cφ c l preduce eq lookup_eq isAttr =>
     let tc_t'c_many := congDotClos (par_to_redMany preduce)
     let tφc_dispatch := Reduce.dot_cφ c l eq lookup_eq isAttr
-    let tφc_dispatch_clos := RedMany.cons tφc_dispatch RedMany.nil
+    let tφc_dispatch_clos := ReflTransGen.head tφc_dispatch ReflTransGen.refl
     red_trans tc_t'c_many tφc_dispatch_clos
   | @PReduce.papp_c t t' u u' c lst l prtt' pruu' path_t'_obj_lst path_lst_c_void =>
     let tu_t'u_many := congAPPₗClos (par_to_redMany prtt')
     let t'u_t'u'_many := congAPPᵣClos (par_to_redMany pruu')
     let tu_t'u'_many := red_trans tu_t'u_many t'u_t'u'_many
     let tu_app := Reduce.app_c t' u' c l path_t'_obj_lst path_lst_c_void
-    let tu_app_clos := RedMany.cons tu_app RedMany.nil
+    let tu_app_clos := ReflTransGen.head tu_app ReflTransGen.refl
     red_trans tu_t'u'_many tu_app_clos
 
 /-- Equivalence of `⇛` and `⇝` [KS22, Proposition 3.4 (4)] -/
 def parMany_to_redMany {t t' : Term} : (t ⇛* t') → (t ⇝* t')
-  | ParMany.nil => RedMany.nil
-  | ParMany.cons red reds => red_trans (par_to_redMany red) (parMany_to_redMany reds)
+  | ReflTransGen.refl => ReflTransGen.refl
+  | ReflTransGen.head red reds => red_trans (par_to_redMany red) (parMany_to_redMany reds)
 
 /-- Equivalence of `⇛` and `⇝` [KS22, Proposition 3.4 (2)] -/
 def redMany_to_parMany {t t' : Term} : (t ⇝* t') → (t ⇛* t')
-  | RedMany.nil => ParMany.nil
-  | RedMany.cons red reds => ParMany.cons (reg_to_par red) (redMany_to_parMany reds)
+  | ReflTransGen.refl => ReflTransGen.refl
+  | ReflTransGen.head red reds => ReflTransGen.head (reg_to_par red) (redMany_to_parMany reds)
 
 /-! ### Substitution Lemma -/
 /-- Increment swap [KS22, Lemma A.9] -/
@@ -1795,77 +1796,23 @@ def half_diamond
 
 /-! ### Confluence -/
 
-inductive BothPReduce : Term → Term → Term → Type where
-  | reduce : { u v w : Term } → (u ⇛ w) → (v ⇛ w) → BothPReduce u v w
-
-inductive BothPReduceClosure : Term → Term → Term → Type where
-  | reduce : { u v w : Term } → (u ⇛* w) → (v ⇛* w) → BothPReduceClosure u v w
-
-inductive BothReduceTo : Term → Term → Term → Type where
-  | reduce : { u v w : Term } → (u ⇝* w) → (v ⇝* w) → BothReduceTo u v w
-
 /-- Diamond property of `⇛` [KS22, Corollary 3.9] -/
-def diamond_preduce
-  { t u v : Term }
-  : (t ⇛ u)
-  → (t ⇛ v)
-  → Σ w : Term, BothPReduce u v w
-  := λ tu tv =>
+
+def diamond_preduce : DiamondProperty PReduce
+  := λ t _ _ tu tv =>
     ⟨ complete_development t
-    , BothPReduce.reduce (half_diamond tu) (half_diamond tv)
+    , (half_diamond tu)
+    , (half_diamond tv)
     ⟩
 
-inductive PReduceClosureStep : Term → Term → Term → Type where
-  | step
-    : { v u' vv : Term }
-    → (u' ⇛* vv)
-    → (v ⇛ vv)
-    → PReduceClosureStep v u' vv
-
-def confluence_step
-  { t u' v v' : Term }
-  : (t ⇛ u')
-  → (t ⇛ v')
-  → (v' ⇛* v)
-  → Σ vv : Term, PReduceClosureStep v u' vv
-  := λ tu tv v_clos =>
-    let ⟨t', BothPReduce.reduce u't' v't'⟩ := diamond_preduce tu tv
-    match v_clos with
-    | ParMany.nil =>
-      ⟨ t'
-      , PReduceClosureStep.step (ParMany.cons u't' ParMany.nil) v't'
-      ⟩
-    | @ParMany.cons _ _v'' _ v'_to_v'' tail =>
-      let ⟨vv, PReduceClosureStep.step t'_to_vv v_to_vv⟩ := confluence_step v't' v'_to_v'' tail
-      ⟨ vv
-      , PReduceClosureStep.step (ParMany.cons u't' t'_to_vv) v_to_vv
-      ⟩
-
-
 /-- Confluence of `⇛` [KS22, Corollary 3.10], [Krivine93, Lemma 1.17] -/
-def confluence_preduce
-  { t u v : Term }
-  : (t ⇛* u)
-  → (t ⇛* v)
-  → Σ w : Term, BothPReduceClosure u v w
-  := λ tu tv => match tu, tv with
-    | ParMany.nil, tv => ⟨v, BothPReduceClosure.reduce tv ParMany.nil⟩
-    | tu, ParMany.nil => ⟨u, BothPReduceClosure.reduce ParMany.nil tu⟩
-    | @ParMany.cons _ _u' _ tu' tail_u, @ParMany.cons _ _v' _ tv' tail_v =>
-      let ⟨_vv, PReduceClosureStep.step u'vv v_to_vv⟩ := confluence_step tu' tv' tail_v
-      let ⟨w, BothPReduceClosure.reduce uw vvw⟩ := confluence_preduce tail_u u'vv
-      ⟨w, BothPReduceClosure.reduce uw (ParMany.cons v_to_vv vvw)⟩
+def confluence_preduce : ChurchRosser PReduce
+  := diamond_implies_church_rosser diamond_preduce
 
 /-- Confluence of `⇝` [KS22, Theorem 3.11] -/
-def confluence
-  { t u v : Term }
-  : (t ⇝* u)
-  → (t ⇝* v)
-  → Σ w : Term, BothReduceTo u v w
-  := λ tu tv =>
-    let tu' := redMany_to_parMany tu
-    let tv' := redMany_to_parMany tv
-    let ⟨w, BothPReduceClosure.reduce uw' vw'⟩ := confluence_preduce tu' tv'
-    let uw := parMany_to_redMany uw'
-    let vw := parMany_to_redMany vw'
-    ⟨w, BothReduceTo.reduce uw vw⟩
+def confluence_reduce : ChurchRosser Reduce
+  := λ t u v tu tv =>
+  let (tu', tv') := (redMany_to_parMany tu, redMany_to_parMany tv)
+  let ⟨w, uw', vw'⟩ := confluence_preduce t u v tu' tv'
+  let (uw, vw) := (parMany_to_redMany uw', parMany_to_redMany vw')
+  ⟨w, uw, vw⟩
