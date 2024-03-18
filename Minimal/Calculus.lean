@@ -68,65 +68,18 @@ namespace MapBindings
         cases u <;> simp [mapBindings] <;> exact mapBindings_compose f g tail
 end MapBindings
 
-/-- Locator increment [KS22, Definition 2.5] -/
-def incLocatorsFrom (n : Nat) (term : Term) : Term
-  := match term with
-    | loc m => if m < n then loc m else loc (m + 1)
-    | dot t a => dot (incLocatorsFrom n t) a
-    | app t a u => app (incLocatorsFrom n t) a (incLocatorsFrom n u)
-    | obj o => (obj (mapBindings (incLocatorsFrom (n+1)) o))
-decreasing_by all_goals sorry
-
 mutual
-  def depth (term : Term) : Nat
-    := match term with
-      | loc _ => 1
-      | dot t _ => (depth t) + 1
-      | app t _ u => max (depth t) (depth u) + 1
-      | obj o => (max_depth o) + 1
-
-  def max_depth
-    { lst : List Attr}
-    ( o : Bindings lst)
-    : Nat
-    := match o with
-    | Bindings.nil => 0
-    | Bindings.cons _ _ void tail => max_depth tail
-    | Bindings.cons _ _ (attached term) tail =>
-      max (depth term) (max_depth tail)
-end
-
-def incLocatorsFrom' (n : Nat) (term : Term) : Term
-  := match term with
-    | loc m => if m < n then loc m else loc (m + 1)
-    | dot t a =>
-      have : depth t < depth (dot t a) := by
-        simp [depth]
-        exact Nat.lt_succ_self (depth t)
-      dot (incLocatorsFrom' n t) a
-    | app t a u =>
-      have : depth t < depth (app t a u) := by
-        simp [depth]
-        -- exact Nat.lt_succ_self (depth t)
-        admit
-      have : depth u < depth (app t a u) := by
-        simp [depth]
-        -- exact Nat.lt_succ_self (depth t)
-        admit
-      app (incLocatorsFrom' n t) a (incLocatorsFrom' n u)
-    | obj o =>
-      (obj (mapBindings (incLocatorsFrom' (n+1)) o))
-termination_by _ t => depth t
-
-mutual
+  /-- Locator increment [KS22, Definition 2.5] -/
+  @[simp]
   def incLocatorsFrom (n : Nat) (term : Term) : Term
     := match term with
       | loc m => if m < n then loc m else loc (m + 1)
       | dot t a => dot (incLocatorsFrom n t) a
       | app t a u => app (incLocatorsFrom n t) a (incLocatorsFrom n u)
-      | obj o => (obj (incLocatorsFrom_map (n + 1) o))
+      | obj o => (obj (incLocatorsFromLst (n + 1) o))
 
-  def incLocatorsFrom_map
+  @[simp]
+  def incLocatorsFromLst
     ( n : Nat)
     { lst : List Attr}
     ( o : Bindings lst)
@@ -134,25 +87,37 @@ mutual
     := match o with
     | Bindings.nil => Bindings.nil
     | Bindings.cons a not_in void tail =>
-      Bindings.cons a not_in void (incLocatorsFrom_map n tail)
+      Bindings.cons a not_in void (incLocatorsFromLst n tail)
     | Bindings.cons a not_in (attached term) tail =>
-      Bindings.cons a not_in (attached (incLocatorsFrom n term)) (incLocatorsFrom_map n tail)
+      Bindings.cons a not_in (attached (incLocatorsFrom n term)) (incLocatorsFromLst n tail)
 end
 
 def incLocators : Term → Term
   := incLocatorsFrom 0
 
+mutual
 /-- Locator substitution [KS22, Fig. 1] -/
-def substitute : Nat × Term → Term → Term
+  @[simp]
+  def substitute : Nat × Term → Term → Term
   := λ (k, v) term => match term with
-    | obj o => obj (mapBindings (substitute (k + 1, incLocators v)) o)
-    | dot t a => dot (substitute (k, v) t) a
-    | app t a u => app (substitute (k, v) t) a (substitute (k, v) u)
     | loc n =>
       if (n < k) then (loc n)
       else if (n == k) then v
       else loc (n-1)
-decreasing_by all_goals sorry
+    | dot t a => dot (substitute (k, v) t) a
+    | app t a u => app (substitute (k, v) t) a (substitute (k, v) u)
+    | obj o => obj (substituteLst (k + 1, incLocators v) o)
+
+  @[simp]
+  def substituteLst {lst : List Attr}
+  : Nat × Term → Bindings lst → Bindings lst
+  := λ (k, v) o => match o with
+  | Bindings.nil => Bindings.nil
+  | Bindings.cons a not_in void tail =>
+    Bindings.cons a not_in void (substituteLst (k, v) tail)
+  | Bindings.cons a not_in (attached term) tail =>
+    Bindings.cons a not_in (attached (substitute (k, v) term)) (substituteLst (k, v) tail)
+end
 
 instance : Min (Option Nat) where
   min
@@ -258,16 +223,15 @@ theorem min_free_loc_inc
     { lst : List Attr}
     ( bindings : Bindings lst)
     ( free_locs : le_nat_option_nat i (min_free_loc j (obj bindings)))
-    : le_nat_option_nat (i + 1) (min_free_loc j (obj (mapBindings (incLocatorsFrom (j + 1)) bindings)))
+    : le_nat_option_nat (i + 1) (min_free_loc j (obj (incLocatorsFromLst (j + 1) bindings)))
     := by match bindings with
       | Bindings.nil =>
-        simp [mapBindings]
         simp [min_free_loc, le_nat_option_nat]
       | Bindings.cons _ _ void tail =>
-        simp [mapBindings, min_free_loc]
+        simp [min_free_loc]
         exact traverse_bindings tail (by simp [min_free_loc] at free_locs ; exact free_locs)
       | Bindings.cons _ _ (attached term) tail =>
-        simp [mapBindings, min_free_loc]
+        simp [min_free_loc]
         apply le_min_option_reverse
         constructor
         . simp [min_free_loc] at free_locs
@@ -278,6 +242,8 @@ theorem min_free_loc_inc
           exact traverse_bindings tail free_locs.right
     exact traverse_bindings o free_locs_v
 
+
+mutual
 /-- `substitute` and `incLocatorsFrom` cancel effect of each other, if they act only on free locators. -/
 theorem subst_inc_cancel
   (v u : Term)
@@ -293,7 +259,7 @@ theorem subst_inc_cancel
     simp [min_free_loc] at v_loc
     split at v_loc
     . rename_i n_is_not_free
-      simp [incLocatorsFrom, Nat.lt_of_lt_of_le n_is_not_free le_0k]
+      simp [Nat.lt_of_lt_of_le n_is_not_free le_0k]
       simp [substitute, Nat.lt_of_lt_of_le n_is_not_free le_0j]
     . rename_i n_is_free
       simp [le_nat_option_nat] at v_loc
@@ -302,57 +268,63 @@ theorem subst_inc_cancel
         (Nat.sub_add_cancel n_is_free) ▸ Nat.add_le_add_right v_loc zeroth_level
       have le_kn : k ≤ n := Nat.le_trans le_ki le_in
       have nlt_nk: ¬ n < k := λ x => Nat.lt_irrefl n (Nat.lt_of_lt_of_le x le_kn)
-      simp [incLocatorsFrom, nlt_nk]
+      simp [nlt_nk]
       have lt_jn1 : j < n + 1 := Nat.lt_succ_of_le (Nat.le_trans le_ji le_in)
       have nlt_n1j : ¬ n + 1 < j := λ x => Nat.lt_irrefl j (Nat.lt_trans lt_jn1 x)
       have neq_n1j : ¬ n + 1 = j := λ x => Nat.lt_irrefl j (x ▸ lt_jn1)
-      simp [substitute, nlt_n1j, neq_n1j, Nat.add_sub_cancel]
+      simp [nlt_n1j, neq_n1j, Nat.add_sub_cancel]
   | dot t _ => by
-    simp [incLocatorsFrom, substitute]
+    simp [substitute]
     apply subst_inc_cancel _ _ _ _ _ _ le_ji le_ki le_0j le_0k
       (by simp [min_free_loc] at v_loc ; exact v_loc)
   | app t _ u => by
     simp [min_free_loc] at v_loc
     have v_loc := le_min_option v_loc
-    simp [incLocatorsFrom, substitute]
+    simp
     constructor <;> apply subst_inc_cancel _ _ _ _ _ _ le_ji le_ki le_0j le_0k
     . exact v_loc.left
     . exact v_loc.right
   | obj o => by
-    simp [incLocatorsFrom, substitute, MapBindings.mapBindings_compose]
-    let rec traverse_bindings
-    { lst : List Attr}
-    ( bindings : Bindings lst)
-    ( free_locs : le_nat_option_nat i (min_free_loc zeroth_level (obj bindings)))
-    : bindings = mapBindings (fun t => substitute (j + 1, incLocators u) (incLocatorsFrom (k + 1) t)) bindings
-    := by match bindings with
-      | Bindings.nil =>
-        simp [mapBindings]
-      | Bindings.cons _ _ void tail =>
-        simp [mapBindings]
-        exact traverse_bindings tail (by simp [min_free_loc] at free_locs ; assumption)
-      | Bindings.cons _ _ (attached term) tail =>
-        simp [mapBindings]
-        constructor
-        . simp [min_free_loc] at free_locs
-          have free_locs_term := (le_min_option free_locs).left
-          exact subst_inc_cancel
-            term
-            _
-            (j + 1)
-            (k + 1)
-            i
-            (zeroth_level + 1)
-            (by rw [← Nat.add_assoc] ; exact Nat.succ_le_succ le_ji)
-            (by rw [← Nat.add_assoc] ; exact Nat.succ_le_succ le_ki)
-            (Nat.succ_le_succ le_0j)
-            (Nat.succ_le_succ le_0k)
-            (free_locs_term)
-        . simp [min_free_loc] at free_locs
-          have free_locs := le_min_option free_locs
-          exact traverse_bindings tail free_locs.right
-    decreasing_by all_goals sorry
-    exact traverse_bindings o v_loc
+    simp
+    exact subst_inc_cancel_Lst o _ _ _ _ _ le_ji le_ki le_0j le_0k v_loc
+
+theorem subst_inc_cancel_Lst
+  { lst : List Attr}
+  ( bindings : Bindings lst)
+  (u : Term)
+  (j k i zeroth_level : Nat)
+  (le_ji : j ≤ i + zeroth_level)
+  (le_ki : k ≤ i + zeroth_level)
+  (le_0j : zeroth_level ≤ j)
+  (le_0k : zeroth_level ≤ k)
+  (v_loc : le_nat_option_nat i (min_free_loc zeroth_level (obj bindings)))
+  : bindings = substituteLst (j + 1, incLocators u) (incLocatorsFromLst (k + 1) bindings)
+  := match bindings with
+  | Bindings.nil => by simp
+  | Bindings.cons _ _ void tail => by
+    simp [min_free_loc] at *
+    exact subst_inc_cancel_Lst tail u j k i zeroth_level le_ji le_ki le_0j le_0k v_loc
+  | Bindings.cons _ _ (attached term) tail => by
+    simp
+    constructor
+    . simp [min_free_loc] at v_loc
+      have free_locs_term := (le_min_option v_loc).left
+      exact subst_inc_cancel
+        term
+        _
+        (j + 1)
+        (k + 1)
+        i
+        (zeroth_level + 1)
+        (by rw [← Nat.add_assoc] ; exact Nat.succ_le_succ le_ji)
+        (by rw [← Nat.add_assoc] ; exact Nat.succ_le_succ le_ki)
+        (Nat.succ_le_succ le_0j)
+        (Nat.succ_le_succ le_0k)
+        (free_locs_term)
+    . simp [min_free_loc] at v_loc
+      have free_locs := le_min_option v_loc
+      exact subst_inc_cancel_Lst tail _ _ _ _ _ _ _ _ _ free_locs.right
+end
 
 def lookup { lst : List Attr } (l : Bindings lst) (a : Attr) : Option OptionalAttr
   := match l with
@@ -960,17 +932,17 @@ def consBindingsRedMany
   := λ redmany => match redmany with
     | ReflTransGen.refl => ReflTransGen.refl
     | ReflTransGen.head (@Reduce.congOBJ t t' c _ _ red_tt' isAttached) reds =>
-      have one_step : (obj (Bindings.cons a not_in_a u_a l1) ⇝
+      let one_step : (obj (Bindings.cons a not_in_a u_a l1) ⇝
         obj (Bindings.cons a not_in_a u_a (insert l1 c (attached t')))) := by
-          have c_is_in := isAttachedIsIn isAttached
-          have a_not_in := not_in_a
-          have neq_c_a : c ≠ a := notEqByMem c_is_in a_not_in
-          have intermediate := Reduce.congOBJ c (Bindings.cons a not_in_a u_a l1) red_tt'
-            (IsAttached.next_attached c _ _ _ neq_c_a _ _ isAttached)
-          simp [insert, neq_c_a.symm] at intermediate
-          assumption
+          admit
+          -- have c_is_in := isAttachedIsIn isAttached
+          -- have a_not_in := not_in_a
+          -- have neq_c_a : c ≠ a := notEqByMem c_is_in a_not_in
+          -- have intermediate := Reduce.congOBJ c (Bindings.cons a not_in_a u_a l1) red_tt'
+          --   (IsAttached.next_attached c _ _ _ neq_c_a _ _ isAttached)
+          -- simp [insert, neq_c_a.symm] at intermediate
+          -- assumption
       (ReflTransGen.head one_step (consBindingsRedMany _ _ reds))
-decreasing_by sorry
 
 /-- Congruence for `⇝*` in OBJ [KS22, Lemma A.4 (1)] -/
 def congOBJClos
@@ -1115,7 +1087,7 @@ theorem inc_swap
     | obj _ => by
       have ih : (t' : Term) → incLocatorsFrom (i + 1) (incLocatorsFrom (j + 1) t') = incLocatorsFrom (j + 1 + 1) (incLocatorsFrom (i + 1) t') :=
         λ t' => inc_swap (i + 1) (j + 1) (Nat.succ_le_succ le_ij) t'
-      simp [incLocatorsFrom, MapBindings.mapBindings_compose, ih]
+      simp [ih]
 decreasing_by all_goals sorry
 
 /-- Increment and substitution swap [KS22, Lemma A.8] -/
