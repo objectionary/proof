@@ -1806,11 +1806,11 @@ def diamond_preduce : DiamondProperty PReduce
     ⟩
 
 /-- Confluence of `⇛` [KS22, Corollary 3.10], [Krivine93, Lemma 1.17] -/
-def confluence_preduce : ChurchRosser PReduce
-  := diamond_implies_church_rosser diamond_preduce
+def confluence_preduce : Confluence PReduce
+  := diamond_implies_confluence diamond_preduce
 
 /-- Confluence of `⇝` [KS22, Theorem 3.11] -/
-def confluence_reduce : ChurchRosser Reduce
+def confluence_reduce : Confluence Reduce
   := λ t u v tu tv =>
   let (tu', tv') := (redMany_to_parMany tu, redMany_to_parMany tv)
   let ⟨w, uw', vw'⟩ := confluence_preduce t u v tu' tv'
