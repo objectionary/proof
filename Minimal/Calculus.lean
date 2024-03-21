@@ -363,22 +363,6 @@ def insert
         if name == a then Bindings.cons name not_in u tail
         else Bindings.cons name not_in opAttr (insert tail a u)
 
-inductive IsAttr : Attr → Term → Type where
-  | is_attr
-    : { lst : List Attr }
-    → (a : Attr)
-    → a ∈ lst
-    → (l : Bindings lst)
-    → IsAttr a (obj l)
-
-theorem is_attr_in
-  { lst : List Attr }
-  { a : Attr }
-  { l : Bindings lst }
-  : IsAttr a (obj l)
-  → a ∈ lst
-  := λ (IsAttr.is_attr _ is_in _) => is_in
-
 inductive IsAttached : { lst : List Attr } → Attr → Term → Bindings lst → Type where
   | zeroth_attached
     : { lst : List Attr }
@@ -507,7 +491,7 @@ inductive Reduce : Term → Term → Type where
     → (l : Bindings lst)
     → t = obj l
     → lookup l c = none
-    → IsAttr "φ" t
+    → "φ" ∈ lst
     → Reduce (dot t c) (dot (dot t "φ") c)
   | app_c
     : (t u : Term)
@@ -572,7 +556,7 @@ mutual
       → PReduce t t'
       → t' = obj l
       → lookup l c = none
-      → IsAttr "φ" t'
+      → "φ" ∈ lst
       → PReduce (dot t c) (dot (dot t' "φ") c)
     | papp_c
       : { t t' u u' : Term }
@@ -828,17 +812,34 @@ def consBindingsRedMany
       (consBindingsRedMany _ _ reds))
 decreasing_by sorry
 
--- example
---   (A B : Type)
---   (type_family : Type → Type)
---   (a : type_family A)
---   (b : type_family B)
---   (heq : HEq a b)
---   (p : (X : Type) → (x : type_family X) → Type)
---   (pa : p A a)
---   : p B b := by
---   have pb := HEq.subst heq pa
+example
+  (A B : Type)
+  (type_family : Type → Type)
+  (a : type_family A)
+  (b : type_family B)
+  (heq : HEq a b)
+  (p : (X : Type) → (x : type_family X) → Type)
+  (pa : p A a)
+  : p B b := sorry
 
+example
+  (A B : Type)
+  (type_family : Type → Type)
+  (a : type_family A)
+  (b : type_family B)
+  (heq : HEq a b)
+  (p : (X : Type) → (x : type_family X) → Type)
+  (pa : p A a)
+  : p B b := sorry
+
+noncomputable example
+  (A B : Type)
+  (a : A)
+  (b : B)
+  (heq : HEq a b)
+  (p : (X : Type) → (x : X) → Type)
+  (pa : p A a)
+  : p B b := HEq.ndrec pa heq
 
 -- example
 --   (lst lst' : List Attr)
@@ -1229,7 +1230,6 @@ theorem subst_swap
           have le_jk: j ≤ k := Nat.ge_of_not_lt not_lt
           split
           . rename_i eq_kj
-            have le_ki : k ≤ i := eq_kj ▸ le_ji
             have lt_ji1 : j < i + 1 :=  Nat.lt_succ_of_le le_ji
             simp [eq_kj, lt_ji1]
             -- case k == j
@@ -1312,45 +1312,97 @@ theorem subst_swap_Lst
     . exact subst_swap_Lst i j le_ji tail u v free_locs_v
 end
 
--- namespace MapBindings
---   theorem mapBindings_subst_insert
---     { i : Nat }
---     { c : Attr }
---     { lst : List Attr }
---     { l : Bindings lst }
---     { u v : Term}
---     : (insert (mapBindings (substitute (i + 1, incLocators u)) l) c (attached (incLocators (substitute (i, u) v)))) =
---     (mapBindings (substitute (i + 1, incLocators u)) (insert l c (attached (incLocators v))))
---     := match l with
---     | Bindings.nil => by
---       simp [insert, mapBindings]
---     | Bindings.cons a not_in op_attr tail => by
---       simp [insert]
---       split
---       . rw [incLocators]
---         simp [← subst_inc_swap]
---         rw [mapBindings]
---       . split <;> simp [mapBindings] <;> exact mapBindings_subst_insert
+theorem lookup_inc_attached
+  (t : Term)
+  (i : Nat)
+  (c : Attr)
+  {lst : List Attr}
+  (l : Bindings lst)
+  (lookup_eq: lookup l c = some (attached t))
+  : lookup (incLocatorsFromLst i l) c = some (attached (incLocatorsFrom i t))
+  := by match l with
+  | Bindings.nil => contradiction
+  | Bindings.cons name _ void tail =>
+    simp [lookup] at lookup_eq
+    split at lookup_eq
+    . simp at lookup_eq
+    . rename_i neq
+      simp [lookup, neq]
+      exact (lookup_inc_attached t i c tail lookup_eq)
+  | Bindings.cons name _ (attached _) tail =>
+    simp [lookup] at lookup_eq
+    split at lookup_eq
+    . rename_i eq
+      simp at lookup_eq
+      simp [lookup_eq]
+      simp [lookup_eq, lookup, eq]
+    . rename_i neq
+      simp [lookup, neq]
+      exact (lookup_inc_attached t i c tail lookup_eq)
 
---   theorem mapBindings_inc_insert
---     { i : Nat }
---     { c : Attr }
---     { lst : List Attr }
---     { l : Bindings lst }
---     { v : Term}
---     : (insert (mapBindings (incLocatorsFrom (i + 1)) l) c (attached (incLocators (incLocatorsFrom i v)))) =
---     (mapBindings (incLocatorsFrom (i + 1)) (insert l c (attached (incLocators v))))
---     := match l with
---     | Bindings.nil => by
---       simp [insert, mapBindings]
---     | Bindings.cons a not_in op_attr tail => by
---       simp [insert]
---       split
---       . rw [incLocators]
---         simp [inc_swap]
---         simp [mapBindings]
---       . split <;> simp [mapBindings] <;> exact mapBindings_inc_insert
--- end MapBindings
+theorem lookup_inc_void
+  (i : Nat)
+  (c : Attr)
+  {lst : List Attr}
+  (l : Bindings lst)
+  (lookup_eq: lookup l c = some void)
+  : lookup (incLocatorsFromLst i l) c = some void
+  := by match l with
+  | Bindings.nil => contradiction
+  | Bindings.cons name _ void tail =>
+    simp [lookup] at lookup_eq
+    split at lookup_eq
+    . rename_i eq
+      simp [lookup, eq]
+    . rename_i neq
+      simp [lookup, neq]
+      exact (lookup_inc_void i c tail lookup_eq)
+  | Bindings.cons name _ (attached _) tail =>
+    simp [lookup] at lookup_eq
+    split at lookup_eq
+    . simp at lookup_eq
+    . rename_i neq
+      simp [lookup, neq]
+      exact (lookup_inc_void i c tail lookup_eq)
+
+theorem lookup_inc_none
+  (i : Nat)
+  (c : Attr)
+  {lst : List Attr}
+  (l : Bindings lst)
+  (lookup_eq: lookup l c = none)
+  : lookup (incLocatorsFromLst i l) c = none
+  := by match l with
+  | Bindings.nil => simp ; assumption
+  | Bindings.cons name _ u tail =>
+    simp [lookup] at lookup_eq
+    split at lookup_eq
+    . contradiction
+    . rename_i neq
+      cases u
+      repeat simp [lookup, neq] ; exact (lookup_inc_none i c tail lookup_eq)
+
+theorem inc_insert
+  { i : Nat }
+  { c : Attr }
+  { lst : List Attr }
+  { l : Bindings lst }
+  { v : Term}
+  : (insert (incLocatorsFromLst (i + 1) l) c (attached (incLocators (incLocatorsFrom i v)))) =
+  (incLocatorsFromLst (i + 1) (insert l c (attached (incLocators v))))
+  := match l with
+  | Bindings.nil => by
+    simp [insert]
+  | Bindings.cons a not_in u tail => by
+    cases u
+    repeat
+      simp [insert]
+      split
+      . simp
+        rw [incLocators]
+        simp [inc_swap]
+      . simp
+        apply inc_insert
 
 mutual
 /-- Increment of locators preserves parallel reduction. -/
@@ -1382,14 +1434,9 @@ def preduce_incLocatorsFrom
       (incLocatorsFromLst (i+1) l)
       (preduce_incLocatorsFrom i ss')
       (by simp [eq])
-      (by sorry)
+      (lookup_inc_attached t_c (i+1) c l lookup_eq)
   | @PReduce.pdot_cφ s s' c lst l ss' eq lookup_eq is_attr => by
     simp
-    rw [eq] at is_attr
-    have is_attr' : IsAttr "φ" (incLocatorsFrom i (obj l)) := by
-      simp
-      sorry
-    rw [← eq] at is_attr'
     exact @PReduce.pdot_cφ
       (incLocatorsFrom i s)
       (incLocatorsFrom i s')
@@ -1398,11 +1445,11 @@ def preduce_incLocatorsFrom
       (incLocatorsFromLst (i + 1) l)
       (preduce_incLocatorsFrom i ss')
       (by rw [eq, incLocatorsFrom])
-      (by sorry)
-      (is_attr')
+      (lookup_inc_none (i+1) c l lookup_eq)
+      (is_attr)
   | @PReduce.papp_c s s' v v' c lst l ss' vv' eq lookup_eq => by
-    simp
-    have := @PReduce.papp_c
+    simp [← inc_insert]
+    exact @PReduce.papp_c
       (incLocatorsFrom i s)
       (incLocatorsFrom i s')
       (incLocatorsFrom i v)
@@ -1413,8 +1460,7 @@ def preduce_incLocatorsFrom
       (preduce_incLocatorsFrom i ss')
       (preduce_incLocatorsFrom i vv')
       (by rw [eq, incLocatorsFrom])
-      (by sorry)
-    sorry -- swap insert and incLocators
+      (lookup_inc_void (i+1) c l lookup_eq)
 
 def preduce_incLocatorsFrom_Lst
   { lst : List Attr }
@@ -1448,6 +1494,101 @@ def get_premise
   : Premise bnds bnds'
   := match preduce with
     | PReduce.pcongOBJ _ _ premise => premise
+
+theorem lookup_subst_attached
+  (t : Term)
+  {u : Term}
+  (i : Nat)
+  (c : Attr)
+  {lst : List Attr}
+  (l : Bindings lst)
+  (lookup_eq: lookup l c = some (attached t))
+  : lookup (substituteLst (i, u) l) c = some (attached (substitute (i, u) t))
+  := by match l with
+  | Bindings.nil => contradiction
+  | Bindings.cons name _ void tail =>
+    simp [lookup] at lookup_eq
+    split at lookup_eq
+    . simp at lookup_eq
+    . rename_i neq
+      simp [lookup, neq]
+      exact (lookup_subst_attached t i c tail lookup_eq)
+  | Bindings.cons name _ (attached _) tail =>
+    simp [lookup] at lookup_eq
+    split at lookup_eq
+    . rename_i eq
+      simp at lookup_eq
+      simp [lookup_eq]
+      simp [lookup_eq, lookup, eq]
+    . rename_i neq
+      simp [lookup, neq]
+      exact (lookup_subst_attached t i c tail lookup_eq)
+
+theorem lookup_subst_void
+  {u : Term}
+  (i : Nat)
+  (c : Attr)
+  {lst : List Attr}
+  (l : Bindings lst)
+  (lookup_eq: lookup l c = some void)
+  : lookup (substituteLst (i, u) l) c = some void
+  := by match l with
+  | Bindings.nil => contradiction
+  | Bindings.cons name _ void tail =>
+    simp [lookup] at lookup_eq
+    split at lookup_eq
+    . rename_i eq
+      simp [lookup, eq]
+    . rename_i neq
+      simp [lookup, neq]
+      exact (lookup_subst_void i c tail lookup_eq)
+  | Bindings.cons name _ (attached _) tail =>
+    simp [lookup] at lookup_eq
+    split at lookup_eq
+    . simp at lookup_eq
+    . rename_i neq
+      simp [lookup, neq]
+      exact (lookup_subst_void i c tail lookup_eq)
+
+theorem lookup_subst_none
+  {u : Term}
+  (i : Nat)
+  (c : Attr)
+  {lst : List Attr}
+  (l : Bindings lst)
+  (lookup_eq: lookup l c = none)
+  : lookup (substituteLst (i, u) l) c = none
+  := by match l with
+  | Bindings.nil => simp ; assumption
+  | Bindings.cons name _ u tail =>
+    simp [lookup] at lookup_eq
+    split at lookup_eq
+    . contradiction
+    . rename_i neq
+      cases u
+      repeat simp [lookup, neq] ; exact (lookup_subst_none i c tail lookup_eq)
+
+theorem subst_insert
+  { i : Nat }
+  { c : Attr }
+  { lst : List Attr }
+  { l : Bindings lst }
+  { u v : Term}
+  : (insert (substituteLst (i + 1, incLocators u) l) c (attached (incLocators (substitute (i, u) v))))
+  = (substituteLst (i + 1, incLocators u) (insert l c (attached (incLocators v))))
+  := match l with
+  | Bindings.nil => by
+    simp [insert]
+  | Bindings.cons a not_in u tail => by
+    cases u
+    repeat
+      simp [insert]
+      split
+      . simp
+        rw [incLocators]
+        simp [subst_inc_swap]
+      . simp
+        apply subst_insert
 
 mutual
 /-- Substitution Lemma [KS22, Lemma 3.5] -/
@@ -1500,7 +1641,6 @@ def substitution_lemma
       (substitution_lemma i preduce_t uu' (by assumption))
       (substitution_lemma i preduce_u uu' (by assumption))
   | @PReduce.pdot_c s s' t_c c lst l ss' eq lookup_eq => by
-    have ih := substitution_lemma i ss' uu'
     have dot_subst : dot (substitute (i, u) s) c ⇛
       substitute (0, substitute (i, u') s') (substitute (i+1, incLocators u') t_c)
     := @PReduce.pdot_c
@@ -1512,17 +1652,12 @@ def substitution_lemma
       (substituteLst (i+1, incLocators u') l)
       (substitution_lemma i ss' uu' (by assumption))
       (by rw [eq, substitute])
-      (sorry)
+      (lookup_subst_attached t_c (i+1) c l lookup_eq)
     have : substitute (0, substitute (i, u') s') (substitute (i + 1, incLocators u') t_c) = substitute (i, u') (substitute (0, s') t_c) := (subst_swap i 0 (Nat.zero_le i) t_c s' u' ((by assumption))).symm
     simp [this] at dot_subst
     simp
     exact dot_subst
   | @PReduce.pdot_cφ s s' c lst l ss' eq lookup_eq is_attr => by
-    rw [eq] at is_attr
-    have is_attr' : IsAttr "φ" (substitute (i, u') (obj l)) := by
-      simp
-      sorry
-    rw [← eq] at is_attr'
     simp
     exact @PReduce.pdot_cφ
       (substitute (i, u) s)
@@ -1532,11 +1667,11 @@ def substitution_lemma
       (substituteLst (i+1, incLocators u') l)
       (substitution_lemma i ss' uu' (by assumption))
       (by rw [eq, substitute])
-      (sorry)
-      (is_attr')
+      (lookup_subst_none (i+1) c l lookup_eq)
+      (is_attr)
   | @PReduce.papp_c s s' v v' c lst l ss' vv' eq lookup_eq => by
-    simp
-    have := @PReduce.papp_c
+    simp [← subst_insert]
+    exact @PReduce.papp_c
       (substitute (i, u) s)
       (substitute (i, u') s')
       (substitute (i, u) v)
@@ -1547,8 +1682,7 @@ def substitution_lemma
       (substitution_lemma i ss' uu' (by assumption))
       (substitution_lemma i vv' uu' ((by assumption)))
       (by rw [eq, substitute])
-      (sorry)
-    admit
+      (lookup_subst_void (i+1) c l lookup_eq)
 
 def substitution_lemma_Lst
   ( i : Nat )
@@ -1629,7 +1763,7 @@ def term_to_development
                 simp [φ_in]
                 have temp := term_to_development t
                 simp [cd_is_obj] at temp
-                exact PReduce.pdot_cφ a l temp rfl lookup_none (IsAttr.is_attr "φ" φ_in l)
+                exact PReduce.pdot_cφ a l temp rfl lookup_none φ_in
               )
               (λ not_in => by
                 simp [not_in]
@@ -1740,7 +1874,7 @@ def half_diamond
             exact dite ("φ" ∈ attrs)
               (λ φ_in => by
                 simp [φ_in]
-                exact PReduce.pdot_cφ a l assumption_preduce rfl lookup_none (IsAttr.is_attr "φ" φ_in l)
+                exact PReduce.pdot_cφ a l assumption_preduce rfl lookup_none φ_in
               )
               (λ not_in => by
                 simp [not_in]
@@ -1802,10 +1936,7 @@ def half_diamond
               simp [complete_development, h]
               let lookup_none
                 := lookup_none_preserve lookup_none newAttrs
-              simp [lookup_none]
-              simp [eq] at is_attr
-              let φ_in := is_attr_in is_attr
-              simp [φ_in]
+              simp [lookup_none, is_attr]
               let preduce := (PReduce.pcongOBJ _ _ premise)
               simp [<-eq] at preduce
               exact .pcongDOT _ _ c (.pcongDOT _ _ "φ" preduce)
