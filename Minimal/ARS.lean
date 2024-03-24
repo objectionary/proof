@@ -1,3 +1,5 @@
+import Mathlib.Util.CompileInductive
+
 /-!
 # Metatheory about term-rewriting systems
 
@@ -21,6 +23,8 @@ def Transitive := ∀ x y z, r x y → r y z → r x z
 inductive ReflTransGen (r : α → α → Type u) : α → α → Type u
   | refl {a : α} : ReflTransGen r a a
   | head {a b c : α} : r a b → ReflTransGen r b c → ReflTransGen r a c
+
+compile_inductive% ReflTransGen
 
 namespace ReflTransGen
 /-- Rt-closure is transitive -/
