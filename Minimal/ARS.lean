@@ -46,24 +46,11 @@ def DiamondProperty (r : α → α → Type u)
 
 /-- Property that if diverged in any number of steps, the results can be joined in any number of steps -/
 @[simp]
-def ChurchRosser (r : α → α → Type u)
+def Confluence (r : α → α → Type u)
   := ∀ a b c, ReflTransGen r a b → ReflTransGen r a c → Join (ReflTransGen r) b c
 
-def confluence_step
-  { a b c : α }
-  (h : ∀ a b c, r a b → r a c → Join r b c)
-  (hab : r a b)
-  (hac : ReflTransGen r a c)
-  : Σ d : α, Prod (ReflTransGen r b d) (r c d) := match hac with
-  | ReflTransGen.refl => ⟨ b, ReflTransGen.refl, hab ⟩
-  | ReflTransGen.head hax hxc => by
-    rename_i x
-    have ⟨y, hby, hxy⟩ := (h a b x hab hax)
-    have ⟨d, hyd, hcd⟩ := confluence_step h hxy hxc
-    exact ⟨d, ReflTransGen.head hby hyd, hcd⟩
-
 /-- Diamond property implies Church-Rosser (in the form in which Lean recognizes termination) -/
-def confluence
+def diamond_implies_confluence'
   (h : ∀ a b c, r a b → r a c → Join r b c)
   (a b c : α)
   (hab : ReflTransGen r a b)
@@ -71,13 +58,25 @@ def confluence
   : Join (ReflTransGen r) b c := match hab with
   | ReflTransGen.refl => ⟨ c, hac,  ReflTransGen.refl⟩
   | ReflTransGen.head hax hxb => by
+    let rec step
+    { a b c : α }
+    (h : ∀ a b c, r a b → r a c → Join r b c)
+    (hab : r a b)
+    (hac : ReflTransGen r a c)
+    : Σ d : α, Prod (ReflTransGen r b d) (r c d) := match hac with
+    | ReflTransGen.refl => ⟨ b, ReflTransGen.refl, hab ⟩
+    | ReflTransGen.head hax hxc => by
+      rename_i x
+      have ⟨y, hby, hxy⟩ := (h a b x hab hax)
+      have ⟨d, hyd, hcd⟩ := step h hxy hxc
+      exact ⟨d, ReflTransGen.head hby hyd, hcd⟩
     rename_i x
-    have ⟨c', hxc', hcc'⟩ := confluence_step h hax hac
-    have ⟨d, hbd, hc'd⟩ := confluence h x b c' hxb hxc'
+    have ⟨c', hxc', hcc'⟩ := step h hax hac
+    have ⟨d, hbd, hc'd⟩ := diamond_implies_confluence' h x b c' hxb hxc'
     exact ⟨d, hbd, ReflTransGen.head hcc' hc'd⟩
 
 /-- Diamond property implies Church-Rosser -/
-def diamond_implies_church_rosser : DiamondProperty r → ChurchRosser r := by
+def diamond_implies_confluence : DiamondProperty r → Confluence r := by
   simp
   intros h a b c hab hac
-  exact confluence h a b c hab hac
+  exact diamond_implies_confluence' h a b c hab hac
