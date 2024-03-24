@@ -1,5 +1,4 @@
 import Minimal.ARS
-import Mathlib.Util.CompileInductive
 
 /-!
 # Confluence of minimal φ-calculus
@@ -44,8 +43,6 @@ mutual
 end
 open OptionalAttr
 open Term
-
-compile_inductive% Bindings
 
 /-! ### Defition of increment, substitution, its properties, and auxiliary definitions that involve terms -/
 
@@ -783,7 +780,7 @@ theorem notEqByMem
     b_not_in (Eq.mp memEq a_is_in)
 
 
-noncomputable def consBindingsRedMany''
+def consBindingsRedMany
   { lst : List Attr}
   (a : Attr)
   { not_in_a : a ∉ lst }
@@ -812,68 +809,6 @@ noncomputable def consBindingsRedMany''
         have head_cons := Reduce.congOBJ attr _ inner_red isAttached_cons
         simp [insert_φ, neq.symm] at head_cons
         exact ReflTransGen.head head_cons tail_cons
-
-def consBindingsRedMany
-  { lst : List Attr}
-  (a : Attr)
-  { not_in_a : a ∉ lst }
-  (u_a  : OptionalAttr)
-  { l1 l2 : Bindings lst }
-  : (obj l1 ⇝* obj l2)
-  → (obj (Bindings.cons a not_in_a u_a l1) ⇝* obj (Bindings.cons a not_in_a u_a l2))
-  := λ redmany => match redmany with
-    | ReflTransGen.refl => ReflTransGen.refl
-    | ReflTransGen.head (@Reduce.congOBJ t t' c _ _ red_tt' isAttached) reds =>
-      have one_step : (obj (Bindings.cons a not_in_a u_a l1) ⇝
-        obj (Bindings.cons a not_in_a u_a (insert_φ l1 c (attached t')))) := by
-          have c_is_in := isAttachedIsIn isAttached
-          have a_not_in := not_in_a
-          have neq_c_a : c ≠ a := notEqByMem c_is_in a_not_in
-          have intermediate := Reduce.congOBJ c (Bindings.cons a not_in_a u_a l1) red_tt'
-            (IsAttached.next_attached c _ _ _ neq_c_a _ _ isAttached)
-          simp [insert_φ, neq_c_a.symm] at intermediate
-          assumption
-      (ReflTransGen.head one_step (consBindingsRedMany _ _ reds))
-decreasing_by sorry
-
-def consBindingsRedMany'
-  { lst : List Attr}
-  (a : Attr)
-  { not_in_a : a ∉ lst }
-  (u_a  : OptionalAttr)
-  (t1 t2 : Term)
-  { l1 l2 : Bindings lst }
-  ( l1_eq : obj l1 = t1)
-  ( l2_eq : obj l2 = t2)
-  (reds : t1 ⇝* t2)
-  : obj (Bindings.cons a not_in_a u_a l1)
-    ⇝* obj (Bindings.cons a not_in_a u_a l2)
-  := by match reds with
-  | ReflTransGen.refl =>
-    simp [← l1_eq] at l2_eq
-    simp [l2_eq]
-    exact ReflTransGen.refl
-  | @ReflTransGen.head _ _ _ _ _ (@Reduce.congOBJ t t' c lst1 ll red_tt' isAttached) tail_reds =>
-    simp at l1_eq
-    have eq_l := l1_eq.right.symm
-    have eq_lst := l1_eq.left
-    simp [← eq_lst] at *
-    admit
-    -- have := heq_eq_eq ll l1 eq_l
-    -- simp [eq_lst] at eq_l
-    -- simp [← l2_eq] at tail_reds
-    -- rw [← eq_lst] at l
-    -- have ll1_eq := heq_eq_eq l l1
-    -- have bu : l = l1:= eq_of_heq
-    -- have : IsAttached c t l1 :=
-    --   HEq.subst eq_l isAttached
-    -- have : IsAttached c t l1 := @HEq.ndrec (Bindings lst1) ll ((_l : Bindings lst) → IsAttached c t _l) (Bindings lst1) isAttached eq_l
-    -- exact (ReflTransGen.head
-    --   (consBindingsReduce a u_a (Reduce.congOBJ c l1 red_tt' (
-    --     sorry
-    --   )))
-
-    --   (consBindingsRedMany' _ _ _ _ (sorry) (sorry) tail_reds))
 
 /-- Congruence for `⇝*` in OBJ [KS22, Lemma A.4 (1)] -/
 def congOBJClos
