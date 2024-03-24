@@ -1,4 +1,5 @@
 import Minimal.ARS
+import Mathlib.Util.CompileInductive
 
 /-!
 # Confluence of minimal φ-calculus
@@ -43,6 +44,8 @@ mutual
 end
 open OptionalAttr
 open Term
+
+compile_inductive% Bindings
 
 /-! ### Defition of increment, substitution, its properties, and auxiliary definitions that involve terms -/
 
@@ -351,7 +354,7 @@ theorem lookup_none_preserve
           exact lookup_none_preserve lookup_none tail2
         )
 
-def insert
+def insert_φ
   { lst : List Attr }
   (l : Bindings lst)
   (a : Attr)
@@ -361,7 +364,7 @@ def insert
     | Bindings.nil => Bindings.nil
     | Bindings.cons name not_in opAttr tail =>
         if name == a then Bindings.cons name not_in u tail
-        else Bindings.cons name not_in opAttr (insert tail a u)
+        else Bindings.cons name not_in opAttr (insert_φ tail a u)
 
 inductive IsAttached : { lst : List Attr } → Attr → Term → Bindings lst → Type where
   | zeroth_attached
@@ -403,13 +406,13 @@ namespace Insert
     { not_in : b ∉ lst }
     { u : OptionalAttr }
     { l : Bindings lst }
-    : insert (Bindings.cons b not_in u l) a (attached t)
-        = Bindings.cons b not_in u (insert l a (attached t))
-    := by simp [insert, neq];
-          split
-          . have neq' := neq.symm
-            contradiction
-          . simp
+    : insert_φ (Bindings.cons b not_in u l) a (attached t)
+        = Bindings.cons b not_in u (insert_φ l a (attached t))
+    := by
+      simp [insert_φ, neq]
+      intro eq
+      have neq' := neq.symm
+      contradiction
 
   theorem insertAttached
     { a : Attr }
@@ -417,8 +420,8 @@ namespace Insert
     { lst : List Attr }
     { l : Bindings lst }
     : IsAttached a t l
-    → insert l a (attached t) = l
-      | IsAttached.zeroth_attached _ _ _ _ => by simp [insert]
+    → insert_φ l a (attached t) = l
+      | IsAttached.zeroth_attached _ _ _ _ => by simp [insert_φ]
       | IsAttached.next_attached _ _ l b neq not_in u isAttached =>
           let step := @insertAttachedStep a b neq t _ not_in u _
           Eq.trans step (congrArg (Bindings.cons b not_in u) (insertAttached isAttached))
@@ -428,16 +431,16 @@ namespace Insert
     (l : Bindings lst)
     (a : Attr)
     (t t' : Term)
-    : insert (insert l a (attached t')) a (attached t) = insert l a (attached t)
+    : insert_φ (insert_φ l a (attached t')) a (attached t) = insert_φ l a (attached t)
     := match lst with
       | [] => match l with
-        | Bindings.nil => by simp [insert]
+        | Bindings.nil => by simp [insert_φ]
       | b :: bs => match l with
         | Bindings.cons _ not_in _ tail => dite (a = b)
-          (λ eq => by simp [insert, eq])
+          (λ eq => by simp [insert_φ, eq])
           (λ neq =>
             let neq' : b ≠ a := λ eq => neq eq.symm
-            by  simp [insert, neq']
+            by  simp [insert_φ, neq']
                 exact insertTwice tail a t t'
           )
 
@@ -446,16 +449,16 @@ namespace Insert
     { l : Bindings lst }
     { a : Attr }
     { t t' : Term}
-    : IsAttached a t l → IsAttached a t' (insert l a (attached t'))
+    : IsAttached a t l → IsAttached a t' (insert_φ l a (attached t'))
     := λ isAttached => match isAttached with
       | IsAttached.zeroth_attached _ not_in _ _=> by
-        simp [insert]
+        simp [insert_φ]
         exact IsAttached.zeroth_attached _ _ _ _
       | IsAttached.next_attached _ _ l b neq not_in u new_isAttached => by
-        have hypothesis : IsAttached a t' (insert l a (attached t'))
+        have hypothesis : IsAttached a t' (insert_φ l a (attached t'))
           := insert_new_isAttached new_isAttached
-        simp [insert, neq.symm]
-        exact IsAttached.next_attached a t' (insert l a (attached t')) b neq not_in u hypothesis
+        simp [insert_φ, neq.symm]
+        exact IsAttached.next_attached a t' (insert_φ l a (attached t')) b neq not_in u hypothesis
 
 end Insert
 
@@ -471,7 +474,7 @@ inductive Reduce : Term → Term → Type where
     → (l : Bindings lst)
     → Reduce t t'
     → IsAttached b t l
-    → Reduce (obj l) (obj (insert l b (attached t')))
+    → Reduce (obj l) (obj (insert_φ l b (attached t')))
   | congDOT : ∀ t t' a, Reduce t t' → Reduce (dot t a) (dot t' a)
   | congAPPₗ : ∀ t t' u a, Reduce t t' → Reduce (app t a u) (app t' a u)
   | congAPPᵣ : ∀ t u u' a, Reduce u u' → Reduce (app t a u) (app t a u')
@@ -500,7 +503,7 @@ inductive Reduce : Term → Term → Type where
     → (l : Bindings lst)
     → t = obj l
     → lookup l c = some void
-    → Reduce (app t c u) (obj (insert l c (attached (incLocators u))))
+    → Reduce (app t c u) (obj (insert_φ l c (attached (incLocators u))))
 
 mutual
   -- | tᵢ => tᵢ' for all i with ⟦ ... αᵢ ↦ tᵢ ... ⟧
@@ -567,7 +570,7 @@ mutual
       → PReduce u u'
       → t' = obj l
       → lookup l c = some void
-      → PReduce (app t c u) (obj (insert l c (attached (incLocators u'))))
+      → PReduce (app t c u) (obj (insert_φ l c (attached (incLocators u'))))
 end
 
 namespace PReduce
@@ -603,19 +606,19 @@ namespace PReduce
     (t' : Term)
     (isAttached : IsAttached a t l)
     (preduce : PReduce t t')
-    : Premise l (insert l a (attached t'))
+    : Premise l (insert_φ l a (attached t'))
     := match lst with
       | [] => match l with
         | Bindings.nil => Premise.nil
       | b :: bs => match isAttached with
         | IsAttached.zeroth_attached _ _ _ tail => match l with
           | Bindings.cons _ _ _ _ => by
-              simp [insert]
+              simp [insert_φ]
               exact Premise.consAttached b t t' preduce (reflexivePremise tail)
         | IsAttached.next_attached _ _ tail _ neq not_in u newIsAttached => match l with
           | Bindings.cons _ _ _ _ => by
               have neq' : b ≠ a := λ eq => neq eq.symm
-              simp [insert, neq']
+              simp [insert_φ, neq']
               have premise := (singlePremise tail a t t' newIsAttached preduce)
               exact (match u with
                 | void => Premise.consVoid b premise
@@ -629,27 +632,27 @@ namespace PReduce
     { t1 t2 : Term }
     (preduce : PReduce t1 t2)
     (premise : Premise l1 l2)
-    : Premise (insert l1 a (attached t1)) (insert l2 a (attached t2))
+    : Premise (insert_φ l1 a (attached t1)) (insert_φ l2 a (attached t2))
     := match premise with
       | Premise.nil => Premise.nil
       | Premise.consVoid b tail => dite
           (b = a)
           (λ eq => by
-            simp [insert, eq]
+            simp [insert_φ, eq]
             exact Premise.consAttached b _ _ preduce tail
           )
           (λ neq => by
-            simp [insert, neq]
+            simp [insert_φ, neq]
             exact Premise.consVoid b (singlePremiseInsert preduce tail)
           )
       | Premise.consAttached b t' t'' preduce' tail => dite
           (b = a)
           (λ eq => by
-            simp [insert, eq]
+            simp [insert_φ, eq]
             exact Premise.consAttached b _ _ preduce tail
           )
           (λ neq => by
-            simp [insert, neq]
+            simp [insert_φ, neq]
             exact Premise.consAttached b t' t'' preduce' (singlePremiseInsert preduce tail)
           )
 
@@ -749,7 +752,7 @@ def reg_to_par {t t' : Term} : (t ⇝ t') → (t ⇛ t')
   | .congOBJ b l red isAttached =>
       .pcongOBJ
         l
-        (insert l b (attached _))
+        (insert_φ l b (attached _))
         (PReduce.singlePremise l b _ _ isAttached (reg_to_par red))
   | .congDOT t t' a red =>
       .pcongDOT t t' a (reg_to_par red)
@@ -779,23 +782,8 @@ theorem notEqByMem
       congrArg (λ x => Membership.mem x lst) eq
     b_not_in (Eq.mp memEq a_is_in)
 
-def consBindingsReduce
-  { lst : List Attr}
-  (a : Attr)
-  { not_in_a : a ∉ lst }
-  (u_a  : OptionalAttr)
-  { l1 l2 : Bindings lst }
-  : (obj l1 ⇝ obj l2)
-  → (obj (Bindings.cons a not_in_a u_a l1) ⇝ obj (Bindings.cons a not_in_a u_a l2))
-  | @Reduce.congOBJ t t' c _ _ red_tt' isAttached => by
-    have c_is_in := isAttachedIsIn isAttached
-    have neq_c_a : c ≠ a := notEqByMem c_is_in not_in_a
-    have intermediate := Reduce.congOBJ c (Bindings.cons a not_in_a u_a l1) red_tt'
-      (IsAttached.next_attached c _ _ _ neq_c_a _ _ isAttached)
-    simp [insert, neq_c_a.symm] at intermediate
-    assumption
 
-def consBindingsRedMany
+noncomputable def consBindingsRedMany''
   { lst : List Attr}
   (a : Attr)
   { not_in_a : a ∉ lst }
@@ -804,56 +792,49 @@ def consBindingsRedMany
   (reds : (obj l1) ⇝* (obj l2))
   : obj (Bindings.cons a not_in_a u_a l1) ⇝*
     obj (Bindings.cons a not_in_a u_a l2)
-  := match reds with
-  | ReflTransGen.refl => ReflTransGen.refl
-  | ReflTransGen.head (@Reduce.congOBJ t t' c _ _ red_tt' isAttached) reds =>
-    (ReflTransGen.head
-      (consBindingsReduce _ _ (Reduce.congOBJ c _ red_tt' isAttached))
-      (consBindingsRedMany _ _ reds))
+  := by
+    generalize h : obj l1 = t1
+    generalize h' : obj l2 = t2
+    rw [h, h'] at reds
+    induction reds generalizing l1 l2 with
+    | refl =>
+      subst h ; simp at h' ; simp [h'] ; exact .refl
+    | head =>
+      subst h h'
+      rename_i t_i red redmany ih
+      match red with
+      | Reduce.congOBJ attr _ inner_red isAttached =>
+        rename_i ti1 ti2
+        have tail_cons := @ih (insert_φ l1 attr (attached ti2)) l2 rfl rfl
+        have neq := (notEqByMem (isAttachedIsIn isAttached) not_in_a)
+        have isAttached_cons : IsAttached attr ti1 (Bindings.cons a not_in_a u_a l1) :=
+        IsAttached.next_attached attr ti1 l1 a neq not_in_a u_a isAttached
+        have head_cons := Reduce.congOBJ attr _ inner_red isAttached_cons
+        simp [insert_φ, neq.symm] at head_cons
+        exact ReflTransGen.head head_cons tail_cons
+
+def consBindingsRedMany
+  { lst : List Attr}
+  (a : Attr)
+  { not_in_a : a ∉ lst }
+  (u_a  : OptionalAttr)
+  { l1 l2 : Bindings lst }
+  : (obj l1 ⇝* obj l2)
+  → (obj (Bindings.cons a not_in_a u_a l1) ⇝* obj (Bindings.cons a not_in_a u_a l2))
+  := λ redmany => match redmany with
+    | ReflTransGen.refl => ReflTransGen.refl
+    | ReflTransGen.head (@Reduce.congOBJ t t' c _ _ red_tt' isAttached) reds =>
+      have one_step : (obj (Bindings.cons a not_in_a u_a l1) ⇝
+        obj (Bindings.cons a not_in_a u_a (insert_φ l1 c (attached t')))) := by
+          have c_is_in := isAttachedIsIn isAttached
+          have a_not_in := not_in_a
+          have neq_c_a : c ≠ a := notEqByMem c_is_in a_not_in
+          have intermediate := Reduce.congOBJ c (Bindings.cons a not_in_a u_a l1) red_tt'
+            (IsAttached.next_attached c _ _ _ neq_c_a _ _ isAttached)
+          simp [insert_φ, neq_c_a.symm] at intermediate
+          assumption
+      (ReflTransGen.head one_step (consBindingsRedMany _ _ reds))
 decreasing_by sorry
-
-example
-  (A B : Type)
-  (type_family : Type → Type)
-  (a : type_family A)
-  (b : type_family B)
-  (heq : HEq a b)
-  (p : (X : Type) → (x : type_family X) → Type)
-  (pa : p A a)
-  : p B b := sorry
-
-example
-  (A B : Type)
-  (type_family : Type → Type)
-  (a : type_family A)
-  (b : type_family B)
-  (heq : HEq a b)
-  (p : (X : Type) → (x : type_family X) → Type)
-  (pa : p A a)
-  : p B b := sorry
-
-noncomputable example
-  (A B : Type)
-  (a : A)
-  (b : B)
-  (heq : HEq a b)
-  (p : (X : Type) → (x : X) → Type)
-  (pa : p A a)
-  : p B b := HEq.ndrec pa heq
-
--- example
---   (lst lst' : List Attr)
---   (l : Bindings lst)
---   (l' : Bindings lst')
---   (heq : HEq l l')
---   (c : Attr)
---   (u : Term)
---   (isAttached : IsAttached c u l)
---   : IsAttached c u l' := by
---   have p (_lst : List Attr) (x : Bindings _lst) : Prop := (lookup x c = some (attached u))
---   have pa : p lst l := sorry
---   have pb := HEq.ndrec pa heq
-
 
 def consBindingsRedMany'
   { lst : List Attr}
@@ -875,26 +856,24 @@ def consBindingsRedMany'
   | @ReflTransGen.head _ _ _ _ _ (@Reduce.congOBJ t t' c lst1 ll red_tt' isAttached) tail_reds =>
     simp at l1_eq
     have eq_l := l1_eq.right.symm
-    -- have eq_lst := l1_eq.left
-    -- simp [← eq_lst] at *
-
+    have eq_lst := l1_eq.left
+    simp [← eq_lst] at *
+    admit
     -- have := heq_eq_eq ll l1 eq_l
     -- simp [eq_lst] at eq_l
     -- simp [← l2_eq] at tail_reds
     -- rw [← eq_lst] at l
     -- have ll1_eq := heq_eq_eq l l1
     -- have bu : l = l1:= eq_of_heq
-
-    --  HEq.ndrec.{u1, u2} {α : Sort u2} {a : α} {motive : {β : Sort u2} → β → Sort u1} (m : motive a) {β : Sort u2} {b : β}
-    -- (h : HEq a b) : motive b
     -- have : IsAttached c t l1 :=
-      -- HEq.subst eq_l isAttached
+    --   HEq.subst eq_l isAttached
     -- have : IsAttached c t l1 := @HEq.ndrec (Bindings lst1) ll ((_l : Bindings lst) → IsAttached c t _l) (Bindings lst1) isAttached eq_l
+    -- exact (ReflTransGen.head
+    --   (consBindingsReduce a u_a (Reduce.congOBJ c l1 red_tt' (
+    --     sorry
+    --   )))
 
-    exact (ReflTransGen.head
-      (consBindingsReduce a u_a (Reduce.congOBJ c l1 red_tt' (sorry)))
-
-      (consBindingsRedMany' _ _ _ _ (sorry) (sorry) tail_reds))
+    --   (consBindingsRedMany' _ _ _ _ (sorry) (sorry) tail_reds))
 
 /-- Congruence for `⇝*` in OBJ [KS22, Lemma A.4 (1)] -/
 def congOBJClos
@@ -904,12 +883,12 @@ def congOBJClos
   { l : Bindings lst }
   : (t ⇝* t')
   → IsAttached b t l
-  → (obj l ⇝* obj (insert l b (attached t')))
+  → (obj l ⇝* obj (insert_φ l b (attached t')))
   := λ red_tt' isAttached => match red_tt' with
     | ReflTransGen.refl => Eq.ndrec (ReflTransGen.refl) (congrArg obj (Eq.symm (Insert.insertAttached isAttached)))
     | ReflTransGen.head red redMany => by
       rename_i t_i
-      have ind_hypothesis : obj (insert l b (attached t_i)) ⇝* obj (insert (insert l b (attached t_i)) b (attached t'))
+      have ind_hypothesis : obj (insert_φ l b (attached t_i)) ⇝* obj (insert_φ (insert_φ l b (attached t_i)) b (attached t'))
         := (congOBJClos redMany (Insert.insert_new_isAttached isAttached))
       exact (ReflTransGen.head
         (Reduce.congOBJ b l red isAttached)
@@ -961,12 +940,12 @@ def par_to_redMany {t t' : Term} : (t ⇛ t') → (t ⇝* t')
           | Bindings.cons _ not_in u tail, Bindings.cons _ _ u' tail' => match premise with
             | Premise.consVoid _ premiseTail => consBindingsRedMany a void (fold_premise premiseTail)
             | @Premise.consAttached _ t1 t2 preduce _ l1 l2 not_in premiseTail => by
-                suffices temp : obj (insert (Bindings.cons a not_in (attached t1) l1) a (attached t2)) ⇝*
+                suffices temp : obj (insert_φ (Bindings.cons a not_in (attached t1) l1) a (attached t2)) ⇝*
                   obj (Bindings.cons a _ (attached t2) l2) from
                   (red_trans
                     (congOBJClos (par_to_redMany preduce) (IsAttached.zeroth_attached a _ t1 l1))
                     (temp))
-                simp [insert]
+                simp [insert_φ]
                 exact consBindingsRedMany a (attached t2) (fold_premise premiseTail)
     fold_premise premise
   | .pcong_ρ n => ReflTransGen.refl
@@ -1351,12 +1330,13 @@ theorem lookup_inc_void
   | Bindings.nil => contradiction
   | Bindings.cons name _ void tail =>
     simp [lookup] at lookup_eq
-    split at lookup_eq
-    . rename_i eq
-      simp [lookup, eq]
-    . rename_i neq
-      simp [lookup, neq]
-      exact (lookup_inc_void i c tail lookup_eq)
+    exact (dite (name = c)
+      (λ lookup_eq => by
+        simp [lookup, lookup_eq]))
+      (λ neq => by
+        simp [lookup, neq]
+        exact (lookup_inc_void i c tail (lookup_eq neq)))
+
   | Bindings.cons name _ (attached _) tail =>
     simp [lookup] at lookup_eq
     split at lookup_eq
@@ -1388,15 +1368,15 @@ theorem inc_insert
   { lst : List Attr }
   { l : Bindings lst }
   { v : Term}
-  : (insert (incLocatorsFromLst (i + 1) l) c (attached (incLocators (incLocatorsFrom i v)))) =
-  (incLocatorsFromLst (i + 1) (insert l c (attached (incLocators v))))
+  : (insert_φ (incLocatorsFromLst (i + 1) l) c (attached (incLocators (incLocatorsFrom i v)))) =
+  (incLocatorsFromLst (i + 1) (insert_φ l c (attached (incLocators v))))
   := match l with
   | Bindings.nil => by
-    simp [insert]
+    simp [insert_φ]
   | Bindings.cons a not_in u tail => by
     cases u
     repeat
-      simp [insert]
+      simp [insert_φ]
       split
       . simp
         rw [incLocators]
@@ -1536,12 +1516,12 @@ theorem lookup_subst_void
   | Bindings.nil => contradiction
   | Bindings.cons name _ void tail =>
     simp [lookup] at lookup_eq
-    split at lookup_eq
-    . rename_i eq
-      simp [lookup, eq]
-    . rename_i neq
-      simp [lookup, neq]
-      exact (lookup_subst_void i c tail lookup_eq)
+    exact (dite (name = c)
+      (λ lookup_eq => by
+        simp [lookup, lookup_eq]))
+      (λ neq => by
+        simp [lookup, neq]
+        exact (lookup_subst_void i c tail (lookup_eq neq)))
   | Bindings.cons name _ (attached _) tail =>
     simp [lookup] at lookup_eq
     split at lookup_eq
@@ -1574,15 +1554,15 @@ theorem subst_insert
   { lst : List Attr }
   { l : Bindings lst }
   { u v : Term}
-  : (insert (substituteLst (i + 1, incLocators u) l) c (attached (incLocators (substitute (i, u) v))))
-  = (substituteLst (i + 1, incLocators u) (insert l c (attached (incLocators v))))
+  : (insert_φ (substituteLst (i + 1, incLocators u) l) c (attached (incLocators (substitute (i, u) v))))
+  = (substituteLst (i + 1, incLocators u) (insert_φ l c (attached (incLocators v))))
   := match l with
   | Bindings.nil => by
-    simp [insert]
+    simp [insert_φ]
   | Bindings.cons a not_in u tail => by
     cases u
     repeat
-      simp [insert]
+      simp [insert_φ]
       split
       . simp
         rw [incLocators]
@@ -1724,7 +1704,7 @@ def complete_development : Term → Term
     | t' => dot t' a
   | app t a u => match (complete_development t) with
     | @obj attrs bnds => match (lookup bnds a) with
-      | some void => obj (insert bnds a (attached (incLocators (complete_development u))))
+      | some void => obj (insert_φ bnds a (attached (incLocators (complete_development u))))
       | _ => app (obj bnds) a (complete_development u)
     | _ => app (complete_development t) a (complete_development u)
   | obj bnds => obj (complete_developmentLst bnds)
