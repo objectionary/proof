@@ -9,7 +9,8 @@ require «doc-gen4» from git "https://github.com/leanprover/doc-gen4" @ "main"
 require mathlib from git
   "https://github.com/leanprover-community/mathlib4.git"
 
-require std from git "https://github.com/leanprover/std4" @ "main"
+require batteries from
+  git "https://github.com/leanprover-community/batteries" @ "main"
 
 @[default_target]
 lean_lib PhiCalculus
