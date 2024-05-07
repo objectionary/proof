@@ -1,0 +1,1 @@
+{"name":"PhiCalculus","instances":[],"imports":["Init","Minimal.ARS","Minimal.Calculus","Batteries.Tactic.Lint"],"declarations":[]}
