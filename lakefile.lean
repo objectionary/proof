@@ -16,3 +16,4 @@ require batteries from
 lean_lib PhiCalculus
 
 lean_lib Minimal
+lean_lib SOAS
