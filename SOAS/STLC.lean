@@ -30,11 +30,10 @@ def bb : ΛT := Arrow Base Base
 
 -- λ f: B → B. λ x: B. f (f x)
 def twice {Γ : Ctx ΛT}
-  : Term ΛT Λₒ LamSig (Arrow bb bb) (Γ)
+  : Term ΛT Λₒ LamSig (Arrow bb bb) Γ
   := Term.con (@lamₒ bb bb) rfl
       (Arg.cons (Term.con (@lamₒ Base Base) rfl (Arg.cons
         (Term.con (@appₒ Base Base) rfl (Arg.cons (Term.var (I.old I.new)) (Arg.cons
-          (Term.con (@appₒ Base Base) rfl (Arg.cons (Term.var (I.old I.new)) (Arg.cons (Term.var I.new) Arg.nil)) _ Γ)
-        Arg.nil)) _ Γ)
-      Arg.nil) _ Γ) Arg.nil)
-    _ Γ
+          (Term.con (@appₒ Base Base) rfl (Arg.cons (Term.var (I.old I.new)) (Arg.cons (Term.var I.new) Arg.nil)))
+        Arg.nil)))
+      Arg.nil)) Arg.nil)

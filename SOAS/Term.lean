@@ -34,7 +34,6 @@ mutual
       → (o : O)
       → (α = s.sort o)
       → Arg s (s.arity o) Γ
-      → ∀ x, (lst : List x)
       → Term s α Γ
     -- | mvar
 
