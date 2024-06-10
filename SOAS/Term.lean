@@ -25,8 +25,11 @@ structure Signature where
   arity : O → List ((Ctx T) × T) := λ o => (ops o).1
   sort  : O → T := λ o => (ops o).2
 
+structure Metavar {T : Type} (α : T) (Γ : Ctx T) where
+  name : String
+
 mutual
-  inductive Term (s : Signature T O) : (α : T) → (Ctx T) → Type 1 where
+  inductive Term {T O : Type} (s : Signature T O) : (α : T) → (Ctx T) → Type 1 where
     | var : {α : T} → {Γ : Ctx T} → I α Γ → Term s α Γ
     | con
       : {α : T}
@@ -35,16 +38,40 @@ mutual
       → (α = s.sort o)
       → Arg s (s.arity o) Γ
       → Term s α Γ
-    -- | mvar
+    | mvar
+      : {α : T}
+      → {Pi Γ : Ctx T}
+      → Metavar α Pi
+      → App s Pi Γ
+      → Term s α Γ
 
-  inductive Arg (s : Signature T O) : List ((Ctx T) × T) → Ctx T → Type 1 where
+  inductive Arg {T O : Type} (s : Signature T O) : List ((Ctx T) × T) → Ctx T → Type 1 where
     | nil  : {Γ : Ctx T} → Arg s [] Γ
     | cons
       : {τ : T}
-      → {Γ : Ctx T}
-      → {Θ : Ctx T}
+      → {Γ Θ : Ctx T}
       → {l : List ((Ctx T) × T)}
       → Term s τ (Θ ++ Γ)
       → Arg s l Γ
       → Arg s ((Θ, τ) :: l) Γ
+
+  inductive App {T O : Type} (s : Signature T O) : Ctx T → Ctx T → Type 1 where
+    | nil : {Γ : Ctx T} → App s [] Γ
+    | cons
+      : {τ : T}
+      → {Pi Γ : Ctx T}
+      → Term s τ Γ
+      → App s Pi Γ
+      → App s (τ :: Pi) Γ
 end
+
+structure RewriteRule {T O : Type} (s : Signature T O) {α : T} {Γ : Ctx T} where
+  lhs : Term s α Γ
+  rhs : Term s α Γ
+
+-- inductive SORS {T O : Type} (s : Signature T O) where
+--   | nil : SORS s
+--   | cons
+--     : ((α : T) × (Γ : Ctx T) × @RewriteRule T O s α Γ)
+--     → SORS s
+--     → SORS s
