@@ -1,4 +1,4 @@
-import Minimal.ARS
+import Minimal.Record
 
 /-!
 # Confluence of minimal φ-calculus
@@ -20,26 +20,16 @@ set_option linter.missingDocs false
 @[reducible]
 def Attr := String
 
-mutual
-  -- α₁ → t₁, α₂ ↦ t₂, ...
-  inductive Bindings : List Attr → Type where
-    | nil : Bindings []
-    | cons
-      : { lst : List Attr }
-      → (a : Attr)
-      → a ∉ lst
-      → Option Term
-      → Bindings lst
-      → Bindings (a :: lst)
 
-  inductive Term : Type where
-    | loc : Nat → Term                  -- ρⁿ
-    | dot : Term → Attr → Term          -- t.α
-    | app : Term → Attr → Term → Term   -- t(α ↦ u)
-    | obj : { lst : List Attr } → Bindings lst → Term  -- ⟦ α → ... ⟧
-end
+inductive Term : Type where
+  | loc : Nat → Term                  -- ρⁿ
+  | dot : Term → Attr → Term          -- t.α
+  | app : Term → Attr → Term → Term   -- t(α ↦ u)
+  | obj : { lst : List Attr } → Record (Option Term) lst → Term  -- ⟦ α → ... ⟧
 open Term
 
+@[simp, reducible]
+def Bindings lst := Record (Option Term) lst
 
 /-! ### Defition of increment, substitution, its properties, and auxiliary definitions that involve terms -/
 
@@ -57,14 +47,14 @@ mutual
   def incLocatorsFromLst
     ( n : Nat)
     { lst : List Attr}
-    ( o : Bindings lst)
+    ( bnds : Bindings lst)
     : Bindings lst
-    := match o with
-    | Bindings.nil => Bindings.nil
-    | Bindings.cons a not_in none tail =>
-      Bindings.cons a not_in none (incLocatorsFromLst n tail)
-    | Bindings.cons a not_in (some term) tail =>
-      Bindings.cons a not_in (some (incLocatorsFrom n term)) (incLocatorsFromLst n tail)
+    := match bnds with
+    | .nil => .nil
+    | .cons a not_in none tail =>
+      .cons a not_in none (incLocatorsFromLst n tail)
+    | .cons a not_in (some term) tail =>
+      .cons a not_in (some (incLocatorsFrom n term)) (incLocatorsFromLst n tail)
 end
 
 def incLocators : Term → Term
@@ -87,11 +77,11 @@ mutual
   def substituteLst {lst : List Attr}
   : Nat × Term → Bindings lst → Bindings lst
   := λ (k, v) o => match o with
-  | Bindings.nil => Bindings.nil
-  | Bindings.cons a not_in none tail =>
-    Bindings.cons a not_in none (substituteLst (k, v) tail)
-  | Bindings.cons a not_in (some term) tail =>
-    Bindings.cons a not_in (some (substitute (k, v) term)) (substituteLst (k, v) tail)
+  | .nil => .nil
+  | .cons a not_in none tail =>
+    .cons a not_in none (substituteLst (k, v) tail)
+  | .cons a not_in (some term) tail =>
+    .cons a not_in (some (substitute (k, v) term)) (substituteLst (k, v) tail)
 end
 
 instance : Min (Option Nat) where
@@ -110,9 +100,9 @@ def min_free_loc
   | dot t _ => min_free_loc zeroth_level t
   | app t _ u => min (min_free_loc zeroth_level t) (min_free_loc zeroth_level u)
   | obj o => match o with
-    | Bindings.nil => none
-    | Bindings.cons _ _ none tail => min_free_loc zeroth_level (obj tail)
-    | Bindings.cons _ _ (some t) tail =>
+    | .nil => none
+    | .cons _ _ none tail => min_free_loc zeroth_level (obj tail)
+    | .cons _ _ (some t) tail =>
       min
       (min_free_loc (zeroth_level + 1) t)
       (min_free_loc zeroth_level (obj tail))
@@ -200,12 +190,12 @@ theorem min_free_loc_inc
     ( free_locs : le_nat_option_nat i (min_free_loc j (obj bindings)))
     : le_nat_option_nat (i + 1) (min_free_loc j (obj (incLocatorsFromLst (j + 1) bindings)))
     := by match bindings with
-      | Bindings.nil =>
+      | .nil =>
         simp [min_free_loc, le_nat_option_nat]
-      | Bindings.cons _ _ none tail =>
+      | .cons _ _ none tail =>
         simp [min_free_loc]
         exact traverse_bindings tail (by simp [min_free_loc] at free_locs ; exact free_locs)
-      | Bindings.cons _ _ (some term) tail =>
+      | .cons _ _ (some term) tail =>
         simp [min_free_loc]
         apply le_min_option_reverse
         constructor
@@ -275,11 +265,11 @@ theorem subst_inc_cancel_Lst
   (v_loc : le_nat_option_nat i (min_free_loc zeroth_level (obj bindings)))
   : bindings = substituteLst (j + 1, incLocators u) (incLocatorsFromLst (k + 1) bindings)
   := match bindings with
-  | Bindings.nil => by simp
-  | Bindings.cons _ _ none tail => by
+  | .nil => by simp
+  | .cons _ _ none tail => by
     simp [min_free_loc] at *
     exact subst_inc_cancel_Lst tail u j k i zeroth_level le_ji le_ki le_0j le_0k v_loc
-  | Bindings.cons _ _ (some term) tail => by
+  | .cons _ _ (some term) tail => by
     simp
     constructor
     . simp [min_free_loc] at v_loc
@@ -303,8 +293,8 @@ end
 
 def lookup { lst : List Attr } (l : Bindings lst) (a : Attr) : Option (Option Term)
   := match l with
-    | Bindings.nil => none
-    | Bindings.cons name _ opAttr tail =>
+    | .nil => none
+    | .cons name _ opAttr tail =>
         if (name == a) then some opAttr
         else lookup tail a
 
@@ -317,7 +307,7 @@ theorem lookup_none_not_in
   := λ a_in_lst => match lst with
     | [] => by contradiction
     | b :: bs => match l with
-      | Bindings.cons _ _ opAttr tail =>
+      | .cons _ _ opAttr tail =>
         dite
         (b = a)
         (λ eq => by simp [eq, lookup] at lookup_none)
@@ -337,9 +327,9 @@ theorem lookup_none_preserve
   (l2 : Bindings lst)
   : (lookup l2 a = none)
   := match lst with
-    | [] => match l2 with | Bindings.nil => by simp [lookup]
+    | [] => match l2 with | .nil => by simp [lookup]
     | b :: bs => match l1, l2 with
-      | Bindings.cons _ _ opAttr1 tail1, Bindings.cons _ _ opAttr2 tail2 => dite
+      | .cons _ _ opAttr1 tail1, .cons _ _ opAttr2 tail2 => dite
         (b = a)
         (λ eq => by simp [lookup, eq] at lookup_none)
         (λ neq => by
@@ -355,10 +345,10 @@ def insert_φ
   (u : Option Term)
   : (Bindings lst)
   := match l with
-    | Bindings.nil => Bindings.nil
-    | Bindings.cons name not_in opAttr tail =>
-        if name == a then Bindings.cons name not_in u tail
-        else Bindings.cons name not_in opAttr (insert_φ tail a u)
+    | .nil => .nil
+    | .cons name not_in opAttr tail =>
+        if name == a then .cons name not_in u tail
+        else .cons name not_in opAttr (insert_φ tail a u)
 
 inductive IsAttached : { lst : List Attr } → Attr → Term → Bindings lst → Type where
   | zeroth_attached
@@ -367,7 +357,7 @@ inductive IsAttached : { lst : List Attr } → Attr → Term → Bindings lst �
     → (not_in : a ∉ lst)
     → (t : Term)
     → (l : Bindings lst)
-    → IsAttached a t (Bindings.cons a not_in (some t) l)
+    → IsAttached a t (.cons a not_in (some t) l)
   | next_attached
     : { lst : List Attr }
     → (a : Attr)
@@ -378,7 +368,7 @@ inductive IsAttached : { lst : List Attr } → Attr → Term → Bindings lst �
     → (not_in : b ∉ lst)
     → (u : Option Term)
     → IsAttached a t l
-    → IsAttached a t (Bindings.cons b not_in u l)
+    → IsAttached a t (.cons b not_in u l)
 
 theorem isAttachedIsIn
   { lst : List Attr }
@@ -387,7 +377,7 @@ theorem isAttachedIsIn
   { l : Bindings lst }
   : IsAttached a t l
   → a ∈ lst
-  | @IsAttached.zeroth_attached lst' _ _ _ _ => List.Mem.head lst'
+  | @IsAttached.zeroth_attached lst' _a _ _t _ => List.Mem.head lst'
   | IsAttached.next_attached _ _ _ b _ _ _ isAttached' => List.Mem.tail b (isAttachedIsIn isAttached')
 
 namespace Insert
@@ -400,8 +390,8 @@ namespace Insert
     { not_in : b ∉ lst }
     { u : Option Term }
     { l : Bindings lst }
-    : insert_φ (Bindings.cons b not_in u l) a (some t)
-        = Bindings.cons b not_in u (insert_φ l a (some t))
+    : insert_φ (.cons b not_in u l) a (some t)
+        = .cons b not_in u (insert_φ l a (some t))
     := by
       simp [insert_φ, neq]
       intro eq
@@ -418,7 +408,7 @@ namespace Insert
       | IsAttached.zeroth_attached _ _ _ _ => by simp [insert_φ]
       | IsAttached.next_attached _ _ l b neq not_in u isAttached =>
           let step := @insertAttachedStep a b neq t _ not_in u _
-          Eq.trans step (congrArg (Bindings.cons b not_in u) (insertAttached isAttached))
+          Eq.trans step (congrArg (Record.cons b not_in u) (insertAttached isAttached))
 
   theorem insertTwice
     {lst : List Attr}
@@ -428,9 +418,9 @@ namespace Insert
     : insert_φ (insert_φ l a (some t')) a (some t) = insert_φ l a (some t)
     := match lst with
       | [] => match l with
-        | Bindings.nil => by simp [insert_φ]
+        | .nil => by simp [insert_φ]
       | b :: bs => match l with
-        | Bindings.cons _ not_in _ tail => dite (a = b)
+        | .cons _ not_in _ tail => dite (a = b)
           (λ eq => by simp [insert_φ, eq])
           (λ neq =>
             let neq' : b ≠ a := λ eq => neq eq.symm
@@ -505,11 +495,11 @@ theorem inc_swap_Lst
   : incLocatorsFromLst (i + 1) (incLocatorsFromLst (j + 1) o) =
   incLocatorsFromLst (j + 1 + 1) (incLocatorsFromLst (i + 1) o)
   := match o with
-  | Bindings.nil => by simp
-  | Bindings.cons _ _ none tail => by
+  | .nil => by simp
+  | .cons _ _ none tail => by
     simp
     exact inc_swap_Lst i j le_ij tail
-  | Bindings.cons _ _ (some t) tail => by
+  | .cons _ _ (some t) tail => by
     simp
     constructor
     . exact inc_swap (i + 1) (j + 1) (Nat.succ_le_succ le_ij) t
@@ -578,11 +568,11 @@ theorem subst_inc_swap_Lst
   : substituteLst (i + 1 + 1, incLocators (incLocatorsFrom j u)) (incLocatorsFromLst (j + 1) o) =
   incLocatorsFromLst (j + 1) (substituteLst (i + 1, incLocators u) o)
   := by match o with
-  | Bindings.nil => simp
-  | Bindings.cons _ _ none tail =>
+  | .nil => simp
+  | .cons _ _ none tail =>
     simp
     exact subst_inc_swap_Lst i j le_ji tail u
-  | Bindings.cons _ _ (some t) tail =>
+  | .cons _ _ (some t) tail =>
     simp
     constructor
     . simp [incLocators, inc_swap]
@@ -653,11 +643,11 @@ theorem inc_subst_swap_Lst
   : incLocatorsFromLst (i + 1) (substituteLst (j + 1, incLocators u) o) =
   substituteLst (j + 1, incLocators (incLocatorsFrom i u)) (incLocatorsFromLst (i + 1 + 1) o)
   := by match o with
-  | Bindings.nil => simp
-  | Bindings.cons _ _ none tail =>
+  | .nil => simp
+  | .cons _ _ none tail =>
     simp
     exact inc_subst_swap_Lst i j le_ji tail u
-  | Bindings.cons _ _ (some t) tail =>
+  | .cons _ _ (some t) tail =>
     simp
     constructor
     . simp [incLocators, inc_swap]
@@ -756,11 +746,11 @@ theorem subst_swap_Lst
   : substituteLst (i + 1, incLocators v) (substituteLst (j + 1, incLocators u) o) =
   substituteLst (j + 1, incLocators (substitute (i, v) u)) (substituteLst (i + 1 + 1, incLocators (incLocators v)) o)
   := by match o with
-  | Bindings.nil => simp
-  | Bindings.cons _ _ none tail =>
+  | .nil => simp
+  | .cons _ _ none tail =>
     simp
     exact subst_swap_Lst i j le_ji tail u v free_locs_v
-  | Bindings.cons _ _ (some t) tail =>
+  | .cons _ _ (some t) tail =>
     simp
     constructor
     . simp [incLocators]
@@ -779,15 +769,15 @@ theorem lookup_inc_attached
   (lookup_eq: lookup l c = some (some t))
   : lookup (incLocatorsFromLst i l) c = some (some (incLocatorsFrom i t))
   := by match l with
-  | Bindings.nil => contradiction
-  | Bindings.cons name _ none tail =>
+  | .nil => contradiction
+  | .cons name _ none tail =>
     simp [lookup] at lookup_eq
     split at lookup_eq
     . simp at lookup_eq
     . rename_i neq
       simp [lookup, neq]
       exact (lookup_inc_attached t i c tail lookup_eq)
-  | Bindings.cons name _ (some _) tail =>
+  | .cons name _ (some _) tail =>
     simp [lookup] at lookup_eq
     split at lookup_eq
     . rename_i eq
@@ -806,8 +796,8 @@ theorem lookup_inc_void
   (lookup_eq: lookup l c = some none)
   : lookup (incLocatorsFromLst i l) c = some none
   := by match l with
-  | Bindings.nil => contradiction
-  | Bindings.cons name _ none tail =>
+  | .nil => contradiction
+  | .cons name _ none tail =>
     simp [lookup] at lookup_eq
     exact (dite (name = c)
       (λ lookup_eq => by
@@ -815,7 +805,7 @@ theorem lookup_inc_void
       (λ neq => by
         simp [lookup, neq]
         exact (lookup_inc_void i c tail (lookup_eq neq)))
-  | Bindings.cons name _ (some _) tail =>
+  | .cons name _ (some _) tail =>
     simp [lookup] at lookup_eq
     split at lookup_eq
     . simp at lookup_eq
@@ -831,8 +821,8 @@ theorem lookup_inc_none
   (lookup_eq: lookup l c = none)
   : lookup (incLocatorsFromLst i l) c = none
   := by match l with
-  | Bindings.nil => simp ; assumption
-  | Bindings.cons name _ u tail =>
+  | .nil => simp ; assumption
+  | .cons name _ u tail =>
     simp [lookup] at lookup_eq
     split at lookup_eq
     . contradiction
@@ -849,9 +839,9 @@ theorem inc_insert
   : (insert_φ (incLocatorsFromLst (i + 1) l) c (some (incLocators (incLocatorsFrom i v)))) =
   (incLocatorsFromLst (i + 1) (insert_φ l c (some (incLocators v))))
   := match l with
-  | Bindings.nil => by
+  | .nil => by
     simp [insert_φ]
-  | Bindings.cons a not_in u _tail => by
+  | .cons a not_in u _tail => by
     cases u
     repeat
       simp [insert_φ]
@@ -872,15 +862,15 @@ theorem lookup_subst_attached
   (lookup_eq: lookup l c = some (some t))
   : lookup (substituteLst (i, u) l) c = some (some (substitute (i, u) t))
   := by match l with
-  | Bindings.nil => contradiction
-  | Bindings.cons name _ none tail =>
+  | .nil => contradiction
+  | .cons name _ none tail =>
     simp [lookup] at lookup_eq
     split at lookup_eq
     . simp at lookup_eq
     . rename_i neq
       simp [lookup, neq]
       exact (lookup_subst_attached t i c tail lookup_eq)
-  | Bindings.cons name _ (some _) tail =>
+  | .cons name _ (some _) tail =>
     simp [lookup] at lookup_eq
     split at lookup_eq
     . rename_i eq
@@ -900,8 +890,8 @@ theorem lookup_subst_void
   (lookup_eq: lookup l c = some none)
   : lookup (substituteLst (i, u) l) c = some none
   := by match l with
-  | Bindings.nil => contradiction
-  | Bindings.cons name _ none tail =>
+  | .nil => contradiction
+  | .cons name _ none tail =>
     simp [lookup] at lookup_eq
     exact (dite (name = c)
       (λ lookup_eq => by
@@ -909,7 +899,7 @@ theorem lookup_subst_void
       (λ neq => by
         simp [lookup, neq]
         exact (lookup_subst_void i c tail (lookup_eq neq)))
-  | Bindings.cons name _ (some _) tail =>
+  | .cons name _ (some _) tail =>
     simp [lookup] at lookup_eq
     split at lookup_eq
     . simp at lookup_eq
@@ -926,8 +916,8 @@ theorem lookup_subst_none
   (lookup_eq: lookup l c = none)
   : lookup (substituteLst (i, u) l) c = none
   := by match l with
-  | Bindings.nil => simp ; assumption
-  | Bindings.cons name _ u tail =>
+  | .nil => simp ; assumption
+  | .cons name _ u tail =>
     simp [lookup] at lookup_eq
     split at lookup_eq
     . contradiction
@@ -944,9 +934,9 @@ theorem subst_insert
   : (insert_φ (substituteLst (i + 1, incLocators u) l) c (some (incLocators (substitute (i, u) v))))
   = (substituteLst (i + 1, incLocators u) (insert_φ l c (some (incLocators v))))
   := match l with
-  | Bindings.nil => by
+  | .nil => by
     simp [insert_φ]
-  | Bindings.cons a not_in u _tail => by
+  | .cons a not_in u _tail => by
     cases u
     repeat
       simp [insert_φ]

@@ -13,8 +13,8 @@ mutual
     (l : Bindings lst)
     : Premise l l
     := match l with
-      | Bindings.nil => Premise.nil
-      | Bindings.cons name not_in opAttr tail =>
+      | .nil => Premise.nil
+      | .cons name not_in opAttr tail =>
           match opAttr with
             | none => Premise.consVoid name (reflexivePremise tail)
             | some t => Premise.consAttached name t t (prefl t) (reflexivePremise tail)
@@ -41,14 +41,14 @@ def singlePremise
   : Premise l (insert_φ l a (some t'))
   := match lst with
     | [] => match l with
-      | Bindings.nil => Premise.nil
+      | .nil => Premise.nil
     | b :: bs => match isAttached with
       | IsAttached.zeroth_attached _ _ _ tail => match l with
-        | Bindings.cons _ _ _ _ => by
+        | .cons _ _ _ _ => by
             simp [insert_φ]
             exact Premise.consAttached b t t' preduce (reflexivePremise tail)
       | IsAttached.next_attached _ _ tail _ neq not_in u newIsAttached => match l with
-        | Bindings.cons _ _ _ _ => by
+        | .cons _ _ _ _ => by
             have neq' : b ≠ a := λ eq => neq eq.symm
             simp [insert_φ, neq']
             have premise := (singlePremise tail a t t' newIsAttached preduce)
@@ -96,9 +96,9 @@ theorem lookup_void_premise
   (premise : Premise l1 l2)
   : lookup l2 a = some none
   := match lst with
-    | [] => match l1, l2 with | Bindings.nil, Bindings.nil => by contradiction
+    | [] => match l1, l2 with | .nil, .nil => by contradiction
     | b :: bs => match l1, l2 with
-        | Bindings.cons _ _ _ tail1, Bindings.cons _ _ _ tail2 => match premise with
+        | .cons _ _ _ tail1, .cons _ _ _ tail2 => match premise with
           | Premise.consVoid _ premise_tail => dite
             (b = a)
             (λ eq => by simp [lookup, eq])
@@ -125,7 +125,7 @@ def lookup_attached_premise
   (premise : Premise l1 l2)
   : Σ u' : Term, PProd (lookup l2 a = some (some u')) (PReduce u u')
   := match lst with
-    | [] => match l1, l2 with | Bindings.nil, Bindings.nil => match premise with
+    | [] => match l1, l2 with | .nil, .nil => match premise with
       | Premise.nil => by
         simp [lookup]
         contradiction
@@ -224,7 +224,7 @@ def preduce_incLocatorsFrom_Lst
   : Premise (incLocatorsFromLst (i + 1) bnds) (incLocatorsFromLst (i + 1) bnds')
   :=  match lst with
   | [] => match bnds, bnds' with
-    | Bindings.nil, Bindings.nil => by
+    | .nil, .nil => by
       simp
       exact Premise.nil
   | _ :: as => match premise with

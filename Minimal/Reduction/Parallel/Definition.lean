@@ -1,16 +1,17 @@
+import Minimal.ARS
 import Minimal.Term
 
 open Term
 
 set_option autoImplicit false
 
-/-! ### Defition of parallel reduction -/
+/-! ### Defition of parallel reduction `⇛` -/
 
 mutual
   -- | tᵢ => tᵢ' for all i with ⟦ ... αᵢ ↦ tᵢ ... ⟧
   --   α's are given by `lst`
   inductive Premise : { lst : List Attr } → (l1 : Bindings lst) → (l2 : Bindings lst) → Type where
-    | nil : Premise Bindings.nil Bindings.nil
+    | nil : Premise .nil .nil
     | consVoid
       : (a : Attr)
       → { lst : List Attr }
@@ -18,7 +19,7 @@ mutual
       → { l2 : Bindings lst }
       → { not_in : a ∉ lst }
       → Premise l1 l2
-      → Premise (Bindings.cons a not_in none l1) (Bindings.cons a not_in none l2)
+      → Premise (.cons a not_in none l1) (.cons a not_in none l2)
     | consAttached
       : (a : Attr)
       → (t1 : Term)
@@ -29,7 +30,7 @@ mutual
       → { l2 : Bindings lst }
       → { not_in : a ∉ lst }
       → Premise l1 l2
-      → Premise (Bindings.cons a not_in (some t1) l1) (Bindings.cons a not_in (some t2) l2)
+      → Premise (.cons a not_in (some t1) l1) (.cons a not_in (some t2) l2)
 
   /-- Parallel reduction [KS22, Fig. 2] -/
   inductive PReduce : Term → Term → Type where

@@ -1,10 +1,11 @@
+import Minimal.ARS
 import Minimal.Term
 
 open Term
 
 set_option autoImplicit false
 
-/-! ### Defition of regular reduction -/
+/-! ### Defition of regular reduction `⇝` -/
 
 /-- Evaluation [KS22, Fig. 1] -/
 inductive Reduce : Term → Term → Type where

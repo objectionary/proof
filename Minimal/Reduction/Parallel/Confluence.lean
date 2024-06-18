@@ -26,9 +26,9 @@ def complete_development : Term → Term
   | obj bnds => obj (complete_developmentLst bnds)
 @[simp]
 def complete_developmentLst {lst : List Attr} : Bindings lst → Bindings lst
-  | Bindings.nil => Bindings.nil
-  | Bindings.cons a lst none tail => Bindings.cons a lst none (complete_developmentLst tail)
-  | Bindings.cons a lst (some t) tail => Bindings.cons a lst (some (complete_development t)) (complete_developmentLst tail)
+  | .nil => .nil
+  | .cons a lst none tail => .cons a lst none (complete_developmentLst tail)
+  | .cons a lst (some t) tail => .cons a lst (some (complete_development t)) (complete_developmentLst tail)
 end
 
 mutual
@@ -109,12 +109,12 @@ def term_to_development_Lst
   ( l : Bindings lst)
   : Premise l (complete_developmentLst l)
   := by match l with
-  | Bindings.nil => simp ; exact Premise.nil
-  | Bindings.cons _ _ none premise_tail =>
+  | .nil => simp ; exact Premise.nil
+  | .cons _ _ none premise_tail =>
     simp
     apply Premise.consVoid
     exact term_to_development_Lst premise_tail
-  | Bindings.cons _ _ (some t) premise_tail =>
+  | .cons _ _ (some t) premise_tail =>
     simp
     apply Premise.consAttached
     . exact term_to_development t
@@ -137,7 +137,7 @@ def half_diamond
           : Premise l' (complete_developmentLst l)
           := match lst with
             | [] => match l, l' with
-              | Bindings.nil, Bindings.nil => Premise.nil
+              | .nil, .nil => Premise.nil
             | a :: as => match premise with
               | Premise.consVoid _ premise_tail => by
                   simp [complete_development]

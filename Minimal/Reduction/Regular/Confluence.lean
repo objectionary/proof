@@ -43,8 +43,8 @@ def consBindingsRedMany
   (u_a  : Option Term)
   { l1 l2 : Bindings lst }
   (reds : (obj l1) ⇝* (obj l2))
-  : obj (Bindings.cons a not_in_a u_a l1) ⇝*
-    obj (Bindings.cons a not_in_a u_a l2)
+  : obj (.cons a not_in_a u_a l1) ⇝*
+    obj (.cons a not_in_a u_a l2)
   := by
     generalize h : obj l1 = t1
     generalize h' : obj l2 = t2
@@ -60,7 +60,7 @@ def consBindingsRedMany
         rename_i ti1 ti2
         have tail_cons := @ih (insert_φ l1 attr (some ti2)) l2 rfl rfl
         have neq := (notEqByListMem (isAttachedIsIn isAttached) not_in_a)
-        have isAttached_cons : IsAttached attr ti1 (Bindings.cons a not_in_a u_a l1) :=
+        have isAttached_cons : IsAttached attr ti1 (.cons a not_in_a u_a l1) :=
         IsAttached.next_attached attr ti1 l1 a neq not_in_a u_a isAttached
         have head_cons := Reduce.congOBJ attr _ inner_red isAttached_cons
         simp [insert_φ, neq.symm] at head_cons
@@ -126,13 +126,13 @@ def par_to_redMany {t t' : Term} : (t ⇛ t') → (t ⇝* t')
       : (obj al) ⇝* (obj al')
       := match lst with
         | [] => match al, al' with
-          | Bindings.nil, Bindings.nil => ReflTransGen.refl
+          | .nil, .nil => ReflTransGen.refl
         | a :: as => match al, al' with
-          | Bindings.cons _ not_in u tail, Bindings.cons _ _ u' tail' => match premise with
+          | .cons _ not_in u tail, .cons _ _ u' tail' => match premise with
             | Premise.consVoid _ premiseTail => consBindingsRedMany a none (fold_premise premiseTail)
             | @Premise.consAttached _ t1 t2 preduce _ l1 l2 not_in premiseTail => by
-                suffices temp : obj (insert_φ (Bindings.cons a not_in (some t1) l1) a (some t2)) ⇝*
-                  obj (Bindings.cons a _ (some t2) l2) from
+                suffices temp : obj (insert_φ (.cons a not_in (some t1) l1) a (some t2)) ⇝*
+                  obj (.cons a _ (some t2) l2) from
                   (red_trans
                     (congOBJClos (par_to_redMany preduce) (IsAttached.zeroth_attached a _ t1 l1))
                     (temp))
