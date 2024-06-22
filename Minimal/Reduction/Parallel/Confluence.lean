@@ -137,7 +137,7 @@ def half_diamond
           : Premise l' (complete_developmentLst l)
           := match lst with
             | [] => match l, l' with
-              | .nil, .nil => Premise.nil
+              | .nil, .nil => by simp ; exact Premise.nil
             | a :: as => match premise with
               | Premise.consVoid _ premise_tail => by
                   simp [complete_development]
