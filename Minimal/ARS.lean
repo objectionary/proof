@@ -11,7 +11,7 @@ set_option autoImplicit false
 
 universe u
 variable {α : Type u}
-variable {r : α → α → Type u}
+variable {r r1 r2 : α → α → Type u}
 
 /-- Property of being reflexive -/
 def Reflexive := ∀ x, r x x
@@ -49,6 +49,16 @@ def DiamondProperty (r : α → α → Type u)
 def Confluence (r : α → α → Type u)
   := ∀ a b c, ReflTransGen r a b → ReflTransGen r a c → Join (ReflTransGen r) b c
 
+def Takahashi (r : α → α → Type u)
+  := Σ complete_development : α → α, ∀ {s u}, r s u → r u (complete_development s)
+
+def takahashi_implies_diamond
+  (tak : Takahashi r)
+  : DiamondProperty r
+  := λ a _b _c rab rac =>
+    let ⟨cd, joins⟩ := tak
+    ⟨cd a, joins rab, joins rac⟩
+
 /-- Diamond property implies Church-Rosser (in the form in which Lean recognizes termination) -/
 def diamond_implies_confluence'
   (h : ∀ a b c, r a b → r a c → Join r b c)
@@ -80,3 +90,20 @@ def diamond_implies_confluence : DiamondProperty r → Confluence r := by
   simp
   intros h a b c hab hac
   exact diamond_implies_confluence' h a b c hab hac
+
+def Equivalece (r1 r2 : α → α → Type u)
+  := (∀ {a b}, r1 a b → r2 a b) × (∀ {a b}, r2 a b → r1 a b)
+
+def WeakEquivalence (r1 r2 : α → α → Type u)
+  := (∀ {a b}, ReflTransGen r1 a b -> ReflTransGen r2 a b) × (∀ {a b}, ReflTransGen r2 a b -> ReflTransGen r1 a b)
+
+def weak_equiv_keeps_confluence
+  (weakEquiv : WeakEquivalence r1 r2)
+  (conf : Confluence r1)
+  : Confluence r2
+  := λ a b c r2ab r2ac =>
+    let ⟨r1_to_r2, r2_to_r1⟩ := weakEquiv
+    let r1ab := r2_to_r1 r2ab
+    let r1ac := r2_to_r1 r2ac
+    let ⟨w, r1bw, r1cw⟩ := conf a b c r1ab r1ac
+    ⟨w, r1_to_r2 r1bw, r1_to_r2 r1cw⟩
