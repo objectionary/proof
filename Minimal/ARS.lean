@@ -33,6 +33,11 @@ def trans {a b c : α} (hab : ReflTransGen r a b) (hbc : ReflTransGen r b c) : R
   | .refl => by assumption
   | .head x tail => (trans tail hbc).head x
 
+def size {a b : α} (hab : ReflTransGen r a b) : Nat
+  := match hab with
+    | .refl => 0
+    | .head _ tail => 1 + size tail
+
 end ReflTransGen
 
 /-- Two elements can be `join`ed if there exists an element to which both are related -/
@@ -107,3 +112,79 @@ def weak_equiv_keeps_confluence
     let r1ac := r2_to_r1 r2ac
     let ⟨w, r1bw, r1cw⟩ := conf a b c r1ab r1ac
     ⟨w, r1_to_r2 r1bw, r1_to_r2 r1cw⟩
+
+
+@[simp]
+def ZProperty (r : α → α → Type u)
+  := Σ f : α → α, ∀ {a b}, r a b → ReflTransGen r b (f a) × ReflTransGen r (f a) (f b)
+
+
+def lift_f
+  {a b : α}
+  (ab : ReflTransGen r a b)
+  (z : ZProperty r)
+  : ReflTransGen r (z.fst a) (z.fst b)
+  := match ab with
+    | .refl => .refl
+    | @ReflTransGen.head _ _ _ _u _ au ub =>
+      let ⟨_, fa_fu⟩ := z.snd au
+      let fu_fb := lift_f ub z
+      ReflTransGen.trans fa_fu fu_fb
+
+def aux
+  {a b u : α}
+  (au : r a u)
+  (u_b : ReflTransGen r u b)
+  (z : ZProperty r)
+  : ReflTransGen r b (z.fst b)
+  := match u_b with
+    | .refl => let ⟨u_fa, fa_fu⟩ := z.snd au; ReflTransGen.trans u_fa fa_fu
+    | @ReflTransGen.head _ _ _ _s _ as sb =>
+      aux as sb z
+
+def step
+  {a b c : α}
+  (ab : r a b)
+  (ac : ReflTransGen r a c)
+  (z : ZProperty r)
+  : ReflTransGen r b (z.fst c)
+  := let fa_fc := lift_f ac z
+     let b_fa  := (z.snd ab).fst
+     ReflTransGen.trans b_fa fa_fc
+
+def decr {a b c} (ab : r a b) (b_c : ReflTransGen r b c)
+  : b_c.size < (ReflTransGen.head ab b_c).size
+  := match b_c with
+  | .refl => by simp [ReflTransGen.size]
+  | .head _ tail => by
+      simp [ReflTransGen.size]
+      let h : tail.size < 1 + tail.size := Nat.lt_add_of_pos_left Nat.zero_lt_one
+      exact Nat.add_lt_add_left h 1
+
+def z_confluence
+  (z : ZProperty r)
+  {a b c : α}
+  (a_b : ReflTransGen r a b)
+  (a_c : ReflTransGen r a c)
+  : Join (ReflTransGen r) b c
+  := match (a_b, a_c) with
+    | (.refl, _) => ⟨c, a_c, .refl⟩
+    | (_, .refl) => ⟨b, .refl, a_b⟩
+    | (.head au u_b, .head as s_c) =>
+      -- TODO: I have no idea how to prove it
+      let eq : a_b = ReflTransGen.head au u_b := sorry
+      let u_fc := step au a_c z
+      let ⟨w, b_w, fc_w⟩ := z_confluence z u_b u_fc
+      ⟨w, b_w, ReflTransGen.trans (aux as s_c z) fc_w⟩
+termination_by a_b.size
+decreasing_by
+  all_goals simp_wf
+  let proof := decr au u_b
+  -- let eq : a_b = ReflTransGen.head au u_b := sorry
+  simp [←eq] at proof
+  exact proof
+
+def z_implies_confluence
+  (z : ZProperty r)
+  : Confluence r
+  := λ _ _ _ ab ac => z_confluence z ab ac
