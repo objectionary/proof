@@ -19,7 +19,7 @@ def complete_development : Term → Term
       | none => if ("φ" ∈ attrs) then dot (dot (obj bnds) "φ") a else dot (obj bnds) a
     | t' => dot t' a
   | app t a u => match (complete_development t) with
-    | @obj attrs bnds => match (lookup bnds a) with
+    | @obj _attrs bnds => match (lookup bnds a) with
       | some none => obj (insert_φ bnds a (some (incLocators (complete_development u))))
       | _ => app (obj bnds) a (complete_development u)
     | _ => app (complete_development t) a (complete_development u)
