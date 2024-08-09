@@ -69,5 +69,13 @@ def lookup
       | some none => LookupRes.void
       | some (some t) => LookupRes.attached t
 
-def insert : Term → Term → Term
-  := sorry
+def insert
+  {attrs : Attrs}
+  (ρ : Option Term)
+  (bnds : Bindings attrs)
+  (attr : Attr)
+  (t : Term)
+  : Term
+  := if attr == "ρ"
+    then obj (some t) bnds
+    else obj ρ (Record.insert bnds attr (some t))

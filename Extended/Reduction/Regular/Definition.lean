@@ -53,7 +53,7 @@ inductive Reduce : Ctx → Term → Term → Type where
     → Reduce
         { glob := g, scope := s }
         (app (obj ρ bnds) (Record.cons attr not_in t app_record_tail))
-        (app (insert (obj ρ bnds) (substitute t s)) app_record_tail)
+        (app (insert ρ bnds attr (substitute t s)) app_record_tail)
   | r_over
     : { ρ : Option Term }
     → { attrs app_attrs : Attrs }

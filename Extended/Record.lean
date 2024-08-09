@@ -74,4 +74,17 @@ def lookup
     | k :: _ => match record with
       | Record.cons _ _ a tail => if key == k then some a else lookup tail key
 
+def insert
+  {keys : List String}
+  (record : Record α keys)
+  (key : String)
+  (a : α)
+  : Record α keys
+  := match keys with
+    | [] => Record.nil
+    | k :: _ => match record with
+      | Record.cons _ not_in a' tail => if key == k
+        then Record.cons k not_in a tail
+        else Record.cons k not_in a' (insert tail key a)
+
 end Record
