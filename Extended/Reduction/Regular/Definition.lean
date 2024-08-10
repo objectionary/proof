@@ -11,12 +11,7 @@ structure Ctx where
   scope : Term
 
 inductive Reduce : Ctx → Term → Term → Type where
-  | r_Φ
-    : { g s : Term}
-    → Reduce { glob := g, scope := s} glob g
-  | r_ξ
-    : { g s : Term}
-    → Reduce { glob := g, scope := s} glob s
+  -- Dispatch
   | r_dot
     : { ρ : Option Term }
     → { attrs : Attrs }
@@ -35,6 +30,17 @@ inductive Reduce : Ctx → Term → Term → Type where
     → lookup ρ bnds attr = LookupRes.absent
     → "φ" ∈ attrs
     → Reduce ctx (dot (obj ρ bnds) attr) (dot (dot (obj ρ bnds) "φ") attr)
+  | r_stop
+    : { ρ : Option Term }
+    → { attrs : Attrs }
+    → { bnds : Bindings attrs }
+    → { ctx : Ctx }
+    → { attr : Attr }
+    → lookup ρ bnds attr = LookupRes.absent
+    → lookup ρ bnds "φ" = LookupRes.absent
+    → lookup ρ bnds "λ" = LookupRes.absent
+    → Reduce ctx (dot (obj ρ bnds) attr) termination
+  -- Application
   | r_empty
     : { ρ : Option Term }
     → { attrs : Attrs }
@@ -84,16 +90,13 @@ inductive Reduce : Ctx → Term → Term → Type where
         ctx
         (app (obj ρ bnds) (Record.cons attr not_in t app_record_tail))
         termination
-  | r_stop
-    : { ρ : Option Term }
-    → { attrs : Attrs }
-    → { bnds : Bindings attrs }
-    → { ctx : Ctx }
-    → { attr : Attr }
-    → lookup ρ bnds attr = LookupRes.absent
-    → lookup ρ bnds "φ" = LookupRes.absent
-    → lookup ρ bnds "λ" = LookupRes.absent
-    → Reduce ctx (dot (obj ρ bnds) attr) termination
+  -- Special terms
+  | r_Φ
+    : { g s : Term}
+    → Reduce { glob := g, scope := s} glob g
+  | r_ξ
+    : { g s : Term}
+    → Reduce { glob := g, scope := s} glob s
   | r_dd
     : { ctx : Ctx }
     → { attr : Attr }
@@ -103,3 +106,55 @@ inductive Reduce : Ctx → Term → Term → Type where
     → { record : Record Term app_attrs }
     → { ctx : Ctx }
     → Reduce ctx (app termination record) termination
+  -- Congruence
+  | r_cong_appₗ
+    : { ctx : Ctx }
+    → (t t' : Term)
+    → {app_attrs : Attrs}
+    → (app_bnds : Record Term app_attrs)
+    → Reduce ctx t t'
+    → Reduce ctx (app t app_bnds) (app t' app_bnds)
+  -- TODO: since current rules allow to add only one term from application into fomation
+  -- at a time, it is reasonable to assume that congruence should only affect the term in question.
+  -- This would simplify the rules. On the other hand, from the point of view of "intermediate
+  -- representation for optimizations", it would make sence to allow congruence for any term of
+  -- the application.
+  -- | r_cong_appᵣ -- congruence of arbitrary app term
+  --   : { ctx : Ctx }
+  --   → {t u u' : Term}
+  --   → {attr : Attr}
+  --   → {app_attrs : Attrs}
+  --   → (app_bnds : Record Term app_attrs)
+  --   → Contains app_bnds attr u
+  --   → Reduce ctx u u'
+  --   → Reduce ctx (app t app_bnds) (app t (Record.insert app_bnds attr u'))
+  | r_cong_appᵣ -- congruence of the first app term
+    : { ctx : Ctx }
+    → {t u u' : Term}
+    → {attr : Attr}
+    → {app_attrs : Attrs}
+    → {not_in : attr ∉ app_attrs}
+    → (app_bnds : Record Term app_attrs)
+    → Reduce ctx u u'
+    → Reduce
+        ctx
+        (app t (Record.cons attr not_in u app_bnds))
+        (app t (Record.cons attr not_in u' app_bnds))
+  | r_cong_dot
+    : { ctx : Ctx }
+    → {t t' : Term}
+    → {attr : Attr}
+    → Reduce ctx t t'
+    → Reduce ctx (dot t attr) (dot t' attr)
+  | r_cong_obj
+    : { g l t t' : Term}
+    → {ρ : Option Term}
+    → {attr : Attr}
+    → {attrs : Attrs}
+    → {bnds : Bindings attrs}
+    → Contains bnds attr (some t)
+    → Reduce {glob := g, scope := obj ρ bnds} t t'
+    → Reduce
+        {glob := g, scope := l}
+        (obj ρ bnds)
+        (obj ρ (Record.insert bnds attr t'))
