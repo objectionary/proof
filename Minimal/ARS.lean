@@ -167,22 +167,23 @@ def z_confluence
   (a_b : ReflTransGen r a b)
   (a_c : ReflTransGen r a c)
   : Join (ReflTransGen r) b c
-  := match (a_b, a_c) with
-    | (.refl, _) => ⟨c, a_c, .refl⟩
-    | (_, .refl) => ⟨b, .refl, a_b⟩
-    | (.head au u_b, .head as s_c) =>
-      -- TODO: I have no idea how to prove it
-      let eq : a_b = ReflTransGen.head au u_b := sorry
-      let u_fc := step au a_c z
-      let ⟨w, b_w, fc_w⟩ := z_confluence z u_b u_fc
-      ⟨w, b_w, ReflTransGen.trans (aux as s_c z) fc_w⟩
+  := match hab : a_b with
+    | .refl => ⟨c, a_c, .refl⟩
+    | .head au u_b => match hac : a_c with
+      | .refl => by
+        rename_i hb _
+        exact ⟨b, .refl, hb ▸ a_b⟩
+      | .head as s_c =>
+        let u_fc := step au a_c z
+        let ⟨w, b_w, fc_w⟩ := z_confluence z u_b u_fc
+        by
+        rename_i hc
+        exact ⟨w, b_w, ReflTransGen.trans (aux as s_c z) (hc ▸ fc_w)⟩
 termination_by a_b.size
 decreasing_by
-  all_goals simp_wf
-  let proof := decr au u_b
-  -- let eq : a_b = ReflTransGen.head au u_b := sorry
-  simp [←eq] at proof
-  exact proof
+  simp_wf
+  rename_i as' s_c' _ _ _ _
+  exact decr as' s_c'
 
 def z_implies_confluence
   (z : ZProperty r)
