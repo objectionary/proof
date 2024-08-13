@@ -152,14 +152,12 @@ def step
      let b_fa  := (z.snd ab).fst
      ReflTransGen.trans b_fa fa_fc
 
-def decr {a b c} (ab : r a b) (b_c : ReflTransGen r b c)
+theorem decr {a b c} (ab : r a b) (b_c : ReflTransGen r b c)
   : b_c.size < (ReflTransGen.head ab b_c).size
   := match b_c with
   | .refl => by simp [ReflTransGen.size]
-  | .head _ tail => by
+  | .head _ _ => by
       simp [ReflTransGen.size]
-      let h : tail.size < 1 + tail.size := Nat.lt_add_of_pos_left Nat.zero_lt_one
-      exact Nat.add_lt_add_left h 1
 
 def z_confluence
   (z : ZProperty r)
