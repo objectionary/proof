@@ -1,5 +1,5 @@
 import Minimal.ARS
-import Minimal.Calculus
+import Minimal.Reduction.Regular.Confluence
 import Batteries.Tactic.Lint
 
 -- these are all Std linters except docBlame and docBlameThm

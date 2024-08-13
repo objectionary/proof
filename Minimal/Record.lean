@@ -52,7 +52,7 @@ inductive Contains : {keys : List String} → Record α keys → (key : String) 
     → Contains as key a
     → Contains (Record.cons key' not_in b as) key a
 
-def contains_to_mem
+theorem contains_to_mem
   {key : String}
   {a : α}
   {keys : List String}
