@@ -33,6 +33,11 @@ def trans {a b c : α} (hab : ReflTransGen r a b) (hbc : ReflTransGen r b c) : R
   | .refl => by assumption
   | .head x tail => (trans tail hbc).head x
 
+def size {a b : α} (hab : ReflTransGen r a b) : Nat
+  := match hab with
+    | .refl => 0
+    | .head _ tail => 1 + size tail
+
 end ReflTransGen
 
 /-- Two elements can be `join`ed if there exists an element to which both are related -/
@@ -107,3 +112,78 @@ def weak_equiv_keeps_confluence
     let r1ac := r2_to_r1 r2ac
     let ⟨w, r1bw, r1cw⟩ := conf a b c r1ab r1ac
     ⟨w, r1_to_r2 r1bw, r1_to_r2 r1cw⟩
+
+
+@[simp]
+def ZProperty (r : α → α → Type u)
+  := Σ f : α → α, ∀ {a b}, r a b → ReflTransGen r b (f a) × ReflTransGen r (f a) (f b)
+
+
+def lift_f
+  {a b : α}
+  (ab : ReflTransGen r a b)
+  (z : ZProperty r)
+  : ReflTransGen r (z.fst a) (z.fst b)
+  := match ab with
+    | .refl => .refl
+    | @ReflTransGen.head _ _ _ _u _ au ub =>
+      let ⟨_, fa_fu⟩ := z.snd au
+      let fu_fb := lift_f ub z
+      ReflTransGen.trans fa_fu fu_fb
+
+def aux
+  {a b u : α}
+  (au : r a u)
+  (u_b : ReflTransGen r u b)
+  (z : ZProperty r)
+  : ReflTransGen r b (z.fst b)
+  := match u_b with
+    | .refl => let ⟨u_fa, fa_fu⟩ := z.snd au; ReflTransGen.trans u_fa fa_fu
+    | @ReflTransGen.head _ _ _ _s _ as sb =>
+      aux as sb z
+
+def step
+  {a b c : α}
+  (ab : r a b)
+  (ac : ReflTransGen r a c)
+  (z : ZProperty r)
+  : ReflTransGen r b (z.fst c)
+  := let fa_fc := lift_f ac z
+     let b_fa  := (z.snd ab).fst
+     ReflTransGen.trans b_fa fa_fc
+
+theorem decr {a b c} (ab : r a b) (b_c : ReflTransGen r b c)
+  : b_c.size < (ReflTransGen.head ab b_c).size
+  := match b_c with
+  | .refl => by simp [ReflTransGen.size]
+  | .head _ _ => by
+      simp [ReflTransGen.size]
+
+def z_confluence
+  (z : ZProperty r)
+  {a b c : α}
+  (a_b : ReflTransGen r a b)
+  (a_c : ReflTransGen r a c)
+  : Join (ReflTransGen r) b c
+  := match hab : a_b with
+    | .refl => ⟨c, a_c, .refl⟩
+    | .head au u_b => match hac : a_c with
+      | .refl => by
+        rename_i hb _
+        exact ⟨b, .refl, hb ▸ a_b⟩
+      | .head as s_c =>
+        let u_fc := step au a_c z
+        let ⟨w, b_w, fc_w⟩ := z_confluence z u_b u_fc
+        by
+        rename_i hc
+        exact ⟨w, b_w, ReflTransGen.trans (aux as s_c z) (hc ▸ fc_w)⟩
+termination_by a_b.size
+decreasing_by
+  simp_wf
+  rename_i as' s_c' _ _ _ _
+  exact decr as' s_c'
+
+def z_implies_confluence
+  (z : ZProperty r)
+  : Confluence r
+  := λ _ _ _ ab ac => z_confluence z ab ac
