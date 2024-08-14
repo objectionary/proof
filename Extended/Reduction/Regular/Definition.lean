@@ -1,3 +1,4 @@
+import Extended.ARS
 import Extended.Term
 
 set_option autoImplicit false

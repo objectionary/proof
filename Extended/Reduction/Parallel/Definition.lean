@@ -1,4 +1,5 @@
 import Extended.Term
+import  Extended.Reduction.Regular.Definition
 
 set_option autoImplicit false
 
@@ -6,37 +7,49 @@ set_option autoImplicit false
 
 open Term
 
-structure Ctx where
-  glob : Term
-  scope : Term
-
 mutual
 
 -- | tᵢ ⇛ tᵢ' for all i with ⟦ ... αᵢ ↦ tᵢ ... ⟧
 --   α's are given by `attrs`
-inductive Premise : {attrs : Attrs} → Ctx → Bindings attrs → Bindings attrs → Type where
-  | nil : {ctx : Ctx} → Premise ctx .nil .nil
+inductive FormationPremise : {attrs : Attrs} → Ctx → Bindings attrs → Bindings attrs → Type where
+  | nil : {ctx : Ctx} → FormationPremise ctx .nil .nil
   | consVoid
     : {ctx : Ctx}
-    → (attr : Attr)
+    → { attr : Attr }
     → { attrs : Attrs }
     → { bnds1 : Bindings attrs }
     → { bnds2 : Bindings attrs }
     → { not_in : attr ∉ attrs }
-    → Premise ctx bnds1 bnds2
-    → Premise ctx (.cons attr not_in none bnds1) (.cons attr not_in none bnds2)
+    → FormationPremise ctx bnds1 bnds2
+    → FormationPremise ctx (.cons attr not_in none bnds1) (.cons attr not_in none bnds2)
   | consAttached
-    : {ctx : Ctx}
-    → (attr : Attr)
-    → (t1 : Term)
-    → (t2 : Term)
+    : { ctx : Ctx }
+    → { attr : Attr }
+    → { t1 : Term }
+    → { t2 : Term }
     → PReduce ctx t1 t2
     → { attrs : Attrs }
     → { bnds1 : Bindings attrs }
     → { bnds2 : Bindings attrs }
     → { not_in : attr ∉ attrs }
-    → Premise ctx bnds1 bnds2
-    → Premise ctx (.cons attr not_in (some t1) bnds1) (.cons attr not_in (some t2) bnds2)
+    → FormationPremise ctx bnds1 bnds2
+    → FormationPremise ctx (.cons attr not_in (some t1) bnds1) (.cons attr not_in (some t2) bnds2)
+
+inductive ApplicationPremise : {attrs : Attrs} → Ctx → Record Term attrs → Record Term attrs → Type where
+  | nil : {ctx : Ctx} → ApplicationPremise ctx .nil .nil
+  | cons
+    : { ctx : Ctx }
+    → { attr : Attr }
+    → { t1 : Term }
+    → { t2 : Term }
+    → PReduce ctx t1 t2
+    → { attrs : Attrs }
+    → { apps1 : Record Term attrs }
+    → { apps2 : Record Term attrs }
+    → { not_in : attr ∉ attrs }
+    → ApplicationPremise ctx apps1 apps2
+    → ApplicationPremise ctx (.cons attr not_in t1 apps1) (.cons attr not_in t2 apps2)
+
 
 inductive PReduce : Ctx → Term → Term → Type where
   -- Dispatch
@@ -148,17 +161,15 @@ inductive PReduce : Ctx → Term → Term → Type where
   -- Congruence
   | pr_cong_app
     : { ctx : Ctx }
-    → {t t' u u' : Term}
-    → {attr : Attr}
+    → {t t' : Term}
     → {app_attrs : Attrs}
-    → {not_in : attr ∉ app_attrs}
-    → (app_bnds : Record Term app_attrs)
+    → {apps new_apps : Record Term app_attrs}
+    → ApplicationPremise ctx apps new_apps
     → PReduce ctx t t'
-    → PReduce ctx u u'
     → PReduce
         ctx
-        (app t (Record.cons attr not_in u app_bnds))
-        (app t' (Record.cons attr not_in u' app_bnds))
+        (app t apps)
+        (app t' new_apps)
   | pr_cong_dot
     : { ctx : Ctx }
     → {t t' : Term}
@@ -170,7 +181,7 @@ inductive PReduce : Ctx → Term → Term → Type where
     → {ρ : Option Term}
     → {attrs : Attrs}
     → {bnds new_bnds : Bindings attrs}
-    → Premise {glob := glob, scope := obj ρ bnds} bnds new_bnds
+    → FormationPremise {glob := glob, scope := obj ρ bnds} bnds new_bnds
     → PReduce
         {glob := g, scope := l}
         (obj ρ bnds)
