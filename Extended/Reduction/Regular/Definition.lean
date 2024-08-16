@@ -159,3 +159,10 @@ inductive Reduce : Ctx → Term → Term → Type where
         {glob := g, scope := l}
         (obj ρ bnds)
         (obj ρ (Record.insert bnds attr t'))
+
+
+def ReducesTo (t t' : Term) := Reduce {glob := t, scope := t} t t'
+def ReducesToMany := ReflTransGen ReducesTo
+
+infix:20 " ⇝ " => ReducesTo
+infix:20 " ⇝* " => ReducesToMany

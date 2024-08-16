@@ -198,3 +198,29 @@ inductive PReduce : Ctx → Term → Term → Type where
     → PReduce ctx glob glob
 
 end
+
+def PReducesTo (t t' : Term) := PReduce {glob := t, scope := t} t t'
+def PReducesToMany := ReflTransGen PReducesTo
+
+infix:20 " ⇛ " => PReducesTo
+infix:20 " ⇛* " => PReducesToMany
+
+def get_form_premise
+  {attrs : List Attr}
+  {ρ : Option Term}
+  {bnds bnds' : Bindings attrs}
+  {ctx : Ctx}
+  (preduce : PReduce ctx (obj ρ bnds) (obj ρ bnds'))
+  : FormationPremise {glob := ctx.glob, scope := obj ρ bnds} bnds bnds'
+  := match preduce with
+    | .pr_cong_obj premise => premise
+
+def get_application_premise
+  {attrs : List Attr}
+  {t : Term}
+  {apps apps' : Record Term attrs}
+  {ctx : Ctx}
+  (preduce : PReduce ctx (app t apps) (app t apps'))
+  : ApplicationPremise ctx apps apps'
+  := match preduce with
+    | .pr_cong_app premise _ => premise
