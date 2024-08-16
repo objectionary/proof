@@ -72,3 +72,27 @@ def single
           exact FormationPremise.consAttached prefl (single bnds_tail attr pred contains_tail)
 
 end FormationPremise
+
+namespace ApplicationPremise
+
+def single
+  {ctx : Ctx}
+  {t t' : Term}
+  {attrs : Attrs}
+  (apps : Record Term attrs)
+  (attr : Attr)
+  (preduce : PReduce ctx t t')
+  (contains : Contains apps attr t)
+  : ApplicationPremise ctx apps (Record.insert apps attr t')
+  := match attrs with
+    | [] => match apps with | Record.nil => ApplicationPremise.nil
+    | _ :: attrs_tail => match apps with
+      | Record.cons _ not_in term bnds_tail => match contains with
+        | Contains.head _ _ => by
+          simp [Record.insert]
+          exact ApplicationPremise.cons preduce prefl_app_premise
+        | Contains.tail _ _ neq _ contains_tail => by
+          simp [Record.insert, neq]
+          exact ApplicationPremise.cons prefl (single bnds_tail attr preduce contains_tail)
+
+end ApplicationPremise

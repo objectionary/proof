@@ -88,4 +88,45 @@ def insert
         then Record.cons k not_in a tail
         else Record.cons k not_in a' (insert tail key a)
 
+def consequtive_insert
+  {keys : List String}
+  {record : Record α keys}
+  {key : String}
+  {a b : α}
+  : insert (insert record key a) key b
+    = insert record key b
+  := match record with
+    | nil => by rfl
+    | cons cur_key not_in elem tail => by
+      simp [insert]
+      exact dite
+        (key = cur_key)
+        (λ eq => by
+          simp [eq]
+          exact _
+        )
+        (λ neq => by
+          simp [neq]
+          exact _
+        )
+
 end Record
+
+namespace Contains
+
+def contains_after_insert
+  {keys : List String}
+  {record : Record α keys}
+  {key : String}
+  {a b : α}
+  (contains : Contains record key a)
+  : Contains (Record.insert record key b) key b
+  := match contains with
+    | head _ _ => by
+      simp [Record.insert]
+      exact head _ _
+    | tail cur_key _ neq _ contains_tail => by
+      simp [Record.insert, neq]
+      exact tail _ _ neq _ (contains_after_insert contains_tail)
+
+end Contains
