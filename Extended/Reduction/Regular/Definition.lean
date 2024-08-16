@@ -110,7 +110,7 @@ inductive Reduce : Ctx → Term → Term → Type where
   -- Congruence
   | r_cong_appₗ
     : { ctx : Ctx }
-    → (t t' : Term)
+    → {t t' : Term}
     → {app_attrs : Attrs}
     → (app_bnds : Record Term app_attrs)
     → Reduce ctx t t'

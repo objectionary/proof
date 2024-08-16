@@ -48,10 +48,11 @@ inductive Contains : {keys : List String} → Record α keys → (key : String) 
     : {keys : List String}
     → {a b : α}
     → {as : Record α keys}
-    → (key' key : String)
-    → (not_in : key' ∉ keys)
+    → (cur_key key : String)
+    → key ≠ cur_key
+    → (not_in : cur_key ∉ keys)
     → Contains as key a
-    → Contains (Record.cons key' not_in b as) key a
+    → Contains (Record.cons cur_key not_in b as) key a
 
 theorem contains_to_mem
   {key : String}
@@ -60,7 +61,7 @@ theorem contains_to_mem
   {record : Record α keys}
   : Contains record key a → a ∈ record
   | Contains.head _key _ => Mem.head _ _
-  | Contains.tail _ _ _ tail => Mem.tail _ _ (contains_to_mem tail)
+  | Contains.tail _ _ _ _ tail => Mem.tail _ _ (contains_to_mem tail)
 
 namespace Record
 

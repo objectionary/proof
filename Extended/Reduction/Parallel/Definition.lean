@@ -181,7 +181,7 @@ inductive PReduce : Ctx → Term → Term → Type where
     → {ρ : Option Term}
     → {attrs : Attrs}
     → {bnds new_bnds : Bindings attrs}
-    → FormationPremise {glob := glob, scope := obj ρ bnds} bnds new_bnds
+    → FormationPremise {glob := g, scope := obj ρ bnds} bnds new_bnds
     → PReduce
         {glob := g, scope := l}
         (obj ρ bnds)

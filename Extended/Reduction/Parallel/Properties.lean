@@ -51,16 +51,24 @@ def single
   {ctx : Ctx}
   {t t' : Term}
   {attrs : Attrs}
-  {bnds : Bindings attrs}
-  {attr : Attr}
+  (bnds : Bindings attrs)
+  (attr : Attr)
   (pred : PReduce ctx t t')
   (contains : Contains bnds attr (some t))
   : FormationPremise ctx bnds (Record.insert bnds attr t')
-  := match contains with
-    | .head _ _ => by
-        simp [Record.insert]
-        exact FormationPremise.consAttached pred prefl_form_premise
-    -- TODO
-    | .tail _ _ _ _ => sorry
+  := match attrs with
+    | [] => match bnds with | Record.nil => FormationPremise.nil
+    | _ :: attrs_tail => match bnds with
+      | Record.cons _ not_in none bnds_tail => match contains with
+        | Contains.tail _ _ neq _ contains_tail => by
+          simp [Record.insert, neq]
+          exact FormationPremise.consVoid (single bnds_tail attr pred contains_tail)
+      | Record.cons _ not_in (some term) bnds_tail => match contains with
+        | Contains.head _ _ => by
+          simp [Record.insert]
+          exact FormationPremise.consAttached pred prefl_form_premise
+        | Contains.tail _ _ neq _ contains_tail => by
+          simp [Record.insert, neq]
+          exact FormationPremise.consAttached prefl (single bnds_tail attr pred contains_tail)
 
 end FormationPremise

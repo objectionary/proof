@@ -31,11 +31,12 @@ def reg_to_par
   | .r_dd => .pr_dd
   | .r_dc => .pr_dc
   -- Congruence
-  | .r_cong_appₗ t t' app_bnds t_t' => .pr_cong_app prefl_app_premise (reg_to_par t_t')
+  | .r_cong_appₗ app_bnds t_t' => .pr_cong_app prefl_app_premise (reg_to_par t_t')
   | .r_cong_appᵣ app_bnds u_u' =>
       .pr_cong_app
         (ApplicationPremise.cons (reg_to_par u_u') prefl_app_premise)
         prefl
   | .r_cong_dot t_t' => .pr_cong_dot (reg_to_par t_t')
   -- TODO
-  | .r_cong_obj contains t_t' => .pr_cong_obj (FormationPremise.single (reg_to_par _) contains)
+  | .r_cong_obj contains t_t' =>
+      .pr_cong_obj (FormationPremise.single _ _ (reg_to_par t_t') contains)
