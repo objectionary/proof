@@ -88,7 +88,7 @@ def insert
         then Record.cons k not_in a tail
         else Record.cons k not_in a' (insert tail key a)
 
-def consequtive_insert
+theorem consequtive_insert
   {keys : List String}
   {record : Record α keys}
   {key : String}
@@ -97,22 +97,15 @@ def consequtive_insert
     = insert record key b
   := match record with
     | nil => by rfl
-    | cons cur_key not_in elem tail => by
+    | cons cur_key not_in elem _ => by
       simp [insert]
       exact dite
         (key = cur_key)
-        (λ eq => by
-          simp [eq]
-          exact _
-        )
+        (λ eq => by simp [insert, eq])
         (λ neq => by
-          simp [neq]
-          exact _
+          simp [insert, neq]
+          exact consequtive_insert
         )
-
-end Record
-
-namespace Contains
 
 def contains_after_insert
   {keys : List String}
@@ -120,13 +113,36 @@ def contains_after_insert
   {key : String}
   {a b : α}
   (contains : Contains record key a)
-  : Contains (Record.insert record key b) key b
+  : Contains (insert record key b) key b
   := match contains with
-    | head _ _ => by
-      simp [Record.insert]
-      exact head _ _
-    | tail cur_key _ neq _ contains_tail => by
-      simp [Record.insert, neq]
-      exact tail _ _ neq _ (contains_after_insert contains_tail)
+    | .head _ _ => by
+      simp [insert]
+      exact .head _ _
+    | .tail cur_key _ neq _ contains_tail => by
+      simp [insert, neq]
+      exact .tail _ _ neq _ (contains_after_insert contains_tail)
 
-end Contains
+theorem insert_contains_step
+  {keys : List String}
+  {record : Record α keys}
+  {key cur_key : String}
+  {neq : key ≠ cur_key}
+  {a b : α}
+  {not_in : cur_key ∉ keys}
+  : insert (.cons cur_key not_in a record) key b
+      = .cons cur_key not_in a (insert record key b)
+  := by simp [insert, neq]
+
+theorem insert_contains
+  {keys : List String}
+  {record : Record α keys}
+  {key : String}
+  {a : α}
+  : Contains record key a
+  → Record.insert record key a = record
+    | Contains.head _ _ => by simp [insert]
+    | Contains.tail _ _ neq _ contains => by
+        simp [insert, neq]
+        exact insert_contains contains
+
+end Record

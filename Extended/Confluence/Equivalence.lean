@@ -40,7 +40,8 @@ def reg_to_par
         -- prefl
   | .r_cong_dot t_t' => .pr_cong_dot (reg_to_par t_t')
   | .r_cong_obj contains t_t' =>
-      .pr_cong_obj (FormationPremise.single _ _ (reg_to_par t_t') contains)
+      .pr_cong_obj prefl_ρ_premise (FormationPremise.single _ _ (reg_to_par t_t') contains)
+  | .r_cong_ρ t_t' => _
 
 inductive R : Ctx → Term → Term → Type where
   | refl : {ctx : Ctx} → {t : Term} → R ctx t t
@@ -107,6 +108,32 @@ def congr_appᵣ_R
             exact temp
           )
 
+def congr_obj_R
+  {ctx : Ctx}
+  {attrs : Attrs}
+  {bnds : Bindings attrs}
+  {ρ : Option Term}
+  {attr : Attr}
+  {t t' : Term}
+  (r : R ctx t t')
+  (contains : Contains bnds attr t)
+  : R ctx (obj ρ bnds) (obj ρ (Record.insert bnds attr (some t')))
+  := match r with
+    | .refl => by
+      simp [Record.insert_contains contains]
+      exact .refl
+    | .head reduce tail => by
+      rename_i s
+      have ind_hypothesis
+        : R ctx
+          (obj ρ (Record.insert bnds attr (some s)))
+          (obj ρ (Record.insert (Record.insert bnds attr (some s)) attr (some t')))
+        := congr_obj_R tail (Record.contains_after_insert contains)
+      exact .head
+        (.r_cong_obj contains _)
+        (congr_obj_R tail contains)
+      -- exact .head (.r_cong_obj contains _) (congr_obj_R tail contains)
+
 def par_to_reg
   : {ctx : Ctx}
   → {t t' : Term}
@@ -130,11 +157,10 @@ def par_to_reg
     | .pr_copy preduce_t preduce_u attr_void =>
         let reduces_t := par_to_reg preduce_t
         let reduces_u := par_to_reg preduce_u
-        -- _
-        trans_R
-          (congr_appₗ_R reduces_t)
-          (trans_R (congr_appᵣ_R reduces_u _) (.head (.r_copy attr_void) .refl))
-          -- (.head .r_empty .refl)
+        _
+        -- trans_R
+          -- (congr_appₗ_R reduces_t)
+          -- (trans_R (congr_appᵣ_R reduces_u _) (.head (.r_copy attr_void) .refl))
     | .pr_over preduce attr_attached =>
         let reduces := par_to_reg preduce
         trans_R (congr_appₗ_R reduces) (.head (.r_over attr_attached) .refl)
@@ -153,7 +179,7 @@ def par_to_reg
     | .pr_cong_dot preduce =>
         let reduces := par_to_reg preduce
         congr_dot_R reduces
-    | .pr_cong_obj premise => _
+    | .pr_cong_obj ρ_premise premise => _
     | .pr_termination_refl => .refl
     | .pr_ξ_refl => .refl
     | .pr_Φ_refl => .refl

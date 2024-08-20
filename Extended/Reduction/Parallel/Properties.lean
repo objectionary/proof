@@ -1,4 +1,3 @@
--- import Extended.Term
 import Extended.Reduction.Parallel.Definition
 
 set_option autoImplicit false
@@ -8,6 +7,14 @@ open Term
 
 mutual
 
+def prefl_ρ_premise
+  {ctx : Ctx}
+  {ρ : Option Term}
+  : RhoPremise ctx ρ ρ
+  := match ρ with
+    | none => RhoPremise.none
+    | some _ => RhoPremise.some prefl
+
 def prefl_form_premise
   {ctx : Ctx}
   {attrs : Attrs}
@@ -16,9 +23,9 @@ def prefl_form_premise
   := match attrs with
     | [] => match bnds with
       | Record.nil => FormationPremise.nil
-    | a :: as => match bnds with
-      | Record.cons _ not_in none tail => FormationPremise.consVoid prefl_form_premise
-      | Record.cons _ not_in (some t) tail => FormationPremise.consAttached prefl prefl_form_premise
+    | _ :: _ => match bnds with
+      | Record.cons _ _ none _ => FormationPremise.consVoid prefl_form_premise
+      | Record.cons _ _ (some _) _ => FormationPremise.consAttached prefl prefl_form_premise
 
 def prefl_app_premise
   {ctx : Ctx}
@@ -28,17 +35,17 @@ def prefl_app_premise
   := match attrs with
     | [] => match apps with
       | Record.nil => ApplicationPremise.nil
-    | a :: as => match apps with
-      | Record.cons _ not_in t tail => ApplicationPremise.cons prefl prefl_app_premise
+    | _ :: _ => match apps with
+      | Record.cons _ _ _ _ => ApplicationPremise.cons prefl prefl_app_premise
 
 def prefl
   {ctx : Ctx}
   {t : Term}
   : PReduce ctx t t
   := match t with
-    | dot t a => pr_cong_dot prefl
-    | app t app_bnds => pr_cong_app prefl_app_premise prefl
-    | obj ρ bnds => pr_cong_obj prefl_form_premise
+    | dot _ _ => pr_cong_dot prefl
+    | app _ _ => pr_cong_app prefl_app_premise prefl
+    | obj _ _ => pr_cong_obj prefl_ρ_premise prefl_form_premise
     | glob => pr_Φ_refl
     | this => pr_ξ_refl
     | termination => pr_termination_refl

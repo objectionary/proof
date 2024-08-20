@@ -35,6 +35,14 @@ inductive FormationPremise : {attrs : Attrs} → Ctx → Bindings attrs → Bind
     → FormationPremise ctx bnds1 bnds2
     → FormationPremise ctx (.cons attr not_in (some t1) bnds1) (.cons attr not_in (some t2) bnds2)
 
+inductive RhoPremise : Ctx → Option Term → Option Term → Type where
+  | none : {ctx : Ctx} → RhoPremise ctx none none
+  | some
+    : {ctx : Ctx}
+    → {t t' : Term}
+    → PReduce ctx t t'
+    → RhoPremise ctx (some t) (some t')
+
 inductive ApplicationPremise : {attrs : Attrs} → Ctx → Record Term attrs → Record Term attrs → Type where
   | nil : {ctx : Ctx} → ApplicationPremise ctx .nil .nil
   | cons
@@ -123,7 +131,7 @@ inductive PReduce : Ctx → Term → Term → Type where
     → lookup ρ bnds attr = LookupRes.attached t_inner
     → PReduce
         ctx
-        (app (obj ρ bnds) (Record.cons attr not_in u app_record_tail))
+        (app t (Record.cons attr not_in u app_record_tail))
         termination
   | pr_miss
     : { ρ : Option Term }
@@ -177,10 +185,11 @@ inductive PReduce : Ctx → Term → Term → Type where
     → PReduce ctx t t'
     → PReduce ctx (dot t attr) (dot t' attr)
   | pr_cong_obj
-    : { g l : Term}
-    → {ρ : Option Term}
+    : {g l : Term}
+    → {ρ ρ' : Option Term}
     → {attrs : Attrs}
     → {bnds new_bnds : Bindings attrs}
+    → RhoPremise {glob := g, scope := obj ρ bnds} ρ ρ'
     → FormationPremise {glob := g, scope := obj ρ bnds} bnds new_bnds
     → PReduce
         {glob := g, scope := l}
@@ -213,7 +222,17 @@ def get_form_premise
   (preduce : PReduce ctx (obj ρ bnds) (obj ρ bnds'))
   : FormationPremise {glob := ctx.glob, scope := obj ρ bnds} bnds bnds'
   := match preduce with
-    | .pr_cong_obj premise => premise
+    | .pr_cong_obj _ premise => premise
+
+def get_ρ_premise
+  {attrs : List Attr}
+  {ρ : Option Term}
+  {bnds bnds' : Bindings attrs}
+  {ctx : Ctx}
+  (preduce : PReduce ctx (obj ρ bnds) (obj ρ bnds'))
+  : Σ ρ' : Option Term, RhoPremise {glob := ctx.glob, scope := obj ρ bnds} ρ ρ'
+  := match preduce with
+    | .pr_cong_obj premise _ => ⟨_, premise⟩
 
 def get_application_premise
   {attrs : List Attr}

@@ -142,13 +142,13 @@ inductive Reduce : Ctx → Term → Term → Type where
   --       (app t (Record.cons attr not_in u app_bnds))
   --       (app t (Record.cons attr not_in u' app_bnds))
   | r_cong_dot
-    : { ctx : Ctx }
+    : {ctx : Ctx}
     → {t t' : Term}
     → {attr : Attr}
     → Reduce ctx t t'
     → Reduce ctx (dot t attr) (dot t' attr)
   | r_cong_obj
-    : { g l t t' : Term}
+    : {g l t t' : Term}
     → {ρ : Option Term}
     → {attr : Attr}
     → {attrs : Attrs}
@@ -159,6 +159,15 @@ inductive Reduce : Ctx → Term → Term → Type where
         {glob := g, scope := l}
         (obj ρ bnds)
         (obj ρ (Record.insert bnds attr t'))
+  | r_cong_ρ
+    : {g l t t' : Term}
+    → {attrs : Attrs}
+    → {bnds : Bindings attrs}
+    → Reduce {glob := g, scope := obj (some t) bnds} t t'
+    → Reduce
+        {glob := g, scope := l}
+        (obj (some t) bnds)
+        (obj (some t') bnds)
 
 
 def ReducesTo (t t' : Term) := Reduce {glob := t, scope := t} t t'
