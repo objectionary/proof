@@ -14,7 +14,7 @@ mutual
 inductive FormationPremise : {attrs : Attrs} → Ctx → Bindings attrs → Bindings attrs → Type where
   | nil : {ctx : Ctx} → FormationPremise ctx .nil .nil
   | consVoid
-    : {ctx : Ctx}
+    : { ctx : Ctx }
     → { attr : Attr }
     → { attrs : Attrs }
     → { bnds1 : Bindings attrs }
@@ -103,21 +103,21 @@ inductive PReduce : Ctx → Term → Term → Type where
     → { t : Term }
     → PReduce ctx t (obj ρ bnds)
     → PReduce ctx (app t Record.nil) (obj ρ bnds)
-  | pr_copy
-    : { ρ : Option Term }
-    → { attrs app_attrs : Attrs }
-    → { bnds : Bindings attrs }
-    → { app_record_tail : Record Term app_attrs }
-    → { attr : Attr }
-    → { not_in : attr ∉ app_attrs }
-    → { g s t u u' : Term }
-    → PReduce {glob := g, scope := s} t (obj ρ bnds)
-    → PReduce {glob := g, scope := s} u u'
-    → lookup ρ bnds attr = LookupRes.void
-    → PReduce
-        { glob := g, scope := s }
-        (app t (Record.cons attr not_in u app_record_tail))
-        (app (insert ρ bnds attr (substitute u' s)) app_record_tail)
+  -- | pr_copy
+  --   : { ρ : Option Term }
+  --   → { attrs app_attrs : Attrs }
+  --   → { bnds : Bindings attrs }
+  --   → { app_record_tail : Record Term app_attrs }
+  --   → { attr : Attr }
+  --   → { not_in : attr ∉ app_attrs }
+  --   → { g s t u u' : Term }
+  --   → PReduce {glob := g, scope := s} t (obj ρ bnds)
+  --   → PReduce {glob := g, scope := s} u u'
+  --   → lookup ρ bnds attr = LookupRes.void
+  --   → PReduce
+  --       { glob := g, scope := s }
+  --       (app t (Record.cons attr not_in u app_record_tail))
+  --       (app (insert ρ bnds attr (substitute u' s)) app_record_tail)
   | pr_over
     : { ρ : Option Term }
     → { attrs app_attrs : Attrs }
@@ -154,9 +154,6 @@ inductive PReduce : Ctx → Term → Term → Type where
   | pr_Φ
     : { g s : Term}
     → PReduce { glob := g, scope := s} glob g
-  | pr_ξ
-    : { g s : Term}
-    → PReduce { glob := g, scope := s} glob s
   | pr_dd
     : { ctx : Ctx }
     → { attr : Attr }
@@ -185,16 +182,16 @@ inductive PReduce : Ctx → Term → Term → Type where
     → PReduce ctx t t'
     → PReduce ctx (dot t attr) (dot t' attr)
   | pr_cong_obj
-    : {g l : Term}
+    : {ctx : Ctx}
     → {ρ ρ' : Option Term}
     → {attrs : Attrs}
     → {bnds new_bnds : Bindings attrs}
-    → RhoPremise {glob := g, scope := obj ρ bnds} ρ ρ'
-    → FormationPremise {glob := g, scope := obj ρ bnds} bnds new_bnds
+    → RhoPremise ctx ρ ρ'
+    → FormationPremise ctx bnds new_bnds
     → PReduce
-        {glob := g, scope := l}
+        ctx
         (obj ρ bnds)
-        (obj ρ new_bnds)
+        (obj ρ' new_bnds)
   -- Reflexive
   | pr_termination_refl
     : { ctx : Ctx }
@@ -220,7 +217,7 @@ def get_form_premise
   {bnds bnds' : Bindings attrs}
   {ctx : Ctx}
   (preduce : PReduce ctx (obj ρ bnds) (obj ρ bnds'))
-  : FormationPremise {glob := ctx.glob, scope := obj ρ bnds} bnds bnds'
+  : FormationPremise ctx bnds bnds'
   := match preduce with
     | .pr_cong_obj _ premise => premise
 
@@ -230,7 +227,7 @@ def get_ρ_premise
   {bnds bnds' : Bindings attrs}
   {ctx : Ctx}
   (preduce : PReduce ctx (obj ρ bnds) (obj ρ bnds'))
-  : Σ ρ' : Option Term, RhoPremise {glob := ctx.glob, scope := obj ρ bnds} ρ ρ'
+  : Σ ρ' : Option Term, RhoPremise ctx ρ ρ'
   := match preduce with
     | .pr_cong_obj premise _ => ⟨_, premise⟩
 

@@ -63,6 +63,15 @@ theorem contains_to_mem
   | Contains.head _key _ => Mem.head _ _
   | Contains.tail _ _ _ _ tail => Mem.tail _ _ (contains_to_mem tail)
 
+theorem contains_to_isin
+  {key : String}
+  {a : α}
+  {keys : List String}
+  {record : Record α keys}
+  : Contains record key a → key ∈ keys
+  | Contains.head _key _ => by simp
+  | Contains.tail _ _ _ _ tail => List.Mem.tail _ (contains_to_isin tail)
+
 namespace Record
 
 def lookup
