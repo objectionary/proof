@@ -160,7 +160,7 @@ def cons_obj_R
     (obj ρ' (Record.cons attr not_in t new_bnds))
   := match r with
   | .refl => .refl
-  | .head reduce r_tail => match reduce with--.head _ (cons_obj_R attr not_in t _)
+  | .head reduce r_tail => match reduce with
     | .r_cong_obj contains red =>
         let not_eq := notEqByListMem (contains_to_isin contains) not_in
         .head
@@ -225,8 +225,12 @@ def par_to_reg
           (premise : ApplicationPremise ctx apps new_apps)
           : R ctx (app t apps) (app t new_apps)
           := match attrs with
-            | [] => match apps, new_apps with | Record.nil, Record.nil => R.refl
-            | a :: as => sorry
+            | [] => match apps, new_apps with | .nil, .nil => .refl
+            | a :: as => match apps, new_apps with
+              | .cons _ _ _ _, .cons _ _ _ _ => match premise with
+                | .cons preduce premise_tail =>
+                    -- let r := fold_app_premise premise_tail
+                    sorry
         trans_R
           (congr_appₗ_R (par_to_reg preduce))
           (fold_app_premise premise)
@@ -242,7 +246,7 @@ def par_to_reg
           (premise : FormationPremise ctx bnds new_bnds)
           : R ctx (obj ρ bnds) (obj ρ new_bnds)
           := match attrs with
-          | [] => match bnds, new_bnds with | Record.nil, Record.nil => R.refl
+          | [] => match bnds, new_bnds with | .nil, .nil => R.refl
           | a :: as => match bnds, new_bnds with
             | .cons _ not_in _ _, .cons _ _ _ _ => match premise with
               | .consVoid premise_tail => cons_obj_R _ _ _ (fold_premise premise_tail)

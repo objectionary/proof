@@ -49,6 +49,7 @@ def substituteRecord
 
 end
 
+
 inductive LookupRes where
   | absent   : LookupRes
   | void     : LookupRes
