@@ -113,7 +113,6 @@ def weak_equiv_keeps_confluence
     let ⟨w, r1bw, r1cw⟩ := conf a b c r1ab r1ac
     ⟨w, r1_to_r2 r1bw, r1_to_r2 r1cw⟩
 
-
 @[simp]
 def ZProperty (r : α → α → Type u)
   := Σ f : α → α, ∀ {a b}, r a b → ReflTransGen r b (f a) × ReflTransGen r (f a) (f b)
@@ -187,3 +186,70 @@ def z_implies_confluence
   (z : ZProperty r)
   : Confluence r
   := λ _ _ _ ab ac => z_confluence z ab ac
+
+@[simp]
+def Commutativity (r1 r2 : α → α → Type u)
+  := ∀ a b c, ReflTransGen r1 a b
+     → ReflTransGen r2 a c
+     → Σ w : α, Prod (ReflTransGen r2 b w) (ReflTransGen r1 c w)
+
+@[simp]
+def unionR (r1 r2 : α → α → Type u)
+  : α → α → Type u
+  := λ a b => r1 a b ⊕ r2 a b
+
+inductive AlternatingReductions (r1 r2 : α → α → Type u) : α → α → Type u where
+  | nil {a : α} : AlternatingReductions r1 r2 a a
+  | mk {a b c d : α}
+    : a ≠ d
+    → ReflTransGen r1 a b
+    → ReflTransGen r2 b c
+    → AlternatingReductions r1 r2 c d
+    → AlternatingReductions r1 r2 a d
+
+@[simp]
+def alternating_reductions_in_union
+  (r1 r2 : α → α → Type u) {a b : α}
+  : ReflTransGen (unionR r1 r2) a b → AlternatingReductions r1 r2 a b
+  := λ h => match h with
+  | ReflTransGen.refl => .nil
+  | ReflTransGen.head ax xb => sorry
+
+def commutative_union_lemma :
+  (Commutativity r1 r2) →
+  (Confluence r1) →
+  (Confluence r2) →
+  (Confluence (unionR r1 r2))
+  := λ comm conf1 conf2 => by
+  simp
+  intros a b c uab uac
+  match uab with
+  | ReflTransGen.refl =>
+    exact ⟨ c, uac, ReflTransGen.refl ⟩
+  | ReflTransGen.head uax uxb =>
+    -- let rec step
+    -- { a b c : α }
+    -- (hab : unionR r1 r2 a b)
+    -- (hac : ReflTransGen (unionR r1 r2) a c)
+    -- : Σ d : α, Prod
+    --   (ReflTransGen (unionR r1 r2) b d)
+    --   (ReflTransGen (unionR r1 r2) c d)
+    -- := match hac with
+    -- | ReflTransGen.refl =>
+    --   ⟨ b, ReflTransGen.refl
+    --   , ReflTransGen.head
+    --     (by
+    --       cases hab
+    --       . rename_i hab
+    --         exact .inl hab
+    --       . rename_i hab
+    --         exact .inr hab
+    --     )
+    --     ReflTransGen.refl ⟩
+    -- | ReflTransGen.head hax hxc => by
+    --   rename_i x
+    --   rw [unionR] at hax
+    --   cases hax
+    --   . sorry
+    --   . sorry
+      sorry
