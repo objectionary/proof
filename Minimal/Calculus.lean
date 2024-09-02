@@ -44,7 +44,9 @@ end
 open OptionalAttr
 open Term
 
-/-! ### Defition of increment, substitution, its properties, and auxiliary definitions that involve terms -/
+/-! ### Defition of increment, substitution, its properties,
+  and auxiliary definitions that involve terms
+-/
 
 mutual
   /-- Locator increment [KS22, Definition 2.5] -/
@@ -1695,7 +1697,13 @@ def term_to_development
           rename_i l
           split
           . rename_i lookup_void
-            exact PReduce.papp_c a l (term_to_development t) (term_to_development u) cd_is_obj lookup_void
+            exact PReduce.papp_c
+              a
+              l
+              (term_to_development t)
+              (term_to_development u)
+              cd_is_obj
+              lookup_void
           . rename_i lookup_not_void
             have goal := PReduce.pcongAPP
               t
