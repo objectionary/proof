@@ -42,6 +42,7 @@ jobs:
       - name: '🔨 Generate documentation'
         run: |
           lake -R -Kenv=dev build PhiCalculus:docs
+          lake -R -Kenv=dev build Minimal.Calculus:docs
 
       - name: '🚀 Publish Documentation'
         if: ${{ github.ref_name == 'master' && github.event_name != 'pull_request' }}
