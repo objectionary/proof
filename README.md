@@ -1,4 +1,4 @@
-# Confluence for 𝜑-calculus
+# Proof of Confluence for 𝜑-calculus
 
 Formalization of 𝜑-calculus variants and corresponding confluence results.
 
