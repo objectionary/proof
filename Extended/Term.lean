@@ -70,6 +70,36 @@ def lookup
       | some none => LookupRes.void
       | some (some t) => LookupRes.attached t
 
+theorem LookupRes.absent_means_notin
+  {attrs : Attrs}
+  {bnds : Bindings attrs}
+  {attr : Attr}
+  {ρ : Option Term}
+  (neq : attr ≠ "ρ")
+  (attr_absent : lookup ρ bnds attr = .absent)
+  : attr ∉ attrs
+  := by
+    simp [lookup, neq] at attr_absent
+    admit
+
+-- def LookupRes.lookup_absent_preserve
+--   {attrs : Attrs}
+--   {bnds1 bnds2 : Bindings attrs}
+--   {attr : Attr}
+--   {ρ1 ρ2 : Option Term}
+--   (attr_absent : lookup ρ1 bnds1 attr = .absent)
+--   : lookup ρ2 bnds2 attr = .absent
+--   := dite (attr = "ρ")
+--     (λ eq => by
+--       simp [lookup, eq] at attr_absent
+--       split at attr_absent
+--       . contradiction
+--       . contradiction
+--     )
+--     (λ neq => by
+--       simp [lookup, neq]
+--     )
+
 def insert
   {attrs : Attrs}
   (ρ : Option Term)

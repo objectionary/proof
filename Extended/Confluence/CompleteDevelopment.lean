@@ -186,24 +186,37 @@ def half_diamond
   (preduce : PReduce ctx t t')
   : PReduce ctx t' (complete_development ctx t)
   := match preduce with
-  | .pr_dot pred attr_attached => _ --by
-    -- simp [complete_development]
-    -- exact _
-  | .pr_φ pred attr_absent φ_in => _
-  | .pr_stop pred attr_absent φ_absent lam_absent => _
-  | .pr_empty pred => by
-    have ⟨new_ρ, new_bnds, cd_is_obj⟩ := pred_to_obj_means_cd_obj pred
-    simp [cd_is_obj]
-    have h := half_diamond pred
-    simp [cd_is_obj] at h
-    exact h
-  | .pr_over pred attr_attached => _
-  | .pr_miss pred attr_absent φ_absent lam_absent => _
+  | .pr_dot pred attr_attached => sorry
+  | @PReduce.pr_φ ρ _ bnds ctx attr t pred attr_absent φ_in => by
+    generalize h : complete_development ctx t = foo
+    have pred' := half_diamond pred
+    simp [h] at pred'
+    match pred' with
+    | .pr_cong_obj ρ_premise premise =>
+      simp [h, φ_in]
+      exact sorry
+  | .pr_stop pred attr_absent φ_absent lam_absent => sorry
+  | @PReduce.pr_empty _ _ _ ctx t pred => by
+    generalize h : complete_development ctx t = foo
+    have pred' := half_diamond pred
+    simp [h] at pred'
+    match pred' with
+    | .pr_cong_obj ρ_premise premise =>
+      simp [h]
+      exact .pr_cong_obj ρ_premise premise
+  -- | .pr_empty pred => by
+  --   have ⟨new_ρ, new_bnds, cd_is_obj⟩ := pred_to_obj_means_cd_obj pred
+  --   simp [cd_is_obj]
+  --   have h := half_diamond pred
+  --   simp [cd_is_obj] at h
+  --   exact h
+  | .pr_over pred attr_attached => sorry
+  | .pr_miss pred attr_absent φ_absent lam_absent => sorry
   | .pr_Φ => prefl
   | .pr_dd => prefl
   | .pr_dc => prefl
-  | .pr_cong_app premise pred => _
-  | .pr_cong_dot pred => _
+  | .pr_cong_app premise pred => sorry
+  | .pr_cong_dot pred => sorry
   | .pr_cong_obj ρ_premise premise => match ρ_premise with
     | .none => .pr_cong_obj .none (new_form_premise premise)
     | .some preduce =>
