@@ -42,6 +42,7 @@ jobs:
       - name: '🔨 Generate documentation'
         run: |
           lake -R -Kenv=dev build PhiCalculus:docs
+          lake update doc-gen4
           lake -R -Kenv=dev build Minimal.Calculus:docs
 
       - name: '🚀 Publish Documentation'
