@@ -159,6 +159,7 @@ theorem decr {a b c} (ab : r a b) (b_c : ReflTransGen r b c)
   | .head _ _ => by
       simp [ReflTransGen.size]
 
+set_option linter.unusedVariables false
 def z_confluence
   (z : ZProperty r)
   {a b c : α}
@@ -187,3 +188,4 @@ def z_implies_confluence
   (z : ZProperty r)
   : Confluence r
   := λ _ _ _ ab ac => z_confluence z ab ac
+set_option linter.unusedVariables true

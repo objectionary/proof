@@ -79,7 +79,7 @@ mutual
 /-- Locator substitution [KS22, Fig. 1] -/
   @[simp]
   def substitute : Nat × Term → Term → Term
-  := λ (k, v) term => match term with
+  := fun (k, v) term => match term with
     | loc n =>
       if (n < k) then (loc n)
       else if (n == k) then v
@@ -91,7 +91,7 @@ mutual
   @[simp]
   def substituteLst {lst : List Attr}
   : Nat × Term → Bindings lst → Bindings lst
-  := λ (k, v) o => match o with
+  := fun (k, v) o => match o with
   | Bindings.nil => Bindings.nil
   | Bindings.cons a not_in void tail =>
     Bindings.cons a not_in void (substituteLst (k, v) tail)
@@ -106,7 +106,8 @@ instance : Min (Option Nat) where
   | none, some k => some k
   | none, none => none
 
-/-- Minimal free locator in a term, if free locators exist, assuming free locators start at `zeroth_level`. -/
+/-- Minimal free locator in a term, if free locators exist,
+assuming free locators start at `zeroth_level`. -/
 def min_free_loc
   (zeroth_level : Nat)
   : Term → Option Nat
@@ -136,12 +137,12 @@ theorem le_min_option
     simp [le_nat_option_nat] at *
     simp [Nat.min_def] at le_min
     split at le_min
-    . constructor
-      . assumption
-      . apply Nat.le_trans le_min (by assumption)
-    . constructor
-      . exact Nat.le_of_lt (Nat.lt_of_le_of_lt le_min (Nat.gt_of_not_le (by assumption)))
-      . assumption
+    · constructor
+      · assumption
+      · apply Nat.le_trans le_min (by assumption)
+    · constructor
+      · exact Nat.le_of_lt (Nat.lt_of_le_of_lt le_min (Nat.gt_of_not_le (by assumption)))
+      · assumption
   | some n, none => simp [le_nat_option_nat] at * ; assumption
   | none, some n => simp [le_nat_option_nat] at * ; assumption
   | none, none   => simp [le_nat_option_nat] at *
@@ -156,8 +157,8 @@ theorem le_min_option_reverse
     simp [le_nat_option_nat] at *
     simp [Nat.min_def]
     split
-    . exact le_and.left
-    . exact le_and.right
+    · exact le_and.left
+    · exact le_and.right
   | some n, none => simp [le_nat_option_nat] at * ; assumption
   | none, some n => simp [le_nat_option_nat] at * ; assumption
   | none, none   => simp [le_nat_option_nat] at *
@@ -172,15 +173,15 @@ theorem min_free_loc_inc
   | loc k =>
     simp [incLocatorsFrom]
     split
-    . rename_i lt_kj
+    · rename_i lt_kj
       simp [min_free_loc, lt_kj]
       simp [le_nat_option_nat]
-    . rename_i nlt_kj
+    · rename_i nlt_kj
       simp [min_free_loc, nlt_kj, le_nat_option_nat] at free_locs_v
       simp [min_free_loc]
       have le_jk : j ≤ k := Nat.ge_of_not_lt nlt_kj
       have le_jk1 : j ≤ k+1 := Nat.le_succ_of_le le_jk
-      have nlt_k1j : ¬ k + 1 < j := λ x => Nat.lt_irrefl j (Nat.lt_of_le_of_lt le_jk1 x)
+      have nlt_k1j : ¬ k + 1 < j := fun x => Nat.lt_irrefl j (Nat.lt_of_le_of_lt le_jk1 x)
       simp [le_nat_option_nat, nlt_k1j]
       have zzz : (i + j) + 1 ≤ k + 1 := Nat.succ_le_succ (Nat.add_le_of_le_sub le_jk free_locs_v)
       rw [Nat.add_right_comm] at zzz
@@ -195,8 +196,8 @@ theorem min_free_loc_inc
     simp [min_free_loc] at free_locs_v
     have free_locs_v := le_min_option free_locs_v
     constructor <;> simp [min_free_loc] at *
-    . exact min_free_loc_inc free_locs_v.left
-    . exact min_free_loc_inc free_locs_v.right
+    · exact min_free_loc_inc free_locs_v.left
+    · exact min_free_loc_inc free_locs_v.right
   | obj o =>
     simp [incLocatorsFrom]
     let rec traverse_bindings
@@ -214,17 +215,18 @@ theorem min_free_loc_inc
         simp [min_free_loc]
         apply le_min_option_reverse
         constructor
-        . simp [min_free_loc] at free_locs
+        · simp [min_free_loc] at free_locs
           have free_locs := (le_min_option free_locs).left
           exact min_free_loc_inc free_locs
-        . simp [min_free_loc] at free_locs
+        · simp [min_free_loc] at free_locs
           have free_locs := le_min_option free_locs
           exact traverse_bindings tail free_locs.right
     exact traverse_bindings o free_locs_v
 
 
 mutual
-/-- `substitute` and `incLocatorsFrom` cancel effect of each other, if they act only on free locators. -/
+/-- `substitute` and `incLocatorsFrom` cancel effect of each other,
+if they act only on free locators. -/
 theorem subst_inc_cancel
   (v u : Term)
   (j k i zeroth_level : Nat)
@@ -238,20 +240,20 @@ theorem subst_inc_cancel
   | loc n => by
     simp [min_free_loc] at v_loc
     split at v_loc
-    . rename_i n_is_not_free
+    · rename_i n_is_not_free
       simp [Nat.lt_of_lt_of_le n_is_not_free le_0k]
       simp [substitute, Nat.lt_of_lt_of_le n_is_not_free le_0j]
-    . rename_i n_is_free
+    · rename_i n_is_free
       simp [le_nat_option_nat] at v_loc
       have n_is_free : zeroth_level ≤ n := Nat.ge_of_not_lt n_is_free
       have le_in: i + zeroth_level ≤ n :=
         (Nat.sub_add_cancel n_is_free) ▸ Nat.add_le_add_right v_loc zeroth_level
       have le_kn : k ≤ n := Nat.le_trans le_ki le_in
-      have nlt_nk: ¬ n < k := λ x => Nat.lt_irrefl n (Nat.lt_of_lt_of_le x le_kn)
+      have nlt_nk: ¬ n < k := fun x => Nat.lt_irrefl n (Nat.lt_of_lt_of_le x le_kn)
       simp [nlt_nk]
       have lt_jn1 : j < n + 1 := Nat.lt_succ_of_le (Nat.le_trans le_ji le_in)
-      have nlt_n1j : ¬ n + 1 < j := λ x => Nat.lt_irrefl j (Nat.lt_trans lt_jn1 x)
-      have neq_n1j : ¬ n + 1 = j := λ x => Nat.lt_irrefl j (x ▸ lt_jn1)
+      have nlt_n1j : ¬ n + 1 < j := fun x => Nat.lt_irrefl j (Nat.lt_trans lt_jn1 x)
+      have neq_n1j : ¬ n + 1 = j := fun x => Nat.lt_irrefl j (x ▸ lt_jn1)
       simp [nlt_n1j, neq_n1j, Nat.add_sub_cancel]
   | dot t _ => by
     simp [substitute]
@@ -262,8 +264,8 @@ theorem subst_inc_cancel
     have v_loc := le_min_option v_loc
     simp
     constructor <;> apply subst_inc_cancel _ _ _ _ _ _ le_ji le_ki le_0j le_0k
-    . exact v_loc.left
-    . exact v_loc.right
+    · exact v_loc.left
+    · exact v_loc.right
   | obj o => by
     simp
     exact subst_inc_cancel_Lst o _ _ _ _ _ le_ji le_ki le_0j le_0k v_loc
@@ -287,7 +289,7 @@ theorem subst_inc_cancel_Lst
   | Bindings.cons _ _ (attached term) tail => by
     simp
     constructor
-    . simp [min_free_loc] at v_loc
+    · simp [min_free_loc] at v_loc
       have free_locs_term := (le_min_option v_loc).left
       exact subst_inc_cancel
         term
@@ -301,7 +303,7 @@ theorem subst_inc_cancel_Lst
         (Nat.succ_le_succ le_0j)
         (Nat.succ_le_succ le_0k)
         (free_locs_term)
-    . simp [min_free_loc] at v_loc
+    · simp [min_free_loc] at v_loc
       have free_locs := le_min_option v_loc
       exact subst_inc_cancel_Lst tail _ _ _ _ _ le_ji le_ki le_0j le_0k free_locs.right
 end
@@ -319,14 +321,14 @@ theorem lookup_none_not_in
   { a : Attr }
   (lookup_none : lookup l a = none)
   : a ∉ lst
-  := λ a_in_lst => match lst with
+  := fun a_in_lst => match lst with
     | [] => by contradiction
     | b :: bs => match l with
       | Bindings.cons _ _ opAttr tail =>
         dite
         (b = a)
-        (λ eq => by simp [eq, lookup] at lookup_none)
-        (λ neq => by
+        (fun eq => by simp [eq, lookup] at lookup_none)
+        (fun neq => by
           simp [neq, lookup] at lookup_none
           have temp := lookup_none_not_in lookup_none
           match a_in_lst with
@@ -346,8 +348,8 @@ theorem lookup_none_preserve
     | b :: bs => match l1, l2 with
       | Bindings.cons _ _ opAttr1 tail1, Bindings.cons _ _ opAttr2 tail2 => dite
         (b = a)
-        (λ eq => by simp [lookup, eq] at lookup_none)
-        (λ neq => by
+        (fun eq => by simp [lookup, eq] at lookup_none)
+        (fun neq => by
           simp [lookup, neq] at lookup_none
           simp [lookup, neq]
           exact lookup_none_preserve lookup_none tail2
@@ -385,6 +387,7 @@ inductive IsAttached : { lst : List Attr } → Attr → Term → Bindings lst �
     → IsAttached a t l
     → IsAttached a t (Bindings.cons b not_in u l)
 
+set_option linter.unusedVariables false
 theorem isAttachedIsIn
   { lst : List Attr }
   { a : Attr }
@@ -393,7 +396,9 @@ theorem isAttachedIsIn
   : IsAttached a t l
   → a ∈ lst
   | @IsAttached.zeroth_attached lst' _ _ _ _ => List.Mem.head lst'
-  | IsAttached.next_attached _ _ _ b _ _ _ isAttached' => List.Mem.tail b (isAttachedIsIn isAttached')
+  | IsAttached.next_attached _ _ _ b _ _ _ isAttached' =>
+    List.Mem.tail b (isAttachedIsIn isAttached')
+set_option linter.unusedVariables true
 
 namespace Insert
 
@@ -436,9 +441,9 @@ namespace Insert
         | Bindings.nil => by simp [insert_φ]
       | b :: bs => match l with
         | Bindings.cons _ not_in _ tail => dite (a = b)
-          (λ eq => by simp [insert_φ, eq])
-          (λ neq =>
-            let neq' : b ≠ a := λ eq => neq eq.symm
+          (fun eq => by simp [insert_φ, eq])
+          (fun neq =>
+            let neq' : b ≠ a := fun eq => neq eq.symm
             by  simp [insert_φ, neq']
                 exact insertTwice tail a t t'
           )
@@ -449,7 +454,7 @@ namespace Insert
     { a : Attr }
     { t t' : Term}
     : IsAttached a t l → IsAttached a t' (insert_φ l a (attached t'))
-    := λ isAttached => match isAttached with
+    := fun isAttached => match isAttached with
       | IsAttached.zeroth_attached _ not_in _ _=> by
         simp [insert_φ]
         exact IsAttached.zeroth_attached _ _ _ _
@@ -588,7 +593,7 @@ namespace PReduce
 
 /-- Reflexivity of parallel reduction [KS22, Proposition 3.3] -/
     def prefl : (t : Term) → PReduce t t
-      := λ term => match term with
+      := fun term => match term with
         | loc n => PReduce.pcong_ρ n
         | dot t a => PReduce.pcongDOT t t a (prefl t)
         | app t a u => PReduce.pcongAPP t t u u a (prefl t) (prefl u)
@@ -616,7 +621,7 @@ namespace PReduce
               exact Premise.consAttached b t t' preduce (reflexivePremise tail)
         | IsAttached.next_attached _ _ tail _ neq not_in u newIsAttached => match l with
           | Bindings.cons _ _ _ _ => by
-              have neq' : b ≠ a := λ eq => neq eq.symm
+              have neq' : b ≠ a := fun eq => neq eq.symm
               simp [insert_φ, neq']
               have premise := (singlePremise tail a t t' newIsAttached preduce)
               exact (match u with
@@ -636,21 +641,21 @@ namespace PReduce
       | Premise.nil => Premise.nil
       | Premise.consVoid b tail => dite
           (b = a)
-          (λ eq => by
+          (fun eq => by
             simp [insert_φ, eq]
             exact Premise.consAttached b _ _ preduce tail
           )
-          (λ neq => by
+          (fun neq => by
             simp [insert_φ, neq]
             exact Premise.consVoid b (singlePremiseInsert preduce tail)
           )
       | Premise.consAttached b t' t'' preduce' tail => dite
           (b = a)
-          (λ eq => by
+          (fun eq => by
             simp [insert_φ, eq]
             exact Premise.consAttached b _ _ preduce tail
           )
-          (λ neq => by
+          (fun neq => by
             simp [insert_φ, neq]
             exact Premise.consAttached b t' t'' preduce' (singlePremiseInsert preduce tail)
           )
@@ -668,16 +673,16 @@ namespace PReduce
           | Bindings.cons _ _ _ tail1, Bindings.cons _ _ _ tail2 => match premise with
             | Premise.consVoid _ premise_tail => dite
               (b = a)
-              (λ eq => by simp [lookup, eq])
-              (λ neq => by
+              (fun eq => by simp [lookup, eq])
+              (fun neq => by
                 simp [lookup, neq] at lookup_void
                 simp [lookup, neq]
                 exact lookup_void_premise lookup_void premise_tail
               )
             | Premise.consAttached _ _ _ _ premise_tail => dite
               (b = a)
-              (λ eq => by simp [lookup, eq] at lookup_void)
-              (λ neq => by
+              (fun eq => by simp [lookup, eq] at lookup_void)
+              (fun neq => by
                 simp [lookup, neq] at lookup_void
                 simp [lookup, neq]
                 exact lookup_void_premise lookup_void premise_tail
@@ -709,10 +714,10 @@ namespace PReduce
           simp [lookup]
           exact dite
             (b = a)
-            (λ eq => by
+            (fun eq => by
               simp [lookup, eq] at lookup_attached
             )
-            (λ neq => by
+            (fun neq => by
               simp [lookup, neq]
               simp [lookup, neq] at lookup_attached
               exact lookup_attached_premise (lookup_attached) premise_tail
@@ -721,13 +726,13 @@ namespace PReduce
           simp [lookup]
           exact dite
             (b = a)
-            (λ eq => by
+            (fun eq => by
               simp [eq]
               simp [lookup, eq] at lookup_attached
               simp [lookup_attached] at preduce
               exact ⟨t2, Pair.pair rfl preduce⟩
             )
-            (λ neq => by
+            (fun neq => by
               simp [neq]
               simp [lookup, neq] at lookup_attached
               exact lookup_attached_premise (lookup_attached) premise_tail
@@ -776,9 +781,9 @@ theorem notEqByMem
   (a_is_in : a ∈ lst)
   (b_not_in : b ∉ lst)
   : a ≠ b
-  := λ eq =>
+  := fun eq =>
     let memEq : List.Mem a lst = List.Mem b lst :=
-      congrArg (λ x => Membership.mem x lst) eq
+      congrArg (fun x => Membership.mem lst x) eq
     b_not_in (Eq.mp memEq a_is_in)
 
 
@@ -821,11 +826,14 @@ def congOBJClos
   : (t ⇝* t')
   → IsAttached b t l
   → (obj l ⇝* obj (insert_φ l b (attached t')))
-  := λ red_tt' isAttached => match red_tt' with
-    | ReflTransGen.refl => Eq.ndrec (ReflTransGen.refl) (congrArg obj (Eq.symm (Insert.insertAttached isAttached)))
+  := fun red_tt' isAttached => match red_tt' with
+    | ReflTransGen.refl =>
+      Eq.ndrec (ReflTransGen.refl) (congrArg obj (Eq.symm (Insert.insertAttached isAttached)))
     | ReflTransGen.head red redMany => by
       rename_i t_i
-      have ind_hypothesis : obj (insert_φ l b (attached t_i)) ⇝* obj (insert_φ (insert_φ l b (attached t_i)) b (attached t'))
+      have ind_hypothesis
+        : obj (insert_φ l b (attached t_i))
+          ⇝* obj (insert_φ (insert_φ l b (attached t_i)) b (attached t'))
         := (congOBJClos redMany (Insert.insert_new_isAttached isAttached))
       exact (ReflTransGen.head
         (Reduce.congOBJ b l red isAttached)
@@ -875,9 +883,11 @@ def par_to_redMany {t t' : Term} : (t ⇛ t') → (t ⇝* t')
           | Bindings.nil, Bindings.nil => ReflTransGen.refl
         | a :: as => match al, al' with
           | Bindings.cons _ not_in u tail, Bindings.cons _ _ u' tail' => match premise with
-            | Premise.consVoid _ premiseTail => consBindingsRedMany a void (fold_premise premiseTail)
+            | Premise.consVoid _ premiseTail =>
+              consBindingsRedMany a void (fold_premise premiseTail)
             | @Premise.consAttached _ t1 t2 preduce _ l1 l2 not_in premiseTail => by
-                suffices temp : obj (insert_φ (Bindings.cons a not_in (attached t1) l1) a (attached t2)) ⇝*
+                suffices temp
+                  : obj (insert_φ (Bindings.cons a not_in (attached t1) l1) a (attached t2)) ⇝*
                   obj (Bindings.cons a _ (attached t2) l2) from
                   (red_trans
                     (congOBJClos (par_to_redMany preduce) (IsAttached.zeroth_attached a _ t1 l1))
@@ -930,20 +940,21 @@ theorem inc_swap
     | loc k => by
       simp [incLocatorsFrom]
       split
-      . rename_i lt_kj
+      · rename_i lt_kj
         simp [incLocatorsFrom]
         split
-        . rename_i lt_ki
+        · rename_i lt_ki
           have lt_kj1 : k < j + 1 := Nat.lt_trans lt_kj (Nat.lt_succ_self j)
           simp [incLocatorsFrom, lt_kj1]
-        . rename_i nlt_ki
+        · rename_i nlt_ki
           simp [incLocatorsFrom, Nat.succ_lt_succ lt_kj]
-      . rename_i nlt_kj
+      · rename_i nlt_kj
         have le_ik : i ≤ k := Nat.le_trans le_ij (Nat.ge_of_not_lt nlt_kj)
         have nlt_k1i: ¬ k + 1 < i :=
-          λ x => absurd ((Nat.lt_trans (Nat.lt_of_le_of_lt le_ik (Nat.lt_succ_self k)) x)) (Nat.lt_irrefl i)
-        have nlt_ki : ¬ k < i := λ x => absurd le_ik (Nat.not_le_of_gt x)
-        have nlt_k1j1 : ¬ k + 1 < j + 1 := λ x => nlt_kj (Nat.lt_of_succ_lt_succ x)
+          fun x => absurd
+            ((Nat.lt_trans (Nat.lt_of_le_of_lt le_ik (Nat.lt_succ_self k)) x)) (Nat.lt_irrefl i)
+        have nlt_ki : ¬ k < i := fun x => absurd le_ik (Nat.not_le_of_gt x)
+        have nlt_k1j1 : ¬ k + 1 < j + 1 := fun x => nlt_kj (Nat.lt_of_succ_lt_succ x)
         simp [incLocatorsFrom, nlt_k1i, nlt_ki, nlt_k1j1]
     | dot s a => by
       simp
@@ -951,8 +962,8 @@ theorem inc_swap
     | app s a u => by
       simp
       constructor
-      . exact inc_swap i j le_ij s
-      . exact inc_swap i j le_ij u
+      · exact inc_swap i j le_ij s
+      · exact inc_swap i j le_ij u
     | obj o => by
       simp
       exact inc_swap_Lst i j le_ij o
@@ -972,8 +983,8 @@ theorem inc_swap_Lst
   | Bindings.cons _ _ (attached t) tail => by
     simp
     constructor
-    . exact inc_swap (i + 1) (j + 1) (Nat.succ_le_succ le_ij) t
-    . exact inc_swap_Lst i j le_ij tail
+    · exact inc_swap (i + 1) (j + 1) (Nat.succ_le_succ le_ij) t
+    · exact inc_swap_Lst i j le_ij tail
 end
 
 mutual
@@ -988,24 +999,24 @@ theorem subst_inc_swap
     | loc k => by
       simp [substitute, incLocatorsFrom]
       split
-      . rename_i lt_kj
+      · rename_i lt_kj
         have lt_ki: k < i := Nat.lt_of_lt_of_le lt_kj le_ji
         have lt_ki1 : k < i + 1 := Nat.lt_succ_of_le (Nat.le_of_lt lt_ki)
         simp [substitute, lt_ki1, lt_ki, incLocatorsFrom, lt_kj]
-      . rename_i nlt_kj
+      · rename_i nlt_kj
         split
-        . rename_i lt_ki
+        · rename_i lt_ki
           have lt_k1i1 : k + 1 < i + 1 := Nat.succ_lt_succ lt_ki
           simp [substitute, incLocatorsFrom, lt_k1i1, nlt_kj]
-        . rename_i nlt_ki
+        · rename_i nlt_ki
           have nlt_k1i1 : ¬k + 1 < i + 1
-            := λ x => absurd (Nat.lt_of_succ_lt_succ x) nlt_ki
+            := fun x => absurd (Nat.lt_of_succ_lt_succ x) nlt_ki
           simp [substitute, nlt_k1i1]
           split
-          . rename_i eq_ki
+          · rename_i eq_ki
             rfl
-          . rename_i neq_ki
-            have neq_ik : ¬ i = k := λ eq => neq_ki eq.symm
+          · rename_i neq_ki
+            have neq_ik : ¬ i = k := fun eq => neq_ki eq.symm
             have lt_ik : i < k := Nat.lt_of_le_of_ne (Nat.ge_of_not_lt nlt_ki) neq_ik
             have lt_jk : j < k := Nat.lt_of_le_of_lt le_ji lt_ik
             have le_k1 : 1 ≤ k := Nat.succ_le_of_lt
@@ -1014,7 +1025,7 @@ theorem subst_inc_swap
             have lt_j1k1 : j + 1 < k + 1 := Nat.succ_lt_succ lt_jk
             have le_j1k : j + 1 ≤ k := Nat.le_of_lt_succ lt_j1k1
             have le_jk1 := Nat.le_of_succ_le_succ (k0.symm ▸ le_j1k)
-            have nlt_jk1: ¬k - 1 < j := λ x => absurd le_jk1 (Nat.not_le_of_gt x)
+            have nlt_jk1: ¬k - 1 < j := fun x => absurd le_jk1 (Nat.not_le_of_gt x)
             simp [incLocatorsFrom, nlt_jk1, k0, Nat.add_sub_cancel]
     | dot s a => by
       simp [substitute, incLocatorsFrom]
@@ -1022,8 +1033,8 @@ theorem subst_inc_swap
     | app s₁ a s₂ => by
       simp [substitute, incLocatorsFrom]
       constructor
-      . exact subst_inc_swap i j le_ji s₁ u
-      . exact subst_inc_swap i j le_ji s₂ u
+      · exact subst_inc_swap i j le_ji s₁ u
+      · exact subst_inc_swap i j le_ji s₂ u
     | obj o => by
       simp
       exact subst_inc_swap_Lst i j le_ji o u
@@ -1044,10 +1055,10 @@ theorem subst_inc_swap_Lst
   | Bindings.cons _ _ (attached t) tail =>
     simp
     constructor
-    . simp [incLocators, inc_swap]
+    · simp [incLocators, inc_swap]
       rw [← incLocators]
       exact subst_inc_swap (i + 1) (j + 1) (Nat.succ_le_succ le_ji) t (incLocators u)
-    . exact subst_inc_swap_Lst i j le_ji tail u
+    · exact subst_inc_swap_Lst i j le_ji tail u
 end
 
 mutual
@@ -1062,32 +1073,34 @@ theorem inc_subst_swap
     | loc k => by
       simp
       split
-      . rename_i lt_kj
+      · rename_i lt_kj
         have lt_ki: k < i := Nat.lt_of_lt_of_le lt_kj le_ji
         have lt_ki1 : k < i + 1 := Nat.lt_succ_of_le (Nat.le_of_lt lt_ki)
         simp [lt_ki1, lt_ki, lt_kj]
-      . rename_i nlt_kj
+      · rename_i nlt_kj
         split
-        . rename_i eq_kj
+        · rename_i eq_kj
           simp [eq_kj, Nat.lt_succ_of_le le_ji]
-        . rename_i neq_kj
-          have lt_jk : j < k := Nat.lt_of_le_of_ne (Nat.ge_of_not_lt nlt_kj) (λ x => neq_kj x.symm)
+        · rename_i neq_kj
+          have lt_jk : j < k
+            := Nat.lt_of_le_of_ne (Nat.ge_of_not_lt nlt_kj) (fun x => neq_kj x.symm)
           have le_k1 : 1 ≤ k := Nat.succ_le_of_lt (Nat.lt_of_le_of_lt (Nat.zero_le j) lt_jk)
           have k0 : k - 1 + 1 = k := Nat.sub_add_cancel le_k1
           split
-          . rename_i lt_ki1
+          · rename_i lt_ki1
             have lt_k1i : k - 1 < i := Nat.lt_of_succ_lt_succ (k0.symm ▸ lt_ki1)
             simp [nlt_kj, neq_kj, lt_k1i]
-          . rename_i nlt_ki1
-            have nlt_k1i : ¬ k - 1 < i := λ x => by
+          · rename_i nlt_ki1
+            have nlt_k1i : ¬ k - 1 < i := fun x => by
               have lt_ki1 := Nat.add_lt_add_right x 1
               simp [Nat.sub_add_cancel le_k1] at lt_ki1
               exact nlt_ki1 lt_ki1
             have lt_ik : i < k := Nat.lt_of_succ_le (Nat.ge_of_not_lt nlt_ki1)
-            have lt_jk1 : j < k + 1 := Nat.lt_trans (Nat.lt_of_le_of_lt le_ji lt_ik) (Nat.lt_succ_self k)
-            have nlt_k1j : ¬ k + 1 < j := λ x =>
+            have lt_jk1 : j < k + 1
+              := Nat.lt_trans (Nat.lt_of_le_of_lt le_ji lt_ik) (Nat.lt_succ_self k)
+            have nlt_k1j : ¬ k + 1 < j := fun x =>
               (Nat.lt_irrefl j) (Nat.lt_trans lt_jk1 x)
-            have neq_k1j : ¬ k + 1 = j := λ x =>
+            have neq_k1j : ¬ k + 1 = j := fun x =>
               (Nat.lt_irrefl j) (x ▸ lt_jk1 )
             simp [nlt_k1i, neq_k1j, nlt_k1j, k0, Nat.add_sub_cancel]
     | dot s a => by
@@ -1096,8 +1109,8 @@ theorem inc_subst_swap
     | app s₁ a s₂ => by
       simp
       constructor
-      . exact inc_subst_swap i j le_ji s₁ u
-      . exact inc_subst_swap i j le_ji s₂ u
+      · exact inc_subst_swap i j le_ji s₁ u
+      · exact inc_subst_swap i j le_ji s₂ u
     | obj o => by
       simp
       exact inc_subst_swap_Lst i j le_ji o u
@@ -1118,10 +1131,10 @@ theorem inc_subst_swap_Lst
   | Bindings.cons _ _ (attached t) tail =>
     simp
     constructor
-    . simp [incLocators, inc_swap]
+    · simp [incLocators, inc_swap]
       rw [← incLocators]
       exact inc_subst_swap (i + 1) (j + 1) (Nat.succ_le_succ le_ji) t (incLocators u)
-    . exact inc_subst_swap_Lst i j le_ji tail u
+    · exact inc_subst_swap_Lst i j le_ji tail u
 end
 
 mutual
@@ -1137,36 +1150,36 @@ theorem subst_swap
     | loc k => by
         simp
         split
-        . rename_i lt_kj
+        · rename_i lt_kj
           have lt_ki : k < i := Nat.le_trans lt_kj le_ji
           have lt_ki1 : k < i + 1 := Nat.le_step lt_ki
           simp [lt_kj, lt_ki, lt_ki1]
           -- case k < j
-        . rename_i not_lt
+        · rename_i not_lt
           have le_jk: j ≤ k := Nat.ge_of_not_lt not_lt
           split
-          . rename_i eq_kj
+          · rename_i eq_kj
             have lt_ji1 : j < i + 1 :=  Nat.lt_succ_of_le le_ji
             simp [eq_kj, lt_ji1]
             -- case k == j
-          . rename_i neq_kj
-            have neq_jk : ¬j = k := λ eq => neq_kj eq.symm
+          · rename_i neq_kj
+            have neq_jk : ¬j = k := fun eq => neq_kj eq.symm
             have lt_jk : j < k := Nat.lt_of_le_of_ne le_jk neq_jk
             simp
             have le_k1: 1 ≤ k := Nat.succ_le_of_lt
               (Nat.lt_of_le_of_lt (Nat.zero_le j) lt_jk)
             split
-            . rename_i le_k1i
+            · rename_i le_k1i
               have lt_ki1: k < i + 1 := by
                 have temp := Nat.add_lt_add_right le_k1i 1
                 simp [Nat.sub_add_cancel le_k1] at temp
                 exact temp
-              have nlt_kj : ¬ k < j := λ lt_kj => Nat.lt_irrefl k (Nat.lt_trans lt_kj lt_jk)
+              have nlt_kj : ¬ k < j := fun lt_kj => Nat.lt_irrefl k (Nat.lt_trans lt_kj lt_jk)
               simp [lt_ki1, neq_kj, nlt_kj]
               -- case j < k ≤ i
-            . rename_i nlt_k1i
+            · rename_i nlt_k1i
               split
-              . rename_i eq_k1i
+              · rename_i eq_k1i
                 have eq_ki1 : k = i + 1 := by
                   have temp : k - 1 + 1 = i + 1 := congrArg Nat.succ eq_k1i
                   simp [Nat.sub_add_cancel le_k1] at temp
@@ -1180,18 +1193,19 @@ theorem subst_swap
                   (Nat.zero_le j)
                   (Nat.zero_le 0)
                   free_locs_v
-              . rename_i neq_k1i
-                have lt_ik1: i < k - 1 := Nat.lt_of_le_of_ne (Nat.ge_of_not_lt (nlt_k1i)) (λ x => neq_k1i x.symm)
+              · rename_i neq_k1i
+                have lt_ik1: i < k - 1
+                  := Nat.lt_of_le_of_ne (Nat.ge_of_not_lt (nlt_k1i)) (fun x => neq_k1i x.symm)
                 have lt_i1k : i + 1 < k := by
                   have := Nat.add_lt_add_right lt_ik1 1
                   simp [Nat.sub_add_cancel le_k1] at this
                   exact this
-                have nle_ki1 : ¬ k < i + 1 := λ x => Nat.lt_irrefl k (Nat.lt_trans x lt_i1k)
-                have neq_ki1 : ¬ k = i + 1 := λ x => Nat.lt_irrefl k (x ▸ lt_i1k)
+                have nle_ki1 : ¬ k < i + 1 := fun x => Nat.lt_irrefl k (Nat.lt_trans x lt_i1k)
+                have neq_ki1 : ¬ k = i + 1 := fun x => Nat.lt_irrefl k (x ▸ lt_i1k)
                 simp [nle_ki1, neq_ki1]
-                have nlt_k1j : ¬ k - 1 < j := λ x => Nat.lt_irrefl j
+                have nlt_k1j : ¬ k - 1 < j := fun x => Nat.lt_irrefl j
                   (Nat.lt_trans (Nat.lt_of_le_of_lt le_ji lt_ik1) x)
-                have neq : ¬ k - 1 = j := λ x => Nat.lt_irrefl j
+                have neq : ¬ k - 1 = j := fun x => Nat.lt_irrefl j
                   (Nat.lt_of_le_of_lt le_ji (x ▸ lt_ik1))
                 simp [nlt_k1j, neq]
     | dot s a => by
@@ -1212,7 +1226,9 @@ theorem subst_swap_Lst
   ( u v : Term)
   ( free_locs_v : le_nat_option_nat i (min_free_loc 0 v))
   : substituteLst (i + 1, incLocators v) (substituteLst (j + 1, incLocators u) o) =
-  substituteLst (j + 1, incLocators (substitute (i, v) u)) (substituteLst (i + 1 + 1, incLocators (incLocators v)) o)
+    substituteLst
+      (j + 1, incLocators (substitute (i, v) u))
+      (substituteLst (i + 1 + 1, incLocators (incLocators v)) o)
   := by match o with
   | Bindings.nil => simp
   | Bindings.cons _ _ void tail =>
@@ -1221,11 +1237,12 @@ theorem subst_swap_Lst
   | Bindings.cons _ _ (attached t) tail =>
     simp
     constructor
-    . simp [incLocators]
+    · simp [incLocators]
       simp [← subst_inc_swap]
       rw [← incLocators]
-      exact subst_swap (i+1) (j+1) (Nat.add_le_add_right le_ji 1) t (incLocators u) (incLocators v) (min_free_loc_inc free_locs_v)
-    . exact subst_swap_Lst i j le_ji tail u v free_locs_v
+      exact subst_swap (i+1) (j+1) (Nat.add_le_add_right le_ji 1)
+        t (incLocators u) (incLocators v) (min_free_loc_inc free_locs_v)
+    · exact subst_swap_Lst i j le_ji tail u v free_locs_v
 end
 
 theorem lookup_inc_attached
@@ -1241,18 +1258,18 @@ theorem lookup_inc_attached
   | Bindings.cons name _ void tail =>
     simp [lookup] at lookup_eq
     split at lookup_eq
-    . simp at lookup_eq
-    . rename_i neq
+    · simp at lookup_eq
+    · rename_i neq
       simp [lookup, neq]
       exact (lookup_inc_attached t i c tail lookup_eq)
   | Bindings.cons name _ (attached _) tail =>
     simp [lookup] at lookup_eq
     split at lookup_eq
-    . rename_i eq
+    · rename_i eq
       simp at lookup_eq
       simp [lookup_eq]
       simp [lookup_eq, lookup, eq]
-    . rename_i neq
+    · rename_i neq
       simp [lookup, neq]
       exact (lookup_inc_attached t i c tail lookup_eq)
 
@@ -1268,17 +1285,17 @@ theorem lookup_inc_void
   | Bindings.cons name _ void tail =>
     simp [lookup] at lookup_eq
     exact (dite (name = c)
-      (λ lookup_eq => by
+      (fun lookup_eq => by
         simp [lookup, lookup_eq]))
-      (λ neq => by
+      (fun neq => by
         simp [lookup, neq]
         exact (lookup_inc_void i c tail (lookup_eq neq)))
 
   | Bindings.cons name _ (attached _) tail =>
     simp [lookup] at lookup_eq
     split at lookup_eq
-    . simp at lookup_eq
-    . rename_i neq
+    · simp at lookup_eq
+    · rename_i neq
       simp [lookup, neq]
       exact (lookup_inc_void i c tail lookup_eq)
 
@@ -1294,8 +1311,8 @@ theorem lookup_inc_none
   | Bindings.cons name _ u tail =>
     simp [lookup] at lookup_eq
     split at lookup_eq
-    . contradiction
-    . rename_i neq
+    · contradiction
+    · rename_i neq
       cases u
       repeat simp [lookup, neq] ; exact (lookup_inc_none i c tail lookup_eq)
 
@@ -1310,15 +1327,15 @@ theorem inc_insert
   := match l with
   | Bindings.nil => by
     simp [insert_φ]
-  | Bindings.cons a not_in u tail => by
+  | Bindings.cons a not_in u _ => by
     cases u
     repeat
       simp [insert_φ]
       split
-      . simp
+      · simp
         rw [incLocators]
         simp [inc_swap]
-      . simp
+      · simp
         apply inc_insert
 
 mutual
@@ -1329,13 +1346,14 @@ def preduce_incLocatorsFrom
   : ( t ⇛ t') → (incLocatorsFrom i t ⇛ incLocatorsFrom i t')
   | .pcongOBJ bnds bnds' premise => by
     simp
-    exact PReduce.pcongOBJ (incLocatorsFromLst (i + 1) bnds) (incLocatorsFromLst (i + 1) bnds') (preduce_incLocatorsFrom_Lst i premise)
+    exact PReduce.pcongOBJ (incLocatorsFromLst (i + 1) bnds)
+      (incLocatorsFromLst (i + 1) bnds') (preduce_incLocatorsFrom_Lst i premise)
   | .pcong_ρ n =>  prefl (incLocatorsFrom i (loc n))
   | .pcongAPP t t' u u' a tt' uu' => by
     simp
     apply PReduce.pcongAPP
-    . exact preduce_incLocatorsFrom i tt'
-    . exact preduce_incLocatorsFrom i uu'
+    · exact preduce_incLocatorsFrom i tt'
+    · exact preduce_incLocatorsFrom i uu'
   | .pcongDOT t t' a tt' => by
     simp
     apply PReduce.pcongDOT
@@ -1426,18 +1444,18 @@ theorem lookup_subst_attached
   | Bindings.cons name _ void tail =>
     simp [lookup] at lookup_eq
     split at lookup_eq
-    . simp at lookup_eq
-    . rename_i neq
+    · simp at lookup_eq
+    · rename_i neq
       simp [lookup, neq]
       exact (lookup_subst_attached t i c tail lookup_eq)
   | Bindings.cons name _ (attached _) tail =>
     simp [lookup] at lookup_eq
     split at lookup_eq
-    . rename_i eq
+    · rename_i eq
       simp at lookup_eq
       simp [lookup_eq]
       simp [lookup_eq, lookup, eq]
-    . rename_i neq
+    · rename_i neq
       simp [lookup, neq]
       exact (lookup_subst_attached t i c tail lookup_eq)
 
@@ -1454,16 +1472,16 @@ theorem lookup_subst_void
   | Bindings.cons name _ void tail =>
     simp [lookup] at lookup_eq
     exact (dite (name = c)
-      (λ lookup_eq => by
+      (fun lookup_eq => by
         simp [lookup, lookup_eq]))
-      (λ neq => by
+      (fun neq => by
         simp [lookup, neq]
         exact (lookup_subst_void i c tail (lookup_eq neq)))
   | Bindings.cons name _ (attached _) tail =>
     simp [lookup] at lookup_eq
     split at lookup_eq
-    . simp at lookup_eq
-    . rename_i neq
+    · simp at lookup_eq
+    · rename_i neq
       simp [lookup, neq]
       exact (lookup_subst_void i c tail lookup_eq)
 
@@ -1480,8 +1498,8 @@ theorem lookup_subst_none
   | Bindings.cons name _ u tail =>
     simp [lookup] at lookup_eq
     split at lookup_eq
-    . contradiction
-    . rename_i neq
+    · contradiction
+    · rename_i neq
       cases u
       repeat simp [lookup, neq] ; exact (lookup_subst_none i c tail lookup_eq)
 
@@ -1491,20 +1509,22 @@ theorem subst_insert
   { lst : List Attr }
   { l : Bindings lst }
   { u v : Term}
-  : (insert_φ (substituteLst (i + 1, incLocators u) l) c (attached (incLocators (substitute (i, u) v))))
-  = (substituteLst (i + 1, incLocators u) (insert_φ l c (attached (incLocators v))))
+  : insert_φ
+      (substituteLst (i + 1, incLocators u) l) c
+      (attached (incLocators (substitute (i, u) v)))
+    = substituteLst (i + 1, incLocators u) (insert_φ l c (attached (incLocators v)))
   := match l with
   | Bindings.nil => by
     simp [insert_φ]
-  | Bindings.cons a not_in u tail => by
+  | Bindings.cons a not_in u _ => by
     cases u
     repeat
       simp [insert_φ]
       split
-      . simp
+      · simp
         rw [incLocators]
         simp [subst_inc_swap]
-      . simp
+      · simp
         apply subst_insert
 
 mutual
@@ -1520,22 +1540,24 @@ def substitution_lemma
   | @PReduce.pcongOBJ attrs bnds bnds' premise => by
     simp
     exact PReduce.pcongOBJ
-      (substituteLst (i + 1, incLocators u) bnds) (substituteLst (i + 1, incLocators u') bnds') (substitution_lemma_Lst i premise uu' min_free_locs_u')
+      (substituteLst (i + 1, incLocators u) bnds)
+        (substituteLst (i + 1, incLocators u') bnds')
+        (substitution_lemma_Lst i premise uu' min_free_locs_u')
   | .pcong_ρ n => by
     simp
     exact dite (n < i)
-      (λ less => by
+      (fun less => by
         simp [less]
         exact PReduce.pcong_ρ n
       )
-      (λ not_less =>
+      (fun not_less =>
         dite (n = i)
-          (λ eq => by
+          (fun eq => by
             have obvious : ¬ i < i := Nat.lt_irrefl i
             simp [not_less, eq, obvious]
             exact uu'
           )
-          (λ not_eq => by
+          (fun not_eq => by
             simp [not_less, not_eq]
             exact PReduce.pcong_ρ (n - 1)
           )
@@ -1570,7 +1592,7 @@ def substitution_lemma
       (substitution_lemma i ss' uu' (by assumption))
       (by rw [eq, substitute])
       (lookup_subst_attached t_c (i+1) c l lookup_eq)
-    have : substitute (0, substitute (i, u') s') (substitute (i + 1, incLocators u') t_c) = substitute (i, u') (substitute (0, s') t_c) := (subst_swap i 0 (Nat.zero_le i) t_c s' u' ((by assumption))).symm
+    have := (subst_swap i 0 (Nat.zero_le i) t_c s' u' ((by assumption))).symm
     simp [this] at dot_subst
     simp
     exact dot_subst
@@ -1619,11 +1641,11 @@ def substitution_lemma_Lst
   | Premise.consAttached _ t1 t2 preduce premise_tail =>
     simp
     apply Premise.consAttached
-    . apply substitution_lemma
+    · apply substitution_lemma
       exact preduce
       exact preduce_incLocatorsFrom 0 uu'
       exact min_free_loc_inc min_free_locs_u
-    . exact substitution_lemma_Lst i premise_tail uu' min_free_locs_u
+    · exact substitution_lemma_Lst i premise_tail uu' min_free_locs_u
 end
 
 /-! ### Complete Development -/
@@ -1640,7 +1662,7 @@ def complete_development : Term → Term
       | none => if ("φ" ∈ attrs) then dot (dot (obj bnds) "φ") a else dot (obj bnds) a
     | t' => dot t' a
   | app t a u => match (complete_development t) with
-    | @obj attrs bnds => match (lookup bnds a) with
+    | @obj _ bnds => match (lookup bnds a) with
       | some void => obj (insert_φ bnds a (attached (incLocators (complete_development u))))
       | _ => app (obj bnds) a (complete_development u)
     | _ => app (complete_development t) a (complete_development u)
@@ -1649,7 +1671,8 @@ def complete_development : Term → Term
 def complete_developmentLst {lst : List Attr} : Bindings lst → Bindings lst
   | Bindings.nil => Bindings.nil
   | Bindings.cons a lst void tail => Bindings.cons a lst void (complete_developmentLst tail)
-  | Bindings.cons a lst (attached t) tail => Bindings.cons a lst (attached (complete_development t)) (complete_developmentLst tail)
+  | Bindings.cons a lst (attached t) tail =>
+    Bindings.cons a lst (attached (complete_development t)) (complete_developmentLst tail)
 end
 
 mutual
@@ -1662,41 +1685,41 @@ def term_to_development
     | dot t a => by
         simp [complete_development]
         split
-        . rename_i cd_is_obj
+        · rename_i cd_is_obj
           rename_i l
           rename_i attrs
           split
-          . rename_i lookup_attached
+          · rename_i lookup_attached
             rename_i u
             have goal := PReduce.pdot_c u a l (term_to_development t) cd_is_obj lookup_attached
             simp [cd_is_obj] at goal
             exact goal
-          . have goal := PReduce.pcongDOT t (complete_development t) a (term_to_development t)
+          · have goal := PReduce.pcongDOT t (complete_development t) a (term_to_development t)
             simp [cd_is_obj] at goal
             exact goal
-          . rename_i lookup_none
+          · rename_i lookup_none
             exact dite ("φ" ∈ attrs)
-              (λ φ_in => by
+              (fun φ_in => by
                 simp [φ_in]
                 have temp := term_to_development t
                 simp [cd_is_obj] at temp
                 exact PReduce.pdot_cφ a l temp rfl lookup_none φ_in
               )
-              (λ not_in => by
+              (fun not_in => by
                 simp [not_in]
                 have goal := PReduce.pcongDOT t (complete_development t) a (term_to_development t)
                 simp [cd_is_obj] at goal
                 exact goal
               )
-        . rename_i cd_not_obj
+        · rename_i cd_not_obj
           exact PReduce.pcongDOT t (complete_development t) a (term_to_development t)
     | app t a u => by
         simp [complete_development]
         split
-        . rename_i cd_is_obj
+        · rename_i cd_is_obj
           rename_i l
           split
-          . rename_i lookup_void
+          · rename_i lookup_void
             exact PReduce.papp_c
               a
               l
@@ -1704,7 +1727,7 @@ def term_to_development
               (term_to_development u)
               cd_is_obj
               lookup_void
-          . rename_i lookup_not_void
+          · rename_i lookup_not_void
             have goal := PReduce.pcongAPP
               t
               (complete_development t)
@@ -1715,7 +1738,7 @@ def term_to_development
               (term_to_development u)
             simp [cd_is_obj] at goal
             exact goal
-        . exact PReduce.pcongAPP
+        · exact PReduce.pcongAPP
             t
             (complete_development t)
             u
@@ -1744,8 +1767,8 @@ def term_to_development_Lst
   | Bindings.cons _ _ (attached t) premise_tail =>
     simp
     apply Premise.consAttached
-    . exact term_to_development t
-    . exact term_to_development_Lst premise_tail
+    · exact term_to_development t
+    · exact term_to_development_Lst premise_tail
 end
 
 /-- Half Diamond [KS22, Proposition 3.8] -/
@@ -1783,43 +1806,44 @@ def half_diamond
     | .pcongDOT lt lt' a preduce => by
         simp [complete_development]
         split
-        . rename_i cd_is_obj
+        · rename_i cd_is_obj
           rename_i l
           rename_i attrs
           have assumption_preduce := half_diamond preduce
           simp [cd_is_obj] at assumption_preduce
           split
-          . rename_i lookup_attached
+          · rename_i lookup_attached
             rename_i u
             exact PReduce.pdot_c u a l assumption_preduce rfl lookup_attached
-          . exact PReduce.pcongDOT lt' (obj l) a assumption_preduce
-          . rename_i lookup_none
+          · exact PReduce.pcongDOT lt' (obj l) a assumption_preduce
+          · rename_i lookup_none
             exact dite ("φ" ∈ attrs)
-              (λ φ_in => by
+              (fun φ_in => by
                 simp [φ_in]
                 exact PReduce.pdot_cφ a l assumption_preduce rfl lookup_none φ_in
               )
-              (λ not_in => by
+              (fun not_in => by
                 simp [not_in]
                 exact PReduce.pcongDOT lt' (obj l) a assumption_preduce
               )
-        . rename_i cd_not_obj
+        · rename_i cd_not_obj
           exact PReduce.pcongDOT lt' (complete_development lt) a (half_diamond preduce)
     | .pcongAPP lt lt' lu lu' a preduce_lt preduce_lu => by
         simp [complete_development]
         split
-        . rename_i cd_is_obj
+        · rename_i cd_is_obj
           rename_i l
           rename_i attrs
           have assumption_preduce_lt := half_diamond preduce_lt
           have assumption_preduce_lu := half_diamond preduce_lu
           simp [cd_is_obj] at assumption_preduce_lt
           split
-          . rename_i lookup_void
+          · rename_i lookup_void
             exact PReduce.papp_c a l assumption_preduce_lt (assumption_preduce_lu) rfl lookup_void
-          . rename_i lookup_void
-            exact PReduce.pcongAPP lt' (obj l) lu' (complete_development lu) a assumption_preduce_lt assumption_preduce_lu
-        . rename_i cd_not_obj
+          · rename_i lookup_void
+            exact PReduce.pcongAPP lt' (obj l) lu' (complete_development lu) a
+              assumption_preduce_lt assumption_preduce_lu
+        · rename_i cd_not_obj
           exact PReduce.pcongAPP
             lt'
             (complete_development lt)
@@ -1844,8 +1868,8 @@ def half_diamond
             := by
               simp [le_nat_option_nat]
               split
-              . exact Nat.zero_le _
-              . simp
+              · exact Nat.zero_le _
+              · simp
           exact substitution_lemma 0 tc_to_u (.pcongOBJ l newAttrs premise) min_free_locs
 
     | @PReduce.pdot_cφ lt lt' c lst l preduce eq lookup_none is_attr => by
@@ -1884,7 +1908,7 @@ def half_diamond
 /-- Diamond property of `⇛` [KS22, Corollary 3.9] -/
 
 def diamond_preduce : DiamondProperty PReduce
-  := λ t _ _ tu tv =>
+  := fun t _ _ tu tv =>
     ⟨ complete_development t
     , (half_diamond tu)
     , (half_diamond tv)
@@ -1896,7 +1920,7 @@ def confluence_preduce : Confluence PReduce
 
 /-- Confluence of `⇝` [KS22, Theorem 3.11] -/
 def confluence_reduce : Confluence Reduce
-  := λ t u v tu tv =>
+  := fun t u v tu tv =>
   let (tu', tv') := (redMany_to_parMany tu, redMany_to_parMany tv)
   let ⟨w, uw', vw'⟩ := confluence_preduce t u v tu' tv'
   let (uw, vw) := (parMany_to_redMany uw', parMany_to_redMany vw')
