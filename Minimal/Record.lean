@@ -15,22 +15,22 @@ inductive Record (α : Type u) : List String → Type u where
     → Record α (key :: keys)
 
 -- value ∈ record
-inductive Mem : {keys : List String} → (a : α) → Record α keys → Prop where
+inductive Mem : {keys : List String} → Record α keys → (a : α) → Prop where
   | head
     : {keys : List String}
     → {a : α}
     → {as : Record α keys}
     → (key : String)
     → (not_in : key ∉ keys)
-    → Mem a (Record.cons key not_in a as)
+    → Mem (Record.cons key not_in a as) a
   | tail
     : {keys : List String}
     → {a b : α}
     → {as : Record α keys}
     → (key : String)
     → (not_in : key ∉ keys)
-    → Mem a as
-    → Mem a (Record.cons key not_in b as)
+    → Mem as a
+    → Mem (Record.cons key not_in b as) a
 
 instance {keys : List String} : Membership α (Record α keys) where
   mem := Mem
