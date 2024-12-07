@@ -526,6 +526,38 @@ def test5 : example5 ⇝* example5_res :=
     test5_red
     ReflTransGen.refl
 
+---------------------------------
+-- TEST 6: infinite reduction sequence presented after Definition 3.1 [KS22]
+-- ⟦ x ↦ ρ⁰.y, y ↦ ρ⁰.x ⟧.x ⇝ ⟦ x ↦ ρ⁰.y, y ↦ ρ⁰.x ⟧.y
+-- ⟦ x ↦ ρ⁰.y, y ↦ ρ⁰.x ⟧.y ⇝ ⟦ x ↦ ρ⁰.y, y ↦ ρ⁰.x ⟧.x
+
+def example6_bindings : Bindings ["x", "y"] :=
+  .cons "x" (by simp) (attached (dot (loc 0) "y"))
+  (.cons "y" (by simp) (attached (dot (loc 0) "x")) .nil)
+
+def example6_obj : Term := obj example6_bindings
+
+def test6_1 : (dot example6_obj "x" ⇝ dot example6_obj "y") := by
+  have reduction :=
+    dot_c
+      (dot (loc 0) "y")
+      "x"
+      example6_bindings
+      rfl
+      (by simp [lookup])
+  simp [substitute] at reduction
+  exact reduction
+
+def test6_2 : (dot example6_obj "y" ⇝ dot example6_obj "x") := by
+  have reduction :=
+    dot_c
+      (dot (loc 0) "x")
+      "y"
+      example6_bindings
+      rfl
+      (by simp [lookup])
+  simp [substitute] at reduction
+  exact reduction
 
 ---------------------------------
 -- Examples/tests of different term reductions presented after Definition 3.1 [KS22]
