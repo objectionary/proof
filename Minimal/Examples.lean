@@ -9,14 +9,37 @@ open Reduce
 
 This file contains examples of minimal φ-calculus terms and their reductions.
 
+Summary:
+1. R_dot, locator substitution:
+    ⟦ x ↦ ρ⁰.y, y ↦ ⟦ ⟧ ⟧.x ⇝* ⟦ ⟧
+2. R_app, R_dot, cong_DOT:
+    ⟦ x ↦ ∅ ⟧(x ↦ ⟦ ⟧).x ⇝* ⟦ ⟧
+3. R_dot, locator substitution, cong_DOT:
+    ⟦ x ↦ ⟦ z ↦ ρ¹.y ⟧, y ↦ ⟦ ⟧ ⟧.x.z ⇝* ⟦ ⟧
+4. R_phi:
+    ⟦ φ ↦ ⟦ x ↦ ⟦ ⟧ ⟧ ⟧.x ⇝* ⟦ ⟧
+5. cong_APP, R_app, locator increment
+    ⟦ x ↦ ⟦ a ↦ ∅ ⟧ (a ↦ ρ⁰.y) ⟧ ⇝* ⟦ x ↦ ⟦ a ↦ ρ¹.y ⟧ ⟧
+6. Infinite reduction sequence presented after Definition 3.1 [KS22]
+    ⟦ x ↦ ρ⁰.y, y ↦ ρ⁰.x ⟧.x ⇝ ⟦ x ↦ ρ⁰.y, y ↦ ρ⁰.x ⟧.y
+    ⟦ x ↦ ρ⁰.y, y ↦ ρ⁰.x ⟧.y ⇝ ⟦ x ↦ ρ⁰.y, y ↦ ρ⁰.x ⟧.x
+7. Examples/tests of different reductions of the same term presented after Definition 3.1 [KS22]
+    ⟦ x ↦ ⟦ y ↦ ∅ ⟧ ⟧.x(y ↦ ⟦ z ↦ w ⟧.z)
+8. Locator decrement in substitution, cong_OBJ, R_dot
+    ⟦ b ↦ ⟦ c ↦ ρ¹ ⟧.c ⟧ ⇝* ⟦ b ↦ ρ⁰ ⟧
+9. R_dot, R_app, cong_OBJ, congAPPₗ
+    ⟦ a ↦ ⟦ b ↦ ∅ ⟧ ⟧.a (b ↦ ⟦ ⟧) ⇝* ⟦ b ↦ ⟦ ⟧ ⟧
+10. congAPPᵣ, R_dot
+    ⟦ ⟧ (a ↦ ⟦ b ↦ ⟦ ⟧ ⟧.b) ⇝* ⟦ ⟧ (a ↦ ⟦ ⟧)
+
 ## References
 
 * [Nikolai Kudasov and Violetta Sim. 2023. Formalizing 𝜑-Calculus: A Purely Object-Oriented Calculus of Decorated Objects.][KS22]
 -/
 
--- TEST 1: ⟦ x ↦ ξ.y, y ↦ ⟦ ⟧ ⟧.x ⇝* ⟦ ⟧
+-- TEST 1: ⟦ x ↦ ρ⁰.y, y ↦ ⟦ ⟧ ⟧.x ⇝* ⟦ ⟧
 
--- bindings: x ↦ ξ.y, y ↦ ⟦ ⟧
+-- bindings: x ↦ ρ⁰.y, y ↦ ⟦ ⟧
 def bindings1 : Bindings ["x", "y"] :=
   Bindings.cons
     "x"
@@ -25,19 +48,19 @@ def bindings1 : Bindings ["x", "y"] :=
     (Bindings.cons
       "y"
       (by simp)
-      (attached (obj (Bindings.nil)))
+      (attached (obj Bindings.nil))
       Bindings.nil)
 
--- ⟦ x ↦ ξ.y, y ↦ ⟦ ⟧ ⟧.x
+-- ⟦ x ↦ ρ⁰.y, y ↦ ⟦ ⟧ ⟧.x
 def example1 : Term := dot (obj bindings1) "x"
 
--- ⟦ x ↦ ξ.y, y ↦ ⟦ ⟧ ⟧.y
+-- ⟦ x ↦ ρ⁰.y, y ↦ ⟦ ⟧ ⟧.y
 def example1_a : Term := dot (obj bindings1) "y"
 
 -- ⟦ ⟧
 def example1_res : Term := obj Bindings.nil
 
--- ⟦ x ↦ ξ.y, y ↦ ⟦ ⟧ ⟧.x ⇝ ⟦ x ↦ ξ.y, y ↦ ⟦ ⟧ ⟧.y
+-- ⟦ x ↦ ρ⁰.y, y ↦ ⟦ ⟧ ⟧.x ⇝ ⟦ x ↦ ρ⁰.y, y ↦ ⟦ ⟧ ⟧.y
 def test1_red1 : example1 ⇝ example1_a := by
   rw [example1, example1_a]
   have := (@dot_c
@@ -50,7 +73,7 @@ def test1_red1 : example1 ⇝ example1_a := by
     (by simp [lookup]))
   simp at this; exact this
 
--- ⟦ x ↦ ξ.y, y ↦ ⟦ ⟧ ⟧.y ⇝ ⟦ ⟧
+-- ⟦ x ↦ ρ⁰.y, y ↦ ⟦ ⟧ ⟧.y ⇝ ⟦ ⟧
 def test1_red2 : example1_a ⇝ example1_res := by
   rw [example1_a, example1_res]
   exact (dot_c
@@ -60,7 +83,7 @@ def test1_red2 : example1_a ⇝ example1_res := by
     rfl
     (by simp [lookup]))
 
--- ⟦ x ↦ ξ.y, y ↦ ⟦ ⟧ ⟧.x ⇝* ⟦ ⟧
+-- ⟦ x ↦ ρ⁰.y, y ↦ ⟦ ⟧ ⟧.x ⇝* ⟦ ⟧
 def test1 : example1 ⇝* example1_res :=
   ReflTransGen.head
     test1_red1
@@ -127,7 +150,7 @@ def test2_red2 : example2_a ⇝ example2_res := by
     (Bindings.cons
       "x"
       (by simp)
-      (attached (obj (Bindings.nil)))
+      (attached (obj Bindings.nil))
       Bindings.nil)
     (by simp)
     (by simp [lookup]))
@@ -141,9 +164,9 @@ def test2 : example2 ⇝* example2_res :=
       ReflTransGen.refl)
 
 ------------------------------------------
--- TEST 3: ⟦ x ↦ ⟦ z ↦ ρ.y ⟧, y ↦ ⟦ ⟧ ⟧.x.z ⇝* ⟦ ⟧
+-- TEST 3: ⟦ x ↦ ⟦ z ↦ ρ¹.y ⟧, y ↦ ⟦ ⟧ ⟧.x.z ⇝* ⟦ ⟧
 
--- ⟦ x ↦ ⟦ z ↦ ρ.y ⟧, y ↦ ⟦ ⟧ ⟧.x.z
+-- ⟦ x ↦ ⟦ z ↦ ρ¹.y ⟧, y ↦ ⟦ ⟧ ⟧.x.z
 def example3 : Term :=
   dot
     (dot
@@ -159,7 +182,7 @@ def example3 : Term :=
       "x")
     "z"
 
--- ⟦ z ↦ ⟦ x ↦ ⟦ z ↦ ρ.y ⟧, y ↦ ⟦ ⟧ ⟧.y ⟧.z
+-- ⟦ z ↦ ⟦ x ↦ ⟦ z ↦ ρ¹.y ⟧, y ↦ ⟦ ⟧ ⟧.y ⟧.z
 def example3_a : Term :=
   dot
     (obj
@@ -180,7 +203,7 @@ def example3_a : Term :=
         Bindings.nil))
     "z"
 
--- ⟦ x ↦ ⟦ z ↦ ρ.y ⟧, y ↦ ⟦ ⟧ ⟧.y
+-- ⟦ x ↦ ⟦ z ↦ ρ¹.y ⟧, y ↦ ⟦ ⟧ ⟧.y
 def example3_b : Term :=
   dot
     (obj
@@ -198,7 +221,7 @@ def example3_b : Term :=
 -- ⟦ ⟧
 def example3_res : Term := obj Bindings.nil
 
--- ⟦ x ↦ ⟦ z ↦ ρ.y ⟧, y ↦ ⟦ ⟧ ⟧.x.z ⇝ ⟦ z ↦ ⟦ x ↦ ⟦ z ↦ ρ.y ⟧, y ↦ ⟦ ⟧ ⟧.y ⟧.z
+-- ⟦ x ↦ ⟦ z ↦ ρ¹.y ⟧, y ↦ ⟦ ⟧ ⟧.x.z ⇝ ⟦ z ↦ ⟦ x ↦ ⟦ z ↦ ρ¹.y ⟧, y ↦ ⟦ ⟧ ⟧.y ⟧.z
 def test3_red1 : example3 ⇝ example3_a := congDOT
   (dot
     (obj
@@ -326,7 +349,7 @@ def test3_red3 : example3_b ⇝ example3_res := by
     (by simp)
     (by simp [lookup]))
 
--- ⟦ x ↦ ⟦ z ↦ ρ.y ⟧, y ↦ ⟦ ⟧ ⟧.x.z ⇝* ⟦ ⟧
+-- ⟦ x ↦ ⟦ z ↦ ρ¹.y ⟧, y ↦ ⟦ ⟧ ⟧.x.z ⇝* ⟦ ⟧
 def test3 : example3 ⇝* example3_res :=
   ReflTransGen.head
     test3_red1
@@ -465,9 +488,9 @@ def test4 : example4 ⇝* example4_res :=
         ReflTransGen.refl)))
 
 ------------------------------------------
--- TEST 5: ⟦ x ↦ ⟦ a ↦ ∅ ⟧ (a ↦ ξ.y) ⟧ ⇝* ⟦ x ↦ ⟦ a ↦ ρ.y ⟧ ⟧
+-- TEST 5: ⟦ x ↦ ⟦ a ↦ ∅ ⟧ (a ↦ ρ⁰.y) ⟧ ⇝* ⟦ x ↦ ⟦ a ↦ ρ¹.y ⟧ ⟧
 
--- ⟦ x ↦ ⟦ a ↦ ∅ ⟧ (a ↦ ξ.y) ⟧
+-- ⟦ x ↦ ⟦ a ↦ ∅ ⟧ (a ↦ ρ⁰.y) ⟧
 def example5 : Term :=
   (obj
     (Bindings.cons "x" (by simp)
@@ -478,7 +501,7 @@ def example5 : Term :=
           (dot (loc 0) "y")))
       Bindings.nil))
 
--- ⟦ x ↦ ⟦ a ↦ ρ.y ⟧ ⟧
+-- ⟦ x ↦ ⟦ a ↦ ρ¹.y ⟧ ⟧
 def example5_res : Term :=
   (obj
     (Bindings.cons "x" (by simp)
@@ -488,19 +511,11 @@ def example5_res : Term :=
           Bindings.nil)))
       Bindings.nil))
 
--- ⟦ x ↦ ⟦ a ↦ ∅ ⟧ (a ↦ ξ.y) ⟧ ⇝ ⟦ x ↦ ⟦ a ↦ ρ.y ⟧ ⟧
+-- ⟦ x ↦ ⟦ a ↦ ∅ ⟧ (a ↦ ρ⁰.y) ⟧ ⇝ ⟦ x ↦ ⟦ a ↦ ρ¹.y ⟧ ⟧
 def test5_red : example5 ⇝ example5_res := by
   simp [example5, example5_res]
-  exact (@congOBJ
-    (app
-      (obj (Bindings.cons "a" (by simp) void Bindings.nil))
-      "a"
-      (dot (loc 0) "y"))
-    (obj (Bindings.cons "a" (by simp)
-      (attached (dot (loc 1) "y"))
-      Bindings.nil))
+  exact (congOBJ
     "x"
-    ["x"]
     (Bindings.cons "x" (by simp)
       (attached
         (app
@@ -509,18 +524,17 @@ def test5_red : example5 ⇝ example5_res := by
           (dot (loc 0) "y")))
       Bindings.nil)
     (by
-      have := @app_c
+      have := app_c
         (obj (Bindings.cons "a" (by simp) void Bindings.nil))
         (dot (loc 0) "y")
         "a"
-        ["a"]
         (Bindings.cons "a" (by simp) void Bindings.nil)
         (by simp)
         (by simp [lookup])
       simp at this; exact this)
     (by apply IsAttached.zeroth_attached))
 
--- ⟦ x ↦ ⟦ a ↦ ∅ ⟧ (a ↦ ξ.y) ⟧ ⇝* ⟦ x ↦ ⟦ a ↦ ρ.y ⟧ ⟧
+-- ⟦ x ↦ ⟦ a ↦ ∅ ⟧ (a ↦ ρ⁰.y) ⟧ ⇝* ⟦ x ↦ ⟦ a ↦ ρ¹.y ⟧ ⟧
 def test5 : example5 ⇝* example5_res :=
   ReflTransGen.head
     test5_red
@@ -694,3 +708,185 @@ def test_graph_7 : example_graph_r2 ⇝ example_graph_last
       (by simp [lookup])
     simp [insert_φ] at reduction
     exact reduction
+
+------------------------------------------
+-- TEST 8: ⟦ b ↦ ⟦ c ↦ ρ¹ ⟧.c ⟧ ⇝* ⟦ b ↦ ρ⁰ ⟧
+
+-- ⟦ b ↦ ⟦ c ↦ ρ¹ ⟧.c ⟧
+def example8 : Term :=
+  (obj
+    (Bindings.cons "b" (by simp)
+      (attached
+        (dot
+          (obj (Bindings.cons "c" (by simp)
+            (attached (loc 1))
+            Bindings.nil))
+          "c"))
+      Bindings.nil))
+
+-- ⟦ b ↦ ρ⁰ ⟧
+def example8_res : Term :=
+  (obj
+    (Bindings.cons "b" (by simp)
+      (attached (loc 0))
+      Bindings.nil))
+
+-- ⟦ b ↦ ⟦ c ↦ ρ¹ ⟧.c ⟧ ⇝ ⟦ b ↦ ρ⁰ ⟧
+def test8_red : example8 ⇝ example8_res := by
+  simp [example8, example8_res]
+  have := @congOBJ
+    (dot
+      (obj (Bindings.cons "c" (by simp)
+        (attached (loc 1))
+        Bindings.nil))
+      "c")
+    (loc 0)
+    "b"
+    ["b"]
+    (Bindings.cons "b" (by simp)
+      (attached
+        (dot
+          (obj (Bindings.cons "c" (by simp)
+            (attached (loc 1))
+            Bindings.nil))
+          "c"))
+      Bindings.nil)
+    (by
+      have := @dot_c
+        (obj (Bindings.cons "c" (by simp)
+          (attached (loc 1))
+          Bindings.nil))
+        (loc 1)
+        "c"
+        ["c"]
+        (Bindings.cons "c" (by simp)
+          (attached (loc 1))
+          Bindings.nil)
+        (by simp)
+        (by simp [lookup])
+      simp at this; exact this)
+    (by apply IsAttached.zeroth_attached)
+  simp [insert_φ] at this; exact this
+
+-- ⟦ b ↦ ⟦ c ↦ ρ¹ ⟧.c ⟧ ⇝* ⟦ b ↦ ρ⁰ ⟧
+def test8 : example8 ⇝* example8_res :=
+  ReflTransGen.head
+    test8_red
+    ReflTransGen.refl
+
+------------------------------------------
+-- TEST 9: ⟦ a ↦ ⟦ b ↦ ∅ ⟧ ⟧.a (b ↦ ⟦ ⟧) ⇝* ⟦ b ↦ ⟦ ⟧ ⟧
+
+-- ⟦ a ↦ ⟦ b ↦ ∅ ⟧ ⟧.a (b ↦ ⟦ ⟧)
+def example9 : Term :=
+  app
+    (dot
+      (obj
+        (Bindings.cons "a" (by simp)
+          (attached (obj
+            (Bindings.cons "b" (by simp) void Bindings.nil)))
+          Bindings.nil))
+      "a")
+    "b"
+    (obj Bindings.nil)
+
+-- ⟦ b ↦ ∅ ⟧ (b ↦ ⟦ ⟧)
+def example9_a : Term :=
+  app
+    (obj (Bindings.cons "b" (by simp) void Bindings.nil))
+    "b"
+    (obj Bindings.nil)
+
+-- ⟦ b ↦ ⟦ ⟧ ⟧
+def example9_res : Term :=
+  (obj
+    (Bindings.cons "b" (by simp)
+      (attached (obj Bindings.nil))
+      Bindings.nil))
+
+-- ⟦ a ↦ ⟦ b ↦ ∅ ⟧ ⟧.a (b ↦ ⟦ ⟧) ⇝ ⟦ b ↦ ∅ ⟧ (b ↦ ⟦ ⟧)
+def test9_red1 : example9 ⇝ example9_a := by
+  simp [example9, example9_a]
+  exact (congAPPₗ _ _ _ _
+    (by
+      have := @dot_c
+        (obj
+          (Bindings.cons "a" (by simp)
+            (attached (obj
+              (Bindings.cons "b" (by simp) void Bindings.nil)))
+            Bindings.nil))
+        (obj (Bindings.cons "b" (by simp) void Bindings.nil))
+        "a"
+        ["a"]
+        (Bindings.cons "a" (by simp)
+          (attached (obj
+            (Bindings.cons "b" (by simp) void Bindings.nil)))
+          Bindings.nil)
+        (by simp)
+        (by simp [lookup])
+      simp at this; exact this))
+
+-- ⟦ b ↦ ∅ ⟧ (b ↦ ⟦ ⟧) ⇝ ⟦ b ↦ ⟦ ⟧ ⟧
+def test9_red2 : example9_a ⇝ example9_res := by
+  simp [example9_a, example9_res]
+  exact (by
+    have := app_c
+      (obj (Bindings.cons "b" (by simp) void Bindings.nil))
+      (obj Bindings.nil)
+      "b"
+      (Bindings.cons "b" (by simp) void Bindings.nil)
+      (by simp)
+      (by simp [lookup])
+    simp at this; exact this)
+
+-- ⟦ b ↦ ∅ ⟧ (b ↦ ⟦ ⟧) ⇝* ⟦ b ↦ ⟦ ⟧ ⟧
+def test9 : example9 ⇝* example9_res :=
+  ReflTransGen.head test9_red1
+    (ReflTransGen.head test9_red2
+      ReflTransGen.refl)
+
+------------------------------------------
+-- TEST 10: ⟦ ⟧ (a ↦ ⟦ b ↦ ⟦ ⟧ ⟧.b) ⇝* ⟦ ⟧ (a ↦ ⟦ ⟧)
+
+-- ⟦ ⟧ (a ↦ ⟦ b ↦ ⟦ ⟧ ⟧.b)
+def example10 : Term :=
+  app
+    (obj Bindings.nil)
+    "a"
+    (dot
+      (obj (Bindings.cons "b" (by simp)
+        (attached (obj Bindings.nil))
+        Bindings.nil))
+      "b")
+
+-- ⟦ ⟧ (a ↦ ⟦ ⟧)
+def example10_res : Term :=
+  app
+    (obj Bindings.nil)
+    "a"
+    (obj Bindings.nil)
+
+-- ⟦ ⟧ (a ↦ ⟦ b ↦ ⟦ ⟧ ⟧.b) ⇝ ⟦ ⟧ (a ↦ ⟦ ⟧)
+def test10_red : example10 ⇝ example10_res := by
+  simp [example10, example10_res]
+  exact (congAPPᵣ _ _ _ _
+    (by
+      have := @dot_c
+        (obj
+          (Bindings.cons "b" (by simp)
+            (attached (obj Bindings.nil))
+            Bindings.nil))
+        (obj Bindings.nil)
+        "b"
+        ["b"]
+        (Bindings.cons "b" (by simp)
+            (attached (obj Bindings.nil))
+            Bindings.nil)
+        (by simp)
+        (by simp [lookup])
+      simp at this; exact this))
+
+-- ⟦ ⟧ (a ↦ ⟦ b ↦ ⟦ ⟧ ⟧.b) ⇝* ⟦ ⟧ (a ↦ ⟦ ⟧)
+def test10 : example10 ⇝* example10_res :=
+  ReflTransGen.head test10_red
+    ReflTransGen.refl
