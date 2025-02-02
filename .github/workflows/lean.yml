@@ -47,7 +47,7 @@ jobs:
 
       - name: '🚀 Publish Documentation'
         if: ${{ github.ref_name == 'master' && github.event_name != 'pull_request' }}
-        uses: JamesIves/github-pages-deploy-action@v4
+        uses: JamesIves/github-pages-deploy-action@v4.7.2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           folder: .lake/build/doc
