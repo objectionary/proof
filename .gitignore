@@ -1,3 +1,6 @@
+.DS_Store
+.idea/
+.lake/
 build/
 lake-packages/
-.lake/
+node_modules/
