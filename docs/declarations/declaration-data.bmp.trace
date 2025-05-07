@@ -1,0 +1,13 @@
+{"log":
+ [{"message": "Documentation indexing", "level": "info"},
+  {"message":
+   ".> /home/runner/work/proof/proof/.lake/packages/doc-gen4/.lake/build/bin/doc-gen4 index --build /home/runner/work/proof/proof/.lake/build",
+   "level": "trace"}],
+ "inputs":
+ [["/home/runner/work/proof/proof/.lake/packages/doc-gen4/.lake/build/bin/doc-gen4",
+   "4127154150536434786"],
+  ["<collection>", "15241332997907831624"],
+  ["<collection>",
+   [["/home/runner/work/proof/proof/.lake/build/doc/PhiCalculus.html",
+     "825720586381009869"]]]],
+ "depHash": "13049030179298457277"}
