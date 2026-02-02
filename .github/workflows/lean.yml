@@ -30,7 +30,7 @@ jobs:
 
       - name: '👝 Cache .lake/'
         id: cache-lake
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: .lake/
           key: ${{ runner.os }}-${{ hashFiles('lakefile.lean', 'lake-manifest.json') }}-lake
