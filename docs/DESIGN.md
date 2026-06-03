@@ -42,8 +42,9 @@ older *minimal* calculus and never finished the variant resembling the current p
 
 **Key structural fact:** because the paper's rules and examples are generated *from
 phino*, "match the paper" reduces to "match phino", which is executable and testable.
-When the paper prose and the generated figure disagree (e.g. the `alpha` ordinal), phino
-and the figure win and the prose is the upstream defect — see `M0-spec.md`.
+(Two phino bugs surfaced and were fixed during this work: the `alpha`-ordinal asset-counting,
+phino #749, and a duplicate-`ρ` printer bug, phino #748 — our model already matched the
+paper-faithful side of both. See `M0-spec.md`.)
 
 ---
 
@@ -281,11 +282,10 @@ term-level *fidelity* obligation, now discharged both formally (the three lemmas
   (no `αᵢ` formation key) is *necessary for confluence* (the `alpha`-vs-`over` counterexample is a
   `legalKey` violation; the diamond proof uses exactly this clause). `Nodup` (unique keys) is a
   *faithfulness* clause — matches Def. Binding, makes first-match `lookup` agree with phino's matcher
-  — carried but unused by the diamond argument (§4, M0-spec "Why `WF`-scoped"). **phino itself emits
-  non-`Nodup` terms** — `⟦ρ↦⟦⟧⟧ ⟶ ⟦ρ↦⟦ρ↦∅⟧, ρ↦∅⟧` (duplicate `ρ`), though it rejects duplicate keys
-  on *input*: a phino parent-injection **bug** that contradicts its own Def. Binding (like the
-  `alpha`-ordinal defect). Our model gives the WF answer `⟦ρ↦⟦ρ↦∅⟧⟧` and diverges, with phino in the
-  wrong; we deliberately do **not** reproduce the defect. To be fixed upstream in phino.
+  — carried but unused by the diamond argument (§4, M0-spec "Why `WF`-scoped"). (phino once emitted
+  a non-`Nodup` term — `⟦ρ↦⟦⟧⟧ ⟶ ⟦ρ↦⟦ρ↦∅⟧, ρ↦∅⟧` (duplicate `ρ`) — a printer bug contradicting its
+  own Def. Binding; fixed in phino **#748**. Our model already gave the WF answer `⟦ρ↦⟦ρ↦∅⟧⟧`, so we
+  now agree.)
 * **`λ`/`Δ` atoms are outside the normalization relation `⟶`.** They have no rule among the
   eleven. Their reduction is the paper's *separate* **Morphing** (`fig:morphing` — `Mlambda`
   calls a host atom by value) and **Dataization** (`fig:dataization`) partial functions:

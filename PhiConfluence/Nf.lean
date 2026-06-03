@@ -64,7 +64,7 @@ def appNF : Term → Attr → Term → Bool
       | .void => match a with | .alpha _ => false | _ => !xiFree arg
       | .absent =>
           match a with
-          | .alpha i => match bs[i]? with | some (.void _) => false | _ => true
+          | .alpha i => match voidAtOrdinal bs i with | some _ => false | _ => true
           | _ => false
   | _, _, _ => true
 

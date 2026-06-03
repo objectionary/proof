@@ -60,9 +60,9 @@ def reduceStep : Term → Option Term
         if a.isAlpha then
           match a with
           | .alpha i =>
-            match bs[i]? with
-            | some (.void τ₁) => some (.app (.form bs) τ₁ arg)
-            | _ =>
+            match voidAtOrdinal bs i with
+            | some τ₁ => some (.app (.form bs) τ₁ arg)
+            | none =>
               match reduceStep arg with
               | some arg' => some (Term.app (Term.form bs) a arg')
               | none => (reduceForm bs).map (fun bs' => Term.app (Term.form bs') a arg)
@@ -169,13 +169,13 @@ theorem reduce_sound : ∀ {e e' : Term}, reduceStep e = some e' → e ↝ e' :=
       intro e' h
       simp only [reduceStep, habs, hisalpha, if_true, hidx, Option.some.injEq] at h
       subst h; exact Step.alpha hidx
-  | case13 arg bs i arg' hargsome hnotvoid habs hisalpha iharg =>
+  | case13 arg bs i hnone arg' hargsome habs hisalpha iharg =>
       intro e' h
-      simp only [reduceStep, habs, hisalpha, if_true, hargsome, Option.some.injEq] at h
+      simp only [reduceStep, habs, hisalpha, if_true, hnone, hargsome, Option.some.injEq] at h
       subst h; exact Step.congAppArg (iharg hargsome)
-  | case14 arg bs i hargnone hnotvoid habs hisalpha iharg ih2 =>
+  | case14 arg bs i hnone hargnone habs hisalpha iharg ih2 =>
       intro e' h
-      simp only [reduceStep, habs, hisalpha, if_true, hargnone, Option.map_eq_some_iff] at h
+      simp only [reduceStep, habs, hisalpha, if_true, hnone, hargnone, Option.map_eq_some_iff] at h
       obtain ⟨bs', hbs', rfl⟩ := h
       exact Step.congAppFn (ih2 _ hbs')
   | case15 a arg bs habs hisalpha hnotalpha =>

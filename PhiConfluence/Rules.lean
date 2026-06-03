@@ -20,7 +20,7 @@ namespace PhiConfluence
 
 /-- The φ-calculus normalization rules, generated from phino's YAML. -/
 def normalizationRules : List RuleSpec :=
-  [ { name := "alpha", pattern := "⟦𝐵1, 𝜏1 ↦ ∅, 𝐵2⟧(𝜏2 ↦ 𝑒)", result := "⟦𝐵1, 𝜏1 ↦ ∅, 𝐵2⟧(𝜏1 ↦ 𝑒)", cond := "index(𝜏2) = |𝐵1|", wher := "" }
+  [ { name := "alpha", pattern := "⟦𝐵1, 𝜏1 ↦ ∅, 𝐵2⟧(𝜏2 ↦ 𝑒)", result := "⟦𝐵1, 𝜏1 ↦ ∅, 𝐵2⟧(𝜏1 ↦ 𝑒)", cond := "index(𝜏2) = domain(𝐵1)", wher := "" }
   , { name := "copy", pattern := "⟦ 𝐵1, 𝜏 ↦ ∅, 𝐵2 ⟧(𝜏 ↦ 𝑒)", result := "⟦ 𝐵1, 𝜏 ↦ 𝑒, 𝐵2 ⟧", cond := "xi-free(𝑒) and nf(𝑒)", wher := "" }
   , { name := "dc", pattern := "⊥(𝜏 ↦ 𝑒)", result := "⊥", cond := "", wher := "" }
   , { name := "dd", pattern := "⊥.𝜏", result := "⊥", cond := "", wher := "" }
