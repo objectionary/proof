@@ -1,0 +1,32 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Objectionary.com
+# SPDX-License-Identifier: MIT
+
+# Restore (or, on a cache miss, install) the Lean toolchain and the mathlib build
+# artifacts, so the Lean jobs never re-download Lean/mathlib unless the pinned
+# versions change. Shared by the `build` and `difftest` workflows; assumes the
+# repository has already been checked out by the caller.
+name: setup-lean
+description: Restore or install the Lean toolchain and mathlib build cache
+runs:
+  using: composite
+  steps:
+    - name: Cache elan + Lean toolchain
+      uses: actions/cache@v4
+      with:
+        path: ~/.elan
+        key: elan-${{ runner.os }}-${{ hashFiles('lean-toolchain') }}
+    - name: Cache Lake deps + mathlib oleans
+      uses: actions/cache@v4
+      with:
+        path: .lake
+        key: lake-${{ runner.os }}-${{ hashFiles('lake-manifest.json', 'lean-toolchain') }}
+    - name: Install elan (skipped if cached)
+      shell: bash
+      run: |
+        if [ ! -x "$HOME/.elan/bin/lake" ]; then
+          curl -sSf https://elan.lean-lang.org/elan-init.sh | sh -s -- -y --default-toolchain none
+        fi
+        echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+    - name: Fetch mathlib's prebuilt cache (no-op if .lake cached)
+      shell: bash
+      run: lake exe cache get

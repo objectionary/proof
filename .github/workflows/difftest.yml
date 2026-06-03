@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Objectionary.com
+# SPDX-License-Identifier: MIT
+
+name: difftest
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+concurrency:
+  group: difftest-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  difftest:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install phino (latest)
+        run: |
+          sudo curl -fsSL -o /usr/local/bin/phino http://phino.objectionary.com/releases/ubuntu-24.04/phino-latest
+          sudo chmod +x /usr/local/bin/phino
+          phino --version
+      - uses: ./.github/actions/setup-lean
+      - name: Differential test — our reducer vs phino
+        run: bash scripts/difftest.sh

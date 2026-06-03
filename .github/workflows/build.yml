@@ -1,0 +1,54 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Objectionary.com
+# SPDX-License-Identifier: MIT
+
+name: build
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-lean
+      - name: Build the library and executables
+        run: |
+          lake build
+          lake build demo difftest
+      - name: Gate — no sorry/admit/axiom in project sources
+        run: |
+          # Catches proof gaps (Lean only WARNS on `sorry`) and stray `axiom` decls.
+          if grep -REn '\bsorry\b|\badmit\b|^[[:space:]]*axiom[[:space:]]' \
+               PhiConfluence Main.lean Difftest.lean; then
+            echo "::error::found sorry/admit/axiom in project sources"; exit 1
+          fi
+      - name: Gate — headline theorems are axiom-clean (no sorryAx)
+        run: |
+          # The stronger check: `#print axioms` on the load-bearing results must show only
+          # `propext`/`Quot.sound` — never `sorryAx` (a smuggled gap), `Classical.choice`,
+          # or `native_decide`/`ofReduceBool` (trusts the compiler/kernel reduction).
+          cat > axiom_check.lean <<'EOF'
+          import PhiConfluence
+          #print axioms PhiConfluence.confluence
+          #print axioms PhiConfluence.conv_equivalence
+          #print axioms PhiConfluence.reduce_sound
+          #print axioms PhiConfluence.par_triangle
+          #print axioms PhiConfluence.parWF_diamond
+          #print axioms PhiConfluence.nf_iff
+          #print axioms PhiConfluence.contextualize_eq_self
+          #print axioms PhiConfluence.canon_canonical
+          #print axioms PhiConfluence.wf_canon
+          #print axioms PhiConfluence.step_canonical
+          EOF
+          out=$(lake env lean axiom_check.lean 2>&1)
+          echo "$out"
+          rm -f axiom_check.lean
+          if echo "$out" | grep -qiE 'sorryAx|Classical\.choice|native_decide|ofReduceBool|ofReduceNat'; then
+            echo "::error::a headline theorem depends on a forbidden axiom"; exit 1
+          fi
