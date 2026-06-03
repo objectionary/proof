@@ -1,6 +1,4 @@
-.DS_Store
-.idea/
 .lake/
 build/
-lake-packages/
-node_modules/
+*.olean
+.DS_Store
