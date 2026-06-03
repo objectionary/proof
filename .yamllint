@@ -1,0 +1,12 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Objectionary.com
+# SPDX-License-Identifier: MIT
+---
+extends: default
+rules:
+  line-length: disable
+  document-start: disable
+  truthy:
+    check-keys: false
+  comments-indentation: disable
+  comments:
+    min-spaces-from-content: 1

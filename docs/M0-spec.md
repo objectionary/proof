@@ -27,6 +27,7 @@ Newman's lemma.
 
 **Why `WF`-scoped (and not the unconditional `Confluent Step`).** `WF` has two clauses, and they
 carry **different weight** — worth stating precisely:
+
 * **`legalKey` (no positional `αᵢ` as a formation key) is *necessary for confluence*.** The
   counterexample that makes unconditional `Confluent Step` **false** once `alpha` is present is a
   `legalKey` violation: a *malformed* `⟦B₁, αᵢ↦e₁, B₂⟧(αᵢ↦e₂)` whose void slot sits at ordinal `i`
@@ -97,6 +98,7 @@ applied in any order"). `Step.congForm` uses the paper's `⟦B₁,τ↦e,B₂⟧
 
 Disjointness (the root rules are mutually exclusive on a given redex, with the noted
 exceptions):
+
 * dispatch `⟦B⟧.τ` is split by `dot` (τ attached) / `null` (τ void) / `phi` (τ absent,
   φ present) / `stop` (τ absent, φ,λ absent); `⊥.τ` is `dd`. Terms outside all cases
   (e.g. `Φ.τ`, `ξ.τ`) are stuck — this is a partition of *reducible* dispatch redexes,

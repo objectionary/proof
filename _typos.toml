@@ -1,0 +1,14 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Objectionary.com
+# SPDX-License-Identifier: MIT
+
+# Lean identifiers / intentional names that the typo dictionary mis-flags:
+#   ihs  = induction hypotheses (plural)      wher = RuleSpec field (dodges the `where` keyword)
+#   haa/hda = hypothesis names in proofs      pn = shell var (phino normal form)
+#   alls = "catch-alls"
+[default.extend-words]
+alls = "alls"
+pn = "pn"
+ihs = "ihs"
+wher = "wher"
+haa = "haa"
+hda = "hda"

@@ -222,8 +222,8 @@ The project ends at M4: `confluence` covers the whole normalization relation `�
 φ-calculus).** Green, zero `sorry`/`axiom` (`#print axioms confluence` = `[propext, Quot.sound]`).
 Highlights:
 
-* **`Step`/`Par`** cover all eleven rules — the `⊥`-collapse six + `stay` + `phi` + `alpha` + `dot`
-  + `copy` + full congruence closure.
+* **`Step`/`Par`** cover all eleven rules — the `⊥`-collapse six plus `stay`, `phi`, `alpha`,
+  `dot`, `copy`, and the full congruence closure.
 * **M3:** `redMany_eq`, the complete development `devel`, and the Takahashi triangle.
 * **M4.1:** `WF.step`/`WF.par` — reduction preserves well-formedness.
 * **M4.2a:** the WF-relativization bridge (`ParWF`, `parWF_diamond`/`parWF_confluent`) and the

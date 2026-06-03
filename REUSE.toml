@@ -1,0 +1,16 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Objectionary.com
+# SPDX-License-Identifier: MIT
+
+version = 1
+[[annotations]]
+path = [
+    ".gitignore",
+    ".yamllint",
+    "**.json",
+    "**.md",
+    "**.txt",
+    "lean-toolchain",
+]
+precedence = "override"
+SPDX-FileCopyrightText = "Copyright (c) 2026 Objectionary.com"
+SPDX-License-Identifier = "MIT"
