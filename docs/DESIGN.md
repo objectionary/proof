@@ -311,3 +311,16 @@ Mechanically generating the Lean `Step` *relation* (not just the display table) 
 YAML, so the proof object and the paper's figure share a single source. Today `Step` is
 hand-written and pinned to phino behaviorally by `difftest`; this would make the pin
 structural. Optional — it does not affect the proof's validity.
+
+**M5 — rules as checked data (proposed; `docs/RULES-AS-DATA.md`).** A concrete, partial
+realization of the above. `scripts/gen-rule-data.py` (implemented, tested) emits the eleven
+root rules as **structured** `RuleSpec` data — typed redex shape, side-conditions, and
+contractum — under a *fidelity lock* that aborts if phino's YAML drifts from the locked
+interpretation. A hand-written interpreter `RuleSpec.applies` gives that data a semantics, and
+`conformance : RootStep e e' ↔ ∃ r ∈ normalizationRuleData, r.applies e e'` makes the pin
+**kernel-checked** for the root fragment (`RootStep` = `Step` minus the four congruence
+constructors). This shrinks the trusted, hand-written surface from "eleven `Step`
+constructors" to "one interpreter + the semantic helpers `contextualize`/`nf`/`fill`/
+`voidAtOrdinal`" — which is the floor, since phino defines those in Haskell, not in the YAML.
+Fully data-driving `Step` itself (defining it *as* the interpreter over the list, and redoing
+the confluence proof against that) remains the larger, unforced step.
