@@ -5,6 +5,9 @@ SPDX-License-Identifier: MIT
 
 # Confluence of φ-Calculus Normalization (Lean 4)
 
+[![build](https://github.com/objectionary/proof/actions/workflows/build.yml/badge.svg)](https://github.com/objectionary/proof/actions/workflows/build.yml)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](https://github.com/objectionary/proof/blob/master/LICENSE.txt)
+
 A complete, machine-checked proof — in [Lean 4](https://leanprover.github.io) — that the
 normalization (reduction) rules of the φ-calculus are **confluent (Church–Rosser)**: the order in
 which the rules fire never changes the result. It is about the calculus as implemented by the
