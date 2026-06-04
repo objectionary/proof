@@ -5,12 +5,11 @@
 Generate PhiConfluence/RuleData.lean from phino's resources/*.yaml.
 
 Unlike `gen-rules.py` (which emits *display strings* for the demo), this emits the
-**structured** rule data the proof is pinned against: each rule becomes a `RuleSpec`
-of typed tags (redex shape, side-conditions, contractum) that the hand-written
-interpreter `applies` (PhiConfluence/RuleSchema.lean) gives a semantics to, and that
-`conformance` (PhiConfluence/RuleConform.lean) proves equal to the `Step` relation.
-So if phino changes a rule, the regenerated data changes and the Lean conformance
-theorem stops type-checking — drift between phino and the proof becomes a build error.
+**structured** rule data: each rule becomes a `RuleEntry` of typed tags (redex shape,
+side-conditions, contractum), whose types are defined in PhiConfluence/RuleSchema.lean.
+The committed PhiConfluence/RuleData.lean is regenerated from pinned phino by CI
+(rule-data-in-sync) and compared for an exact match, so a phino rule change becomes a
+build error unless the committed data is regenerated to match.
 
 DESIGN — a *fidelity lock*, not a general translator.
   phino's rule semantics live in its Haskell (`contextualize`, `isNF`, ordinals …),
@@ -18,9 +17,9 @@ DESIGN — a *fidelity lock*, not a general translator.
   Instead this script carries one *locked interpretation*
   per rule (the structured tags below) and ASSERTS that phino's current YAML still
   renders to the pattern/result/condition this interpretation assumes — failing loudly
-  on any mismatch. The locked tags are emitted; the proof checks them against `Step`.
-  Net: phino-drift trips the assertion here (CI red); a tags-vs-`Step` mismatch trips
-  the Lean conformance theorem. Both ends are pinned.
+  on any mismatch. The locked tags are emitted into RuleData.lean. phino-drift trips
+  this assertion; a committed RuleData.lean that no longer matches trips the
+  rule-data-in-sync diff in CI.
 
 This intentionally duplicates `gen-rules.py`'s `when`/`where` rendering (keep in sync) so
 the asserted condition strings match the display table's — one rendering, two consumers.
@@ -192,16 +191,15 @@ def main():
         "/-!",
         "# Normalization rules as structured data, generated from phino",
         "",
-        "The eleven rules as `RuleSpec` tags, emitted by the fidelity-lock deriver",
-        "`scripts/gen-rule-data.py`. `PhiConfluence.RuleConform.conformance` proves this list",
-        "equal to the `Step` relation, so a phino change that survives the deriver's assertions",
-        "but alters a rule's meaning makes that theorem fail to compile.",
+        "The eleven rules as `RuleEntry` tags (types in PhiConfluence/RuleSchema.lean), emitted",
+        "by the fidelity-lock deriver `scripts/gen-rule-data.py`. CI (rule-data-in-sync)",
+        "regenerates this file from pinned phino and fails on any diff — keeping it identical.",
         "-/",
         "",
         "namespace PhiConfluence",
         "",
         "/-- The φ-calculus normalization rules as structured, interpretable data. -/",
-        "def normalizationRuleData : List RuleSpec :=",
+        "def normalizationRuleData : List RuleEntry :=",
     ]
     entries = []
     for name in sorted(found):
