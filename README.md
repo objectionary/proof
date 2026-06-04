@@ -3,10 +3,10 @@ SPDX-FileCopyrightText: Copyright (c) 2026 Objectionary.com
 SPDX-License-Identifier: MIT
 -->
 
+# Confluence of φ-Calculus Normalization (Lean 4)
+
 [![build](https://github.com/objectionary/proof/actions/workflows/build.yml/badge.svg)](https://github.com/objectionary/proof/actions/workflows/build.yml)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](https://github.com/objectionary/proof/blob/master/LICENSE.txt)
-
-# Confluence of φ-Calculus Normalization (Lean 4)
 
 A fresh, machine-checked proof — in [Lean 4](https://leanprover.github.io) — that the
 normalization (reduction) rules of the current [φ-calculus][paper] are **confluent**
