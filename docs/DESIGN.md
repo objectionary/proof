@@ -313,7 +313,7 @@ hand-written and pinned to phino behaviorally by `difftest`; this would make the
 structural. Optional — it does not affect the proof's validity.
 
 **M5 — rules as checked data (proposed; `docs/RULES-AS-DATA.md`).** A concrete, partial
-realization of the above. `scripts/gen-rule-data.py` (implemented, tested) emits the eleven
+realization of the above. `scripts/gen-rule-data.py` (implemented) emits the eleven
 root rules as **structured** `RuleSpec` data — typed redex shape, side-conditions, and
 contractum — under a *fidelity lock* that aborts if phino's YAML drifts from the locked
 interpretation. A hand-written interpreter `RuleSpec.applies` gives that data a semantics, and
