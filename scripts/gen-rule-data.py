@@ -161,6 +161,8 @@ def check(name, got, want):
 
 
 def main():
+    if len(sys.argv) != 3:
+        raise SystemExit("Usage: gen-rule-data.py <phino-resources-dir> <output-RuleData.lean>")
     res_dir, out = sys.argv[1], sys.argv[2]
     found = {}
     for path in sorted(glob.glob(os.path.join(res_dir, "*.yaml"))):
