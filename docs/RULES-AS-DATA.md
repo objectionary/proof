@@ -5,7 +5,7 @@ SPDX-License-Identifier: MIT
 
 # Rules as checked data — pinning `Step` to phino (M5, proposed)
 
-**Status.** The deriver (`scripts/gen-rule-data.py`) is implemented and tested.
+**Status.** The deriver (`scripts/gen-rule-data.py`) is implemented; wiring it into CI is described below.
 The Lean layer below is a **reviewed draft**: it was written without a local Lean
 toolchain, so the *definitions and the theorem statement* are the contract, and the
 *proofs* are mechanical case-bashes that still need to be compiled and nudged into
