@@ -14,8 +14,8 @@ theorem stops type-checking — drift between phino and the proof becomes a buil
 
 DESIGN — a *fidelity lock*, not a general translator.
   phino's rule semantics live in its Haskell (`contextualize`, `isNF`, ordinals …),
-  not in the YAML, so the YAML cannot be mechanically translated into a Lean relation
-  (see docs/RULES-AS-DATA.md). Instead this script carries one *locked interpretation*
+  not in the YAML, so the YAML cannot be mechanically translated into a Lean relation.
+  Instead this script carries one *locked interpretation*
   per rule (the structured tags below) and ASSERTS that phino's current YAML still
   renders to the pattern/result/condition this interpretation assumes — failing loudly
   on any mismatch. The locked tags are emitted; the proof checks them against `Step`.
@@ -140,8 +140,7 @@ LOCK = {
                 "𝑒2 := contextualize(𝑒1, ⟦𝐵1, 𝜏 ↦ 𝑒1, 𝐵2⟧)"),
         shape=".dispatchForm", conds="[.slotAttached, .valNf]", rhs=".dotFeedback"),
     # NOTE — copy keeps phino's `xi-free` guard in the DATA (Step.copy carries `xiFree`);
-    # only the DISPLAY table (gen-rules.py) strips ξ for paper-figure parity. See
-    # docs/RULES-AS-DATA.md "ξ-free: data vs display".
+    # only the DISPLAY table (gen-rules.py) strips ξ for paper-figure parity.
     "copy": dict(
         expect=("⟦ 𝐵1, 𝜏 ↦ ∅, 𝐵2 ⟧(𝜏 ↦ 𝑒)", "⟦ 𝐵1, 𝜏 ↦ 𝑒, 𝐵2 ⟧",
                 "xi-free(𝑒) and nf(𝑒)", ""),
