@@ -10,8 +10,8 @@ import PhiConfluence.RuleSchema
 # Normalization rules as structured data, generated from phino
 
 The eleven rules as `RuleEntry` tags (types in PhiConfluence/RuleSchema.lean), emitted
-by the fidelity-lock deriver `scripts/gen-rule-data.py`. CI (rule-data-in-sync)
-regenerates this file from pinned phino and fails on any diff — keeping it identical.
+by the fidelity-lock deriver `scripts/gen-rule-data.py`. The CI build regenerates this
+file from pinned phino and compiles it, so the proof builds against phino's rules.
 -/
 
 namespace PhiConfluence

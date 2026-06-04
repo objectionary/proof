@@ -7,9 +7,9 @@ Generate PhiConfluence/RuleData.lean from phino's resources/*.yaml.
 Unlike `gen-rules.py` (which emits *display strings* for the demo), this emits the
 **structured** rule data: each rule becomes a `RuleEntry` of typed tags (redex shape,
 side-conditions, contractum), whose types are defined in PhiConfluence/RuleSchema.lean.
-The committed PhiConfluence/RuleData.lean is regenerated from pinned phino by CI
-(rule-data-in-sync) and compared for an exact match, so a phino rule change becomes a
-build error unless the committed data is regenerated to match.
+The CI build regenerates PhiConfluence/RuleData.lean from pinned phino and then compiles
+it, so the proof always builds against phino-derived rules and a phino change that breaks
+compilation (or trips the fidelity lock below) fails the build.
 
 DESIGN — a *fidelity lock*, not a general translator.
   phino's rule semantics live in its Haskell (`contextualize`, `isNF`, ordinals …),
@@ -17,9 +17,9 @@ DESIGN — a *fidelity lock*, not a general translator.
   Instead this script carries one *locked interpretation*
   per rule (the structured tags below) and ASSERTS that phino's current YAML still
   renders to the pattern/result/condition this interpretation assumes — failing loudly
-  on any mismatch. The locked tags are emitted into RuleData.lean. phino-drift trips
-  this assertion; a committed RuleData.lean that no longer matches trips the
-  rule-data-in-sync diff in CI.
+  on any mismatch. The locked tags are emitted into RuleData.lean, which the CI build
+  regenerates from pinned phino and compiles — so phino-drift trips this assertion and
+  fails the build.
 
 This intentionally duplicates `gen-rules.py`'s `when`/`where` rendering (keep in sync) so
 the asserted condition strings match the display table's — one rendering, two consumers.
@@ -192,8 +192,8 @@ def main():
         "# Normalization rules as structured data, generated from phino",
         "",
         "The eleven rules as `RuleEntry` tags (types in PhiConfluence/RuleSchema.lean), emitted",
-        "by the fidelity-lock deriver `scripts/gen-rule-data.py`. CI (rule-data-in-sync)",
-        "regenerates this file from pinned phino and fails on any diff — keeping it identical.",
+        "by the fidelity-lock deriver `scripts/gen-rule-data.py`. The CI build regenerates this",
+        "file from pinned phino and compiles it, so the proof builds against phino's rules.",
         "-/",
         "",
         "namespace PhiConfluence",

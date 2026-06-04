@@ -4,8 +4,8 @@
 #
 # Regenerate PhiConfluence/RuleData.lean from the PINNED phino rules on GitHub
 # (objectionary/phino at the tag in .phino-version). The fidelity lock in
-# scripts/gen-rule-data.py aborts if phino's rules drift from the locked interpretation;
-# the rule-data-in-sync CI job then diffs the result against the committed file.
+# scripts/gen-rule-data.py aborts if phino's rules drift from the locked interpretation.
+# The CI build runs this before `lake build`, so the proof compiles against phino's rules.
 #
 # Usage: bash scripts/regen-rule-data.sh
 

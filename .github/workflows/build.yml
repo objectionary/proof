@@ -17,6 +17,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-lean
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Regenerate RuleData.lean from pinned phino (build against phino's rules)
+        run: |
+          pip install pyyaml
+          bash scripts/regen-rule-data.sh
       - name: Build the library and executables
         run: |
           lake build
