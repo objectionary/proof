@@ -14,11 +14,14 @@ cd "$(dirname "$0")/.."
 
 PHINO_REPO="${PHINO_REPO:-https://github.com/objectionary/phino}"
 PHINO_VERSION="$(cat .phino-version)"
+# phino's package/binary version is 4-part (0.0.0.74 — what --pin and the release
+# artifacts use), but its git tags drop the leading component (0.0.74).
+PHINO_TAG="${PHINO_VERSION#0.}"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
-echo "cloning $PHINO_REPO at $PHINO_VERSION (pinned via .phino-version) ..."
-git clone --depth 1 --branch "$PHINO_VERSION" "$PHINO_REPO" "$tmp/phino" >/dev/null 2>&1
+echo "cloning $PHINO_REPO at tag $PHINO_TAG (phino $PHINO_VERSION, pinned via .phino-version) ..."
+git clone --depth 1 --branch "$PHINO_TAG" "$PHINO_REPO" "$tmp/phino" >/dev/null 2>&1
 
 python3 scripts/gen-rules.py "$tmp/phino/resources" PhiConfluence/Rules.lean
 echo "done — PhiConfluence/Rules.lean regenerated from phino $PHINO_VERSION"

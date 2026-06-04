@@ -51,7 +51,7 @@ total=0
 # Normal form of a file, or the sentinel <diverge>/<error> for an unfinished/failed run.
 norm() {
   local out ec
-  out=$($TO phino rewrite --pin="$PHINO_VERSION" --normalize --depth-sensitive --flat "$1" 2>&1); ec=$?
+  out=$($TO phino --pin="$PHINO_VERSION" rewrite --normalize --depth-sensitive --flat "$1" 2>&1); ec=$?
   if [ "$ec" = 124 ]; then echo "<diverge>"
   elif [ "$ec" = 0 ]; then echo "$out"
   elif printf '%s' "$out" | grep -q 'depth-sensitive'; then echo "<diverge>"
@@ -72,16 +72,16 @@ probe() {
 
   local i s ec
   for ((i = 1; i <= ITERS; i++)); do
-    s=$($TO phino rewrite --pin="$PHINO_VERSION" --normalize --shuffle --depth-sensitive --flat "$file" 2>&1); ec=$?
+    s=$($TO phino --pin="$PHINO_VERSION" rewrite --normalize --shuffle --depth-sensitive --flat "$file" 2>&1); ec=$?
     [ "$ec" = 0 ] && [ -n "$s" ] && samples+=("shuffle	$s")
   done
 
-  local canon; canon=$($TO phino rewrite --pin="$PHINO_VERSION" --flat "$file" 2>&1)
+  local canon; canon=$($TO phino --pin="$PHINO_VERSION" rewrite --flat "$file" 2>&1)
   local rule forced nfr tmp
   tmp="$(mktemp)"
   for rule in $RULES; do
     [ -f "$RESOURCES/$rule.yaml" ] || continue
-    forced=$($TO phino rewrite --pin="$PHINO_VERSION" --rule "$RESOURCES/$rule.yaml" --max-depth 1 --max-cycles 1 --flat "$file" 2>&1)
+    forced=$($TO phino --pin="$PHINO_VERSION" rewrite --rule "$RESOURCES/$rule.yaml" --max-depth 1 --max-cycles 1 --flat "$file" 2>&1)
     { [ -z "$forced" ] || [ "$forced" = "$canon" ]; } && continue
     printf '%s\n' "$forced" > "$tmp"
     nfr=$(norm "$tmp")

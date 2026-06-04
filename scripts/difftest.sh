@@ -24,7 +24,7 @@ count=0
 while IFS=$'\t' read -r input expected; do
   [ -z "${input:-}" ] && continue
   count=$((count + 1))
-  out=$(printf '%s\n' "$input" | phino rewrite --normalize --pin="$PHINO_VERSION" --flat 2>/dev/null)
+  out=$(printf '%s\n' "$input" | phino --pin="$PHINO_VERSION" rewrite --normalize --flat 2>/dev/null)
   pn=$(printf '%s' "$out" | tr -d '[:space:]'); pn=${pn#Φ↦}
   ours=$(printf '%s' "$expected" | tr -d '[:space:]')
   if [ "$pn" = "$ours" ]; then
