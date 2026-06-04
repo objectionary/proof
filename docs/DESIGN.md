@@ -150,8 +150,8 @@ independent directions:
 * **Tiny, human-readable trusted surface.** Only `Syntax`, `Step`, `↝∗`, and the
   `confluence` statement must be read and endorsed (a few dozen lines — the M0 spec).
 * **Rule transcription vs phino.** The eleven-rule *display* table (`Rules.lean`) is
-  **generated** from phino's `resources/*.yaml` by `gen-rules.py` and pinned by the
-  `rules-in-sync` CI job, so the displayed rules cannot drift from phino/the paper. The
+  **generated** from phino's `resources/*.yaml` by `gen-rules.py` and regenerated from
+  pinned phino in the CI build, so the displayed rules cannot drift from phino/the paper. The
   *proof relation* `Step` is hand-written (constructors are needed for case-analysis) and
   pinned to phino **behaviorally** by `difftest`.
 * **Differential testing against phino.** `Difftest.lean` + `scripts/difftest.sh` normalize
@@ -232,13 +232,15 @@ relation the confluence theorem governs.
 from phino's `resources/*.yaml` — the same source the paper's Fig. 4 is rendered from — so
 the displayed rules cannot drift from phino/the paper by construction.
 
-**CI** (single-purpose workflows, each on push to `master` + PRs, tracking phino-latest):
+**CI** (single-purpose workflows, each on push to `master` + PRs, against pinned phino):
 
-* **build** — install elan, `lake exe cache get`, `lake build`; then a `sorry`/`admit`/
-  `axiom` source gate **and** a `#print axioms` gate on the headline results.
-* **rules-in-sync** — `scripts/regen-rules.sh` clones `objectionary/phino` and regenerates
-  `Rules.lean`; `git diff --exit-code` fails if our committed table has drifted from phino.
-* **difftest** — install the `phino-latest` binary, build `difftest`, run
+* **build** — install elan and `lake exe cache get`; regenerate `Rules.lean` and
+  `RuleData.lean` from the pinned phino (`scripts/regen-rules.sh`,
+  `scripts/regen-rule-data.sh`) so the proof compiles against phino-derived rules; `lake
+  build`; then a `sorry`/`admit`/`axiom` source gate **and** a `#print axioms` gate on the
+  headline results. (`gen-rule-data.py`'s fidelity lock fails the build on rule-structure
+  drift.)
+* **difftest** — install the pinned phino binary (`.phino-version`), build `difftest`, run
   `scripts/difftest.sh`; fails if our reducer disagrees with phino.
 
 The two Lean workflows share a composite action (`.github/actions/setup-lean`) that caches
