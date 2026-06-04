@@ -22,8 +22,8 @@ DESIGN — a *fidelity lock*, not a general translator.
   Net: phino-drift trips the assertion here (CI red); a tags-vs-`Step` mismatch trips
   the Lean conformance theorem. Both ends are pinned.
 
-This re-uses `gen-rules.py`'s exact `when`/`where` rendering so the asserted condition
-strings are identical to the display table's — one rendering, two consumers.
+This intentionally duplicates `gen-rules.py`'s `when`/`where` rendering (keep in sync) so
+the asserted condition strings match the display table's — one rendering, two consumers.
 
 Usage:
     gen-rule-data.py <phino-resources-dir> <output-RuleData.lean>
