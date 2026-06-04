@@ -67,7 +67,7 @@ inductive Par : Term → Term → Prop where
       ParB bs bs' → lookup bs .phi ≠ .absent → lookup bs a = .absent →
       Par (.dispatch (.form bs) a) (.dispatch (.dispatch (.form bs') .phi) a)
   | alpha {bs bs' : List Binding} {i : Nat} {τ1 : Attr} {e e' : Term} :
-      ParB bs bs' → bs[i]? = some (.void τ1) → Par e e' →
+      ParB bs bs' → voidAtOrdinal bs i = some τ1 → Par e e' →
       Par (.app (.form bs) (.alpha i) e) (.app (.form bs') τ1 e')
   | dot {bs bs' : List Binding} {a : Attr} {e₀ e₁ : Term} :
       ParB bs bs' → lookup bs a = .attached e₀ → lookup bs' a = .attached e₁ → nf e₁ = true →
@@ -349,7 +349,7 @@ mutual
 /-- **Complete development** (Takahashi's `e*`): contract *every* redex present in `e` in one
 sweep. It is the apex of the `Par`-diamond — `par_triangle` shows any single `⇒` out of a
 well-formed `e` is itself followed by a `⇒` into `devel e`, so `d := devel a` joins any fork.
-The `alpha` arm renames a positional `αᵢ` to the `i`-th void slot's key (`bs[i]?`) but does
+The `alpha` arm renames a positional `αᵢ` to the domain-ordinal-`i` void slot's key (`voidAtOrdinal`) but does
 NOT fire the `copy`/`over` redex it creates — a single development contracts redexes *present*,
 not created ones. `dot`/`copy` (M4.3/4.4) will need the guard-on-developed-subterm treatment.
 Pattern order is load-bearing (the `.bot`-subject and `.form`-subject cases precede the
@@ -386,9 +386,9 @@ def devel : Term → Term
       | .absent, _ =>
           match a with
           | .alpha i =>
-              match bs[i]? with
-              | some (.void τ1) => .app (.form (develB bs)) τ1 (devel e₂)
-              | _ => .app (.form (develB bs)) a (devel e₂)
+              match voidAtOrdinal bs i with
+              | some τ1 => .app (.form (develB bs)) τ1 (devel e₂)
+              | none => .app (.form (develB bs)) a (devel e₂)
           | _ => .bot
       | .void, _ =>
           if xiFree (devel e₂) && nf (devel e₂) then .form (fill (develB bs) a (devel e₂))
@@ -492,14 +492,9 @@ theorem par_devel : ∀ (e : Term), Par e (devel e)
       | .absent, b =>
           cases a with
           | alpha i =>
-              cases hget : bs[i]? with
+              cases hget : voidAtOrdinal bs i with
               | none => simp only [hget]; exact .congApp (.congForm (parB_develB bs)) (par_devel e₂)
-              | some bnd =>
-                  cases bnd with
-                  | void τ1 => simp only [hget]; exact .alpha (parB_develB bs) hget (par_devel e₂)
-                  | attached _ _ => simp only [hget]; exact .congApp (.congForm (parB_develB bs)) (par_devel e₂)
-                  | delta _ => simp only [hget]; exact .congApp (.congForm (parB_develB bs)) (par_devel e₂)
-                  | lambda _ => simp only [hget]; exact .congApp (.congForm (parB_develB bs)) (par_devel e₂)
+              | some τ1 => simp only [hget]; exact .alpha (parB_develB bs) hget (par_devel e₂)
           | phi => exact .miss (parB_develB bs) h rfl (par_devel e₂)
           | rho => exact .miss (parB_develB bs) h rfl (par_devel e₂)
           | label nm => exact .miss (parB_develB bs) h rfl (par_devel e₂)
@@ -578,25 +573,33 @@ theorem par_form_inv {bs : List Binding} {t : Term} (h : Par (.form bs) t) :
 
 /-- `ParB` keeps the `i`-th void binding a void binding with the same key (positional
 preservation, the engine behind the triangle's `alpha` side-condition transport). -/
-theorem parB_get_void {bs bs' : List Binding} (h : ParB bs bs') {i : Nat} {τ1 : Attr}
-    (hget : bs[i]? = some (.void τ1)) : bs'[i]? = some (.void τ1) := by
-  induction i generalizing bs bs' with
-  | zero =>
-      cases h with
-      | nil => rw [List.getElem?_nil] at hget; exact absurd hget (by nofun)
-      | consVoid _ =>
-          rw [List.getElem?_cons_zero] at hget ⊢
-          injection hget with hget; injection hget with hget; subst hget; rfl
-      | consAttached _ _ => rw [List.getElem?_cons_zero] at hget; exact absurd hget (by nofun)
-      | consDelta _ => rw [List.getElem?_cons_zero] at hget; exact absurd hget (by nofun)
-      | consLambda _ => rw [List.getElem?_cons_zero] at hget; exact absurd hget (by nofun)
-  | succ j ih =>
-      cases h with
-      | nil => rw [List.getElem?_nil] at hget; exact absurd hget (by nofun)
-      | consVoid hr => rw [List.getElem?_cons_succ] at hget ⊢; exact ih hr hget
-      | consAttached _ hr => rw [List.getElem?_cons_succ] at hget ⊢; exact ih hr hget
-      | consDelta hr => rw [List.getElem?_cons_succ] at hget ⊢; exact ih hr hget
-      | consLambda hr => rw [List.getElem?_cons_succ] at hget ⊢; exact ih hr hget
+theorem parB_voidAtOrdinal {bs bs' : List Binding} (h : ParB bs bs') :
+    ∀ i, voidAtOrdinal bs i = voidAtOrdinal bs' i := by
+  induction h using ParB.rec (motive_1 := fun _ _ _ => True) with
+  | refl => trivial
+  | dd => trivial
+  | dc => trivial
+  | null => trivial
+  | «over» => trivial
+  | stop => trivial
+  | miss => trivial
+  | stay => trivial
+  | phi => trivial
+  | alpha => trivial
+  | dot => trivial
+  | copy => trivial
+  | congDispatch => trivial
+  | congApp => trivial
+  | congForm => trivial
+  | nil => intro i; rfl
+  | consVoid _ ih => intro i; cases i with
+      | zero => rfl
+      | succ j => simp only [voidAtOrdinal]; exact ih j
+  | consAttached _ _ _ ih => intro i; cases i with
+      | zero => rfl
+      | succ j => simp only [voidAtOrdinal]; exact ih j
+  | consDelta _ ih => intro i; simp only [voidAtOrdinal]; exact ih i
+  | consLambda _ ih => intro i; simp only [voidAtOrdinal]; exact ih i
 
 /-- The key well-formedness lemma: in a formation whose every key is legal (not a positional
 `αᵢ`), looking up a positional `αᵢ` is `absent` — otherwise `αᵢ` would be in the domain, but
@@ -713,14 +716,9 @@ theorem tri_app {s s' arg arg' : Term} {a : Attr}
           | .absent, _ =>
               cases a with
               | alpha i =>
-                  cases hget : bs[i]? with
+                  cases hget : voidAtOrdinal bs i with
                   | none => simp only [hget]; exact .congApp ihs iharg
-                  | some bnd =>
-                      cases bnd with
-                      | void τ1 => simp only [hget]; exact .alpha hcd (parB_get_void hbc hget) iharg
-                      | attached _ _ => simp only [hget]; exact .congApp ihs iharg
-                      | delta _ => simp only [hget]; exact .congApp ihs iharg
-                      | lambda _ => simp only [hget]; exact .congApp ihs iharg
+                  | some τ1 => simp only [hget]; exact .alpha hcd (parB_voidAtOrdinal hbc i ▸ hget) iharg
               | phi => exact .miss hcd (parB_lookup_absent hbc hb) rfl iharg
               | rho => exact .miss hcd (parB_lookup_absent hbc hb) rfl iharg
               | label nm => exact .miss hcd (parB_lookup_absent hbc hb) rfl iharg
@@ -903,14 +901,9 @@ theorem nf_devel {e : Term} (hnf : nf e = true) : devel e = e := by
               cases a with
               | alpha i =>
                   simp only [appNF, hl] at happ
-                  cases hget : bs[i]? with
+                  cases hget : voidAtOrdinal bs i with
                   | none => simp only [devel, hl, hget, hb, iharg hnarg]
-                  | some bnd =>
-                      cases bnd with
-                      | void τ1 => rw [hget] at happ; simp at happ
-                      | attached c d => simp only [devel, hl, hget, hb, iharg hnarg]
-                      | delta d => simp only [devel, hl, hget, hb, iharg hnarg]
-                      | lambda f => simp only [devel, hl, hget, hb, iharg hnarg]
+                  | some τ1 => rw [hget] at happ; simp at happ
               | phi => simp [appNF, hl] at happ
               | rho => simp [appNF, hl] at happ
               | label nm => simp [appNF, hl] at happ
@@ -1089,7 +1082,7 @@ theorem par_triangle {e u : Term} (hwf : WF e) (h : Par e u) : Par u (devel e) :
 The structural `nf` equals "no `Step` fires anywhere" — the faithful counterpart of phino's
 `isNF`. Forward (`step_nf_false`) is unconditional; the converse needs **`WF`** (consumed exactly
 once, via `lookup_alpha_absent_of_wf`): an `αᵢ`-keyed *void* slot is marked a redex by `appNF` but
-the `alpha` rule fires positionally (`bs[i]?`), so the malformed term `⟦αᵢ↦∅⟧(αᵢ↦e)` with a
+the `alpha` rule fires by domain ordinal (`voidAtOrdinal`), so the malformed term `⟦αᵢ↦∅⟧(αᵢ↦e)` with a
 non-`ξ`-free normal `e` has `nf = false` yet is irreducible — `WF` (legal-key invariant, dev. #8)
 bars that key. -/
 
@@ -1292,14 +1285,9 @@ theorem nf_false_reducible {e : Term} (hwf : WF e) (h : nf e = false) : Reducibl
                       rw [lookup_alpha_absent_of_wf hlegal] at hl
                       simp only [appNF] at h
                       rw [lookup_alpha_absent_of_wf hlegal] at h
-                      cases hget : bs[i]? with
+                      cases hget : voidAtOrdinal bs i with
                       | none => rw [hget] at h; simp at h
-                      | some bnd =>
-                          cases bnd with
-                          | void τ1 => exact ⟨_, Step.alpha hget⟩
-                          | attached c d => rw [hget] at h; simp at h
-                          | delta d => rw [hget] at h; simp at h
-                          | lambda f => rw [hget] at h; simp at h
+                      | some τ1 => exact ⟨_, Step.alpha hget⟩
                   | phi => exact ⟨_, Step.miss hl (by simp [Attr.isAlpha])⟩
                   | rho => exact ⟨_, Step.miss hl (by simp [Attr.isAlpha])⟩
                   | label nm => exact ⟨_, Step.miss hl (by simp [Attr.isAlpha])⟩

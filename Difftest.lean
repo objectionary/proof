@@ -46,7 +46,11 @@ def cases : List Term :=
     app (form [attached rho glob]) rho glob,                            -- Rstay → ⟦ρ↦Φ⟧ (ρ explicit)
     app (form []) rho glob,                                             -- Rcopy fills implicit ρ → ⟦ρ↦Φ⟧
     app (form [void (label "x")]) (alpha 0) glob,                       -- Ralpha→x, Rcopy → ⟦x↦Φ, ρ↦∅⟧
-    app (form [void (label "x")]) (alpha 1) glob ]                      -- Ralpha hits implicit ρ → ⟦x↦∅, ρ↦Φ⟧
+    app (form [void (label "x")]) (alpha 1) glob,                       -- Ralpha hits implicit ρ → ⟦x↦∅, ρ↦Φ⟧
+    -- alpha indexes over the DOMAIN (skips the λ asset; phino #749):
+    app (form [lambda "Fn", void (label "x")]) (alpha 0) glob,          -- α0 skips λ, hits x → ⟦λ↦Fn, x↦Φ, ρ↦∅⟧
+    app (form [lambda "Fn", void (label "x")]) (alpha 1) glob,          -- α1 = 1st non-asset (ρ) → ⟦λ↦Fn, x↦∅, ρ↦Φ⟧
+    form [attached rho (form [])] ]                                     -- parent: single ρ, no dup (phino #748) → ⟦ρ↦⟦ρ↦∅⟧⟧
 
 /-- Our reducer's normal form (bounded), on the **canonicalised** term — `canon` injects the implicit
 parent `ρ` exactly as phino does, so the result matches phino's normal form. -/

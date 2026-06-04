@@ -58,4 +58,17 @@ def fill : List Binding → Attr → Term → List Binding
   | Binding.delta d :: r, a, e => Binding.delta d :: fill r a e
   | Binding.lambda f :: r, a, e => Binding.lambda f :: fill r a e
 
+/-- The key of the binding at **domain ordinal** `i` — counting only non-asset attributes
+(`Δ`/`λ` assets are skipped) — if that binding is `void`; otherwise `none`. This is `alpha`'s
+positional index *over the domain* (paper Def. Ordinal; phino #749), **not** the raw list
+position: `αᵢ` renames to the key of the `i`-th non-asset void slot. -/
+def voidAtOrdinal : List Binding → Nat → Option Attr
+  | [], _ => none
+  | Binding.delta _ :: r, i => voidAtOrdinal r i
+  | Binding.lambda _ :: r, i => voidAtOrdinal r i
+  | Binding.void a :: _, 0 => some a
+  | Binding.attached _ _ :: _, 0 => none
+  | Binding.void _ :: r, i + 1 => voidAtOrdinal r i
+  | Binding.attached _ _ :: r, i + 1 => voidAtOrdinal r i
+
 end PhiConfluence

@@ -46,14 +46,12 @@ So `WF`-scoping re-imposes exactly the paper's own grammar restrictions our loos
 "normal forms are syntactically identical". We prove it, `WF`-scoped because our encoding is looser
 than the grammar.)
 
-**Upstream defect — phino violates its own `Nodup`.** phino's *parser* rejects duplicate keys (so
-its input obeys Def. Binding), but its *normalizer* can emit a duplicate-`ρ` formation:
-`⟦ρ↦⟦⟧⟧` ⟶ `⟦ρ↦⟦ρ↦∅⟧, ρ↦∅⟧` (two `ρ` keys), specific to `ρ` attached to a sub-formation (`ρ↦⊥`/
-`ρ↦ξ`/`ρ↦Φ` stay single). That contradicts Def. Binding, so it is a phino bug in parent-injection
-(cf. the `alpha`-ordinal prose-vs-figure defect, note †). Our model — faithful to Def. Binding —
-canonicalises `⟦ρ↦⟦⟧⟧` to the WF `⟦ρ↦⟦ρ↦∅⟧⟧` (single `ρ`) and diverges from phino's buggy output,
-with phino in the wrong. We deliberately do **not** reproduce the defect (it would break `Nodup`,
-hence the `lookup`-vs-matcher agreement). To be fixed upstream in phino.
+**phino's duplicate-`ρ` printer bug — resolved (phino #748).** Earlier, phino's *printer* injected a
+duplicate void `ρ`, so `⟦ρ↦⟦⟧⟧` printed as `⟦ρ↦⟦ρ↦∅⟧, ρ↦∅⟧` (two `ρ` keys) — non-`Nodup`,
+contradicting the Def. Binding its own parser enforces. Fixed in phino **#748** ("dont inject
+duplicate void rho in salty printing"); phino now emits the single-`ρ` form our model already
+produces (`canon ⟦ρ↦⟦⟧⟧ = ⟦ρ↦⟦ρ↦∅⟧⟧`). We never reproduced the bug (it would break `Nodup` and the
+`lookup`-vs-matcher agreement), so model and phino now agree here.
 (As of
 M4.2b, `alpha` IS in `Step`, so `WF` is now load-bearing: the headline `confluence` carries
 `WF e` and is proved via the WF-relativized diamond `ParWF a b := WF a ∧ Par a b`. The
@@ -72,7 +70,7 @@ renders into it. `nf e` means "`e` is in normal form" (no rule matches anywhere 
 |---|---|---|---|
 | `dot`   | `Step.dot`   | `⟦B₁,τ↦e₁,B₂⟧.τ → C(e₁⊳⟦…⟧)(ρ↦…)` | `nf e₁` |
 | `copy`  | `Step.copy`  | `⟦B₁,τ↦∅,B₂⟧(τ↦e₁) → ⟦B₁,τ↦e₁,B₂⟧` | `ξFree e₁` ∧ `nf e₁` (ξ-free KEPT; `scope`/`contextualize` vacuous — dev. #7) |
-| `alpha` | `Step.alpha` | `⟦B₁,τ₁↦∅,B₂⟧(τ₂↦e) → ⟦B₁,τ₁↦∅,B₂⟧(τ₁↦e)` | `index τ₂ = |B₁|` (†) |
+| `alpha` | `Step.alpha` | `⟦B₁,τ₁↦∅,B₂⟧(τ₂↦e) → ⟦B₁,τ₁↦∅,B₂⟧(τ₁↦e)` | `index τ₂ = domain(B₁)` (†) |
 | `phi`   | `Step.phi`   | `⟦B⟧.τ → ⟦B⟧.φ.τ` | `φ∈B` ∧ `τ∉B` |
 | `stay`  | `Step.stay`  | `⟦B₁,ρ↦e₁,B₂⟧(ρ↦e₂) → ⟦B₁,ρ↦e₁,B₂⟧` | — |
 | `over`  | `Step.over`  | `⟦B₁,τ↦e₁,B₂⟧(τ↦e₂) → ⊥` | `τ≠ρ` (attached slot) |
@@ -82,13 +80,15 @@ renders into it. `nf e` means "`e` is in normal form" (no rule matches anywhere 
 | `dd`    | `Step.dd`    | `⊥.τ → ⊥` | — |
 | `dc`    | `Step.dc`    | `⊥(τ↦e) → ⊥` | — |
 
-(†) **`alpha`'s index counts *all* bindings, assets included.** `|B₁|` is the raw
-binding-list position (`Step.alpha` matches `bs[i]?`), so a `Δ`/`λ` asset before the void slot
-shifts the ordinal — exactly what phino does (`Rule.hs`: `length bds`), and what the paper's
-*auto-generated* reduction figure (`phino explain`) shows. **Caveat (upstream paper defect):** the
-paper's hand-written prose (`foundations.tex`, Def. Domain/Ordinal) *excludes* assets from the
-ordinal, contradicting its own generated figure. Lean follows phino/the figure; the prose is the
-thing to fix upstream. The gloss "`index τ₂ = |B₁|`" above means raw binding count, not domain size.
+(†) **`alpha`'s index counts the *domain* (assets excluded) — phino #749.** `Step.alpha` matches
+`voidAtOrdinal bs i` = the key of the `i`-th *non-asset* binding when that binding is void, so a
+`Δ`/`λ` asset before the void slot does **not** shift the ordinal. This is the paper's Def. Ordinal /
+Def. Domain (the domain excludes assets) and phino post-**#749** ("count alpha index over domain
+excluding assets" — `alpha.yaml`'s `index = domain` condition). *Earlier* phino (and its generated
+figure) counted assets raw (`|B₁|` = `length bds`), contradicting the paper's own prose and worked
+example (`tab:ordinals`: ordinal of `x` in `⟦L>Fn, x↦…⟧` is `0`); #749 fixed phino to match the
+prose, and `Step.alpha` matches the fixed semantics. The regenerated `Rules.lean` now shows
+`index(τ₂) = domain(B₁)`.
 
 Plus the four congruence constructors `Step.congDispatch`, `Step.congAppFn`,
 `Step.congAppArg`, `Step.congForm` — covering every recursive `Term` position (dispatch
@@ -146,7 +146,8 @@ assumptions — not gaps against the current paper.
 5. **`ρ`-feedback (landed).** `dot`'s `ρ`-introduction (which makes the system non-terminating)
    landed in `Step`/`Par` at **M4.3** with the `nf`-guard and `contextualize` (receiver = the
    dispatched formation, so no `scope`). `copy` landed at **M4.4** (see #7). `alpha` landed at
-   **M4.2b** (positional, modelled by `bs[i]?` — matching phino, assets counted). So **all eleven
+   **M4.2b** (positional; now modelled by `voidAtOrdinal` — the domain ordinal, assets skipped,
+   matching the paper and phino post-#749 — see note †). So **all eleven
    rules are now in `Step`/`Par`**, and `confluence` covers them. (Earlier drafts said "M1–M2 use a
    simplified `dot`" — there was never a simplified `dot`; it arrived at M4.3 with full ρ-feedback.)
 6. **Unique-key well-formedness (Def. 4.8).** Formations are assumed to have unique

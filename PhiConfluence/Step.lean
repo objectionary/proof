@@ -25,9 +25,9 @@ which needs no contextualization or formation rebuilding):
 * `miss` `⟦B⟧(τ↦e) ↝ ⊥`            (apply a missing non-positional `τ`)
 * `stay` `⟦…ρ↦e₁…⟧(ρ↦e₂) ↝ ⟦…ρ↦e₁…⟧`   (applying `ρ` to a formation that already has `ρ`)
 * `phi`  `⟦B⟧.τ ↝ ⟦B⟧.φ.τ`         (dispatch a missing `τ` through the decoration `φ`)
-* `alpha` `⟦B₁,τ₁↦∅,B₂⟧(αᵢ↦e) ↝ ⟦B₁,τ₁↦∅,B₂⟧(τ₁↦e)`  (`i = |B₁|`: rename a positional
-  `αᵢ` argument to the key `τ₁` of the `i`-th, void, binding — **positional**, by `bs[i]?`,
-  matching phino exactly; assets are counted in the index)
+* `alpha` `⟦B₁,τ₁↦∅,B₂⟧(αᵢ↦e) ↝ ⟦B₁,τ₁↦∅,B₂⟧(τ₁↦e)`  (rename a positional `αᵢ` to the key `τ₁`
+  of the binding at **domain ordinal** `i` — the `i`-th *non-asset* binding — when it is void, via
+  `voidAtOrdinal bs i`; `Δ`/`λ` assets are skipped, matching the paper's Def. Ordinal and phino #749)
 * `dot`  `⟦B₁,τ↦e₁,B₂⟧.τ ↝ (C(e₁ ⊳ ⟦…⟧))(ρ↦⟦…⟧)`, guard `nf e₁`  (dispatch on an *attached*
   slot whose value is normal: contextualize it against the formation, then re-decorate with
   `ρ`↦the formation — the `ρ`-feedback that makes the system non-terminating)
@@ -66,7 +66,7 @@ inductive Step : Term → Term → Prop where
       lookup bs .phi ≠ .absent → lookup bs a = .absent →
       Step (.dispatch (.form bs) a) (.dispatch (.dispatch (.form bs) .phi) a)
   | alpha {bs : List Binding} {i : Nat} {τ₁ : Attr} {e : Term} :
-      bs[i]? = some (.void τ₁) →
+      voidAtOrdinal bs i = some τ₁ →
       Step (.app (.form bs) (.alpha i) e) (.app (.form bs) τ₁ e)
   | dot {bs : List Binding} {a : Attr} {e₁ : Term} :
       lookup bs a = .attached e₁ → nf e₁ = true →
