@@ -169,6 +169,8 @@ def main():
         with open(path, encoding="utf-8") as f:
             d = yaml.safe_load(f)
         name = str(d["name"])
+        if name in found:
+            raise SystemExit(f"duplicate rule name '{name}' in {res_dir}")
         got = (str(d["pattern"]), str(d["result"]), rcond(d.get("when")), rwhere(d.get("where")))
         if name not in LOCK:
             raise SystemExit(f"phino has an UNLOCKED rule '{name}' — add it to LOCK and to Step/conformance")
