@@ -16,9 +16,10 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - name: Install phino (latest)
+      - name: Install phino (pinned via .phino-version)
         run: |
-          sudo curl -fsSL -o /usr/local/bin/phino http://phino.objectionary.com/releases/ubuntu-24.04/phino-latest
+          version="$(cat .phino-version)"
+          sudo curl -fsSL -o /usr/local/bin/phino "http://phino.objectionary.com/releases/ubuntu-24.04/phino-$version"
           sudo chmod +x /usr/local/bin/phino
           phino --version
       - uses: ./.github/actions/setup-lean

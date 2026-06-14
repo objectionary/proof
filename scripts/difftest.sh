@@ -4,11 +4,13 @@
 #
 # Differential test: for each example program, check that phino's normal form
 # (`phino rewrite --normalize`) equals our reducer's normal form. The behavioral
-# pin between this prover's Step relation and phino. Requires `phino` on PATH.
+# pin between this prover's Step relation and phino. Requires `phino` on PATH,
+# pinned via `--pin` to the version in .phino-version (phino aborts on a mismatch).
 
 set -uo pipefail
 cd "$(dirname "$0")/.."
 export PATH="$HOME/.elan/bin:$PATH"
+PHINO_VERSION="$(cat .phino-version)"
 
 if ! command -v phino >/dev/null 2>&1; then
   echo "FATAL: phino not found on PATH; the differential test requires it (fail-fast, not skip)" >&2
@@ -22,7 +24,7 @@ count=0
 while IFS=$'\t' read -r input expected; do
   [ -z "${input:-}" ] && continue
   count=$((count + 1))
-  out=$(printf '%s\n' "$input" | phino rewrite --normalize --flat 2>/dev/null)
+  out=$(printf '%s\n' "$input" | phino --pin="$PHINO_VERSION" rewrite --normalize --flat 2>/dev/null)
   pn=$(printf '%s' "$out" | tr -d '[:space:]'); pn=${pn#Φ↦}
   ours=$(printf '%s' "$expected" | tr -d '[:space:]')
   if [ "$pn" = "$ours" ]; then

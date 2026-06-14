@@ -13,6 +13,8 @@ import PhiConfluence.Step
 import PhiConfluence.Reduce
 import PhiConfluence.Render
 import PhiConfluence.Rules
+import PhiConfluence.RuleSchema
+import PhiConfluence.RuleData
 import PhiConfluence.Parallel
 import PhiConfluence.Preservation
 import PhiConfluence.Diamond

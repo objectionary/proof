@@ -18,7 +18,10 @@ docs/M0-spec.md. Run this whenever phino's rules change.
 Usage:
     gen-rules.py <phino-resources-dir> <output-Rules.lean>
 """
-import sys, os, glob
+import glob
+import os
+import sys
+
 import yaml
 
 
@@ -28,7 +31,8 @@ def rterm(x):
 
 def rcmp(x):
     if isinstance(x, dict):
-        k = next(iter(x)); v = x[k]
+        k = next(iter(x))
+        v = x[k]
         if k == "index":
             return f"index({rterm(v)})"
         if k == "length":
@@ -42,7 +46,8 @@ def rcond(w):
         return ""
     if not isinstance(w, dict):
         return rterm(w)
-    k = next(iter(w)); v = w[k]
+    k = next(iter(w))
+    v = w[k]
     if k == "and":
         return " and ".join(p for p in (rcond(x) for x in v) if p)
     if k == "or":
@@ -65,7 +70,9 @@ def rcond(w):
 def rwhere(ws):
     parts = []
     for w in ws or []:
-        meta = w.get("meta"); fn = w.get("function"); args = w.get("args", [])
+        meta = w.get("meta")
+        fn = w.get("function")
+        args = w.get("args", [])
         parts.append(f"{meta} := {fn}({', '.join(rterm(a) for a in args)})")
     return " and ".join(parts)
 
