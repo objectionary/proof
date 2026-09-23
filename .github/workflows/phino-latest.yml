@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Objectionary.com
+# SPDX-License-Identifier: MIT
+---
+name: phino-latest
+'on':
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+jobs:
+  phino-latest:
+    timeout-minutes: 15
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fail when .phino-version lags behind the newest phino release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          pinned="$(cat .phino-version)"
+          latest="$(gh api repos/objectionary/phino/releases/latest --jq .tag_name)"
+          if [ "${pinned#*.}" != "$latest" ]; then
+            echo "::error::.phino-version pins phino $pinned, but the newest release is $latest, bump .phino-version and .phino-sha256"
+            exit 1
+          fi
+          echo "phino pin $pinned is the newest release"
