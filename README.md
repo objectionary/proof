@@ -42,12 +42,16 @@ stateful Morphing/Dataization functions, not term rewriting. The frozen contract
 
 ```bash
 curl -sSf https://elan.lean-lang.org/elan-init.sh | sh   # one-time: Lean's toolchain manager
-lake exe cache get          # download mathlib's prebuilt artifacts
-bash .github/regen-rules.sh # generate the rule files from pinned phino (needs Python + PyYAML)
-lake build                  # green ⇒ every theorem is kernel-checked (CI also gates #print axioms)
+pip install -r .github/requirements.txt                  # one-time: Python deps of the generators
+make                        # green ⇒ every theorem is kernel-checked and axiom-clean, as in CI
 lake exe demo               # the eleven rules + example reductions, by the project's own reducer
-bash .github/difftest.sh    # our reducer vs `phino rewrite --normalize` (needs phino on PATH)
+make difftest               # our reducer vs `phino rewrite --normalize` (needs phino on PATH)
 ```
+
+`make` needs GNU Make 4.3 or newer. It fetches mathlib's prebuilt artifacts, generates the rule
+files from pinned phino (and regenerates them only when `.phino-version` or a generator changes),
+runs the generator unit tests and `lake build`, and checks that no headline theorem depends on a
+forbidden axiom.
 
 The rule files (`Rules.lean`, `RuleData.lean`) are not kept in Git: they are generated from the
 `resources/*.yaml` of the phino pinned in `.phino-version` — the same source the paper's Fig. 4
@@ -74,15 +78,15 @@ PhiConfluence/
   Abstract/Rewriting                Diamond / Confluent vocabulary + the church_rosser bridge
 docs/      M0-spec.md (frozen contract) · DESIGN.md (design + provenance)
 .github/   regen-rules.sh · gen-rules.py · gen-rule-data.py · phino_render.py · difftest.sh
-           test_*.py (generator unit tests) · workflows/ · actions/
-scripts/   confluence-probe.sh (manual confluence probe, not run by CI)
+           test_*.py (generator unit tests) · axioms.lean · requirements.txt · workflows/
+Makefile   `make` builds and checks everything CI checks, except difftest
 ```
 
 ## Stack
 
 Lean 4 (`leanprover/lean4:v4.30.0`) and mathlib4 (pinned in `lakefile.toml`), built with Lake.
-Abstract rewriting is built on mathlib's `Prop`-valued `Relation` API. CI runs `lake build` with a
-`#print axioms` gate, the phino differential test, a rule-table-in-sync check, and the standard
+Abstract rewriting is built on mathlib's `Prop`-valued `Relation` API. CI runs `make` (unit tests,
+`lake build`, and a `#print axioms` gate), the phino differential test, and the standard
 objectionary hygiene checks.
 
 [paper]: https://github.com/objectionary/calculus-paper

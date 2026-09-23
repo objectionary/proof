@@ -167,7 +167,7 @@ independent directions:
 
 Before investing in the Lean diamond, the central open question — *does the full eleven-rule
 calculus even have the diamond, given the non-monotone `nf` guards?* — was stressed both
-empirically and by structural analysis. The empirical probe (`scripts/confluence-probe.sh`) is a
+empirically and by structural analysis. The empirical probe (a `confluence-probe.sh` script, since removed) was a
 **fixed corpus of 7 hand-crafted programs plus the paper's Appendix-A examples**, each run under
 rule-order `--shuffle` and an off-strategy single-rule redex-position check; no divergence was
 found. (This is a *fixed* corpus, not random fuzzing — there is no term generator.) The analysis
@@ -234,15 +234,13 @@ pinned in `.phino-version` — the same source the paper's Fig. 4 is rendered fr
 
 **CI** (single-purpose workflows, each on push to `master` + PRs, against pinned phino):
 
-* **build** — install elan and `lake exe cache get`; run the generator unit tests
-  (`.github/test_*.py`); generate `Rules.lean` and `RuleData.lean` from the pinned phino
-  (`.github/regen-rules.sh`); `lake
-  build`; then a `sorry`/`admit`/`axiom` source gate **and** a `#print axioms` gate on the
-  headline results. (`gen-rule-data.py`'s fidelity lock fails the build on rule-structure
-  drift.)
+* **build** — install elan and `lake exe cache get`, then run `make`: the generator unit
+  tests (`.github/test_*.py`); `Rules.lean` and `RuleData.lean` generated from the pinned
+  phino (`.github/regen-rules.sh`); `lake build`; then a `sorry`/`admit`/`axiom` source gate
+  **and** a `#print axioms` gate (`.github/axioms.lean`) on the headline results.
+  (`gen-rule-data.py`'s fidelity lock fails the build on rule-structure drift.)
 * **difftest** — install the pinned phino binary (`.phino-version`, verified against
-  `.phino-sha256`), generate the rule files, build `difftest`, run `.github/difftest.sh`; fails if our reducer
-  disagrees with phino.
+  `.phino-sha256`), then run `make difftest`; fails if our reducer disagrees with phino.
 * **phino-latest** — weekly, fails when `.phino-version` lags behind phino's newest
   release, so a stale pin is reported instead of silently narrowing `difftest`.
 
