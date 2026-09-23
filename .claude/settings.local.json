@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(reuse lint *)",
+      "Bash(yamllint -c .yamllint .github/workflows/difftest.yml)",
+      "Bash(actionlint .github/workflows/difftest.yml)",
+      "Bash(command -v shellcheck)",
+      "Bash(shellcheck scripts/regen-rules.sh scripts/difftest.sh scripts/confluence-probe.sh)",
+      "Bash(echo \"shellcheck exit: $?\")",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git fetch *)"
+    ]
+  }
+}
