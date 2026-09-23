@@ -10,6 +10,8 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 export PATH="$HOME/.elan/bin:$PATH"
+
+[ -f .phino-version ] || { echo "FATAL: .phino-version is missing, cannot pin phino" >&2; exit 1; }
 PHINO_VERSION="$(cat .phino-version)"
 
 if ! command -v phino >/dev/null 2>&1; then

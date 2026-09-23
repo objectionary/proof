@@ -68,9 +68,11 @@ PhiConfluence/
   Confluence                        the headline `confluence`
   Equivalence                       `≡` (convertibility) as an Equivalence on well-formed terms
   Reduce · Render · Rules           executable reducer + reduce_sound; pretty-printer; rule table
+  RuleSchema · RuleData             rule tags generated from phino by the fidelity lock
   Abstract/Rewriting                Diamond / Confluent vocabulary + the church_rosser bridge
 docs/      M0-spec.md (frozen contract) · DESIGN.md (design + provenance)
-scripts/   gen-rules.py · regen-rules.sh · difftest.sh · confluence-probe.sh
+scripts/   gen-rules.py · gen-rule-data.py · phino_render.py · regen-rules.sh · difftest.sh
+           confluence-probe.sh · tests/ (generator unit tests)
 ```
 
 ## Stack

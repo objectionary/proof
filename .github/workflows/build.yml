@@ -19,12 +19,16 @@ jobs:
       - uses: ./.github/actions/setup-lean
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.x'
-      - name: Regenerate Rules.lean and RuleData.lean from pinned phino
+          python-version: '3.12'
+      - name: Test the rule generators
         run: |
-          pip install pyyaml
+          pip install pyyaml==6.0.3 pyhamcrest==2.1.0 pytest==9.1.1
+          python -m pytest -p no:cacheprovider scripts/tests
+      - name: Regenerate Rules.lean and RuleData.lean from pinned phino, and detect drift
+        run: |
           bash scripts/regen-rules.sh
-          bash scripts/regen-rule-data.sh
+          git diff --exit-code PhiConfluence/Rules.lean PhiConfluence/RuleData.lean \
+            || { echo "::error::generated rules are out of sync with phino, run scripts/regen-rules.sh and commit"; exit 1; }
       - name: Build the library and executables
         run: |
           lake build

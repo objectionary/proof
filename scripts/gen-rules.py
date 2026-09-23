@@ -18,63 +18,9 @@ docs/M0-spec.md. Run this whenever phino's rules change.
 Usage:
     gen-rules.py <phino-resources-dir> <output-Rules.lean>
 """
-import glob
-import os
 import sys
 
-import yaml
-
-
-def rterm(x):
-    return str(x)
-
-
-def rcmp(x):
-    if isinstance(x, dict):
-        k = next(iter(x))
-        v = x[k]
-        if k == "index":
-            return f"index({rterm(v)})"
-        if k == "length":
-            return f"|{rterm(v)}|"
-        return f"{k}({rterm(v)})"
-    return rterm(x)
-
-
-def rcond(w):
-    if w is None:
-        return ""
-    if not isinstance(w, dict):
-        return rterm(w)
-    k = next(iter(w))
-    v = w[k]
-    if k == "and":
-        return " and ".join(p for p in (rcond(x) for x in v) if p)
-    if k == "or":
-        return " or ".join(p for p in (rcond(x) for x in v) if p)
-    if k == "not":
-        return "¬(" + rcond(v) + ")"
-    if k == "in":
-        return f"{rterm(v[0])} ∈ {rterm(v[1])}"
-    if k == "nf":
-        return f"nf({rterm(v)})"
-    if k == "xi":
-        return ""
-    if k == "alpha":
-        return f"α-attr({rterm(v)})"
-    if k == "eq":
-        return f"{rcmp(v[0])} = {rcmp(v[1])}"
-    return f"{k}({rterm(v)})"
-
-
-def rwhere(ws):
-    parts = []
-    for w in ws or []:
-        meta = w.get("meta")
-        fn = w.get("function")
-        args = w.get("args", [])
-        parts.append(f"{meta} := {fn}({', '.join(rterm(a) for a in args)})")
-    return " and ".join(parts)
+from phino_render import rules as rendered
 
 
 def esc(s):
@@ -82,18 +28,10 @@ def esc(s):
 
 
 def main():
+    if len(sys.argv) != 3:
+        raise SystemExit("Usage: gen-rules.py <phino-resources-dir> <output-Rules.lean>")
     res_dir, out = sys.argv[1], sys.argv[2]
-    rules = []
-    for path in sorted(glob.glob(os.path.join(res_dir, "*.yaml"))):
-        with open(path, encoding="utf-8") as f:
-            d = yaml.safe_load(f)
-        rules.append({
-            "name": str(d["name"]),
-            "pattern": str(d["pattern"]),
-            "result": str(d["result"]),
-            "cond": rcond(d.get("when")),
-            "wher": rwhere(d.get("where")),
-        })
+    rules = rendered(res_dir)
     lines = [
         # REUSE-IgnoreStart
         "-- SPDX-FileCopyrightText: Copyright (c) 2026 Objectionary.com",

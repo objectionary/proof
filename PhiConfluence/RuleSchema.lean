@@ -8,8 +8,8 @@ The typed vocabulary that `PhiConfluence/RuleData.lean` (generated from phino by
 `scripts/gen-rule-data.py`) is written in: each normalization rule is a `RuleEntry` of
 tags — the redex it fires on, its side-conditions, and its contractum. These are *data*
 describing the eleven `phino` rules; the proof relation `Step` (`Step.lean`) is the
-authoritative hand-written object, and `RuleData.lean` is kept identical to phino by the
-`rule-data-in-sync` CI job.
+authoritative hand-written object. The `build` CI job regenerates `RuleData.lean` from the
+pinned phino and fails if the committed file differs from the regenerated one.
 -/
 
 namespace PhiConfluence

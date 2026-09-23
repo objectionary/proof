@@ -16,11 +16,13 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - name: Install phino (pinned via .phino-version)
+      - name: Install phino (pinned via .phino-version, verified via .phino-sha256)
         run: |
           version="$(cat .phino-version)"
-          sudo curl -fsSL -o /usr/local/bin/phino "http://phino.objectionary.com/releases/ubuntu-24.04/phino-$version"
-          sudo chmod +x /usr/local/bin/phino
+          curl -fsSL -o phino "http://phino.objectionary.com/releases/ubuntu-24.04/phino-$version"
+          echo "$(cat .phino-sha256)  phino" | sha256sum --check --strict
+          sudo install -m 755 phino /usr/local/bin/phino
+          rm phino
           phino --version
       - uses: ./.github/actions/setup-lean
       - name: Differential test — our reducer vs phino

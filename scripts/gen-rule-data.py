@@ -21,72 +21,16 @@ DESIGN — a *fidelity lock*, not a general translator.
   regenerates from pinned phino and compiles — so phino-drift trips this assertion and
   fails the build.
 
-This intentionally duplicates `gen-rules.py`'s `when`/`where` rendering (keep in sync) so
-the asserted condition strings match the display table's — one rendering, two consumers.
+The `when`/`where` rendering comes from `phino_render.py`, the same module `gen-rules.py`
+uses, so the asserted condition strings are exactly the display table's.
 
 Usage:
     gen-rule-data.py <phino-resources-dir> <output-RuleData.lean>
 """
-import glob
-import os
 import re
 import sys
 
-import yaml
-
-
-# --- condition/where rendering: identical to gen-rules.py (kept in sync on purpose) ---
-
-def rterm(x):
-    return str(x)
-
-
-def rcmp(x):
-    if isinstance(x, dict):
-        k = next(iter(x))
-        v = x[k]
-        if k == "index":
-            return f"index({rterm(v)})"
-        if k == "length":
-            return f"|{rterm(v)}|"
-        if k == "domain":
-            return f"domain({rterm(v)})"
-        return f"{k}({rterm(v)})"
-    return rterm(x)
-
-
-def rcond(w):
-    if w is None:
-        return ""
-    if not isinstance(w, dict):
-        return rterm(w)
-    k = next(iter(w))
-    v = w[k]
-    if k == "and":
-        return " and ".join(p for p in (rcond(x) for x in v) if p)
-    if k == "or":
-        return " or ".join(p for p in (rcond(x) for x in v) if p)
-    if k == "not":
-        return "¬(" + rcond(v) + ")"
-    if k == "in":
-        return f"{rterm(v[0])} ∈ {rterm(v[1])}"
-    if k == "nf":
-        return f"nf({rterm(v)})"
-    if k == "alpha":
-        return f"α-attr({rterm(v)})"
-    if k == "eq":
-        return f"{rcmp(v[0])} = {rcmp(v[1])}"
-    return f"{k}({rterm(v)})"
-
-
-def rwhere(ws):
-    parts = []
-    for w in ws or []:
-        meta = w.get("meta")
-        fn = w.get("function")
-        args = w.get("args", [])
-        parts.append(f"{meta} := {fn}({', '.join(rterm(a) for a in args)})")
-    return " and ".join(parts)
+from phino_render import rules as rendered
 
 
 def norm(s):
@@ -97,13 +41,13 @@ def norm(s):
 # --- the locked interpretation: one entry per phino rule -------------------------------
 #
 # Each entry asserts phino's rendered (pattern, result, cond, where) and, on a match,
-# contributes the structured Lean tags. `shape`/`conds`/`rhs` are Lean `RuleSpec` field
+# contributes the structured Lean tags. `shape`/`conds`/`rhs` are Lean `RuleEntry` field
 # expressions; they MUST stay in step with PhiConfluence/RuleSchema.lean's inductives.
-# `expect` strings are phino's current YAML as rendered above (== the gen-rules.py table).
+# `expect` strings are phino's YAML as `phino_render.py` renders it (== the gen-rules.py table).
 #
 # If phino's YAML drifts from `expect`, this script aborts (see `check`) — that is the
-# point. If the *interpretation* (tags) is what changed, the Lean `conformance` theorem
-# is what fails. Adding/removing a phino rule trips the name-set assertion in `main`.
+# point. The tags themselves are not yet checked against `Step`: no conformance theorem
+# exists so far. Adding/removing a phino rule trips the name-set assertion in `main`.
 
 LOCK = {
     "dd": dict(
@@ -154,8 +98,9 @@ def check(name, got, want):
         raise SystemExit(
             f"FIDELITY-LOCK BREACH for rule '{name}': phino's YAML no longer matches the "
             f"locked interpretation in gen-rule-data.py.\n  phino : {g}\n  locked: {w}\n"
-            f"Re-read the phino rule, update LOCK['{name}'] AND the matching tags, and "
-            f"re-verify PhiConfluence/RuleConform.lean's `conformance` against `Step`.")
+            f"Re-read the phino rule, update LOCK['{name}'] and its tags, and check by hand "
+            f"that `Step` in PhiConfluence/Step.lean still matches, since no conformance "
+            f"theorem ties the tags to `Step` yet")
 
 
 def main():
@@ -163,16 +108,13 @@ def main():
         raise SystemExit("Usage: gen-rule-data.py <phino-resources-dir> <output-RuleData.lean>")
     res_dir, out = sys.argv[1], sys.argv[2]
     found = {}
-    for path in sorted(glob.glob(os.path.join(res_dir, "*.yaml"))):
-        with open(path, encoding="utf-8") as f:
-            d = yaml.safe_load(f)
-        name = str(d["name"])
+    for r in rendered(res_dir):
+        name = r["name"]
         if name in found:
             raise SystemExit(f"duplicate rule name '{name}' in {res_dir}")
-        got = (str(d["pattern"]), str(d["result"]), rcond(d.get("when")), rwhere(d.get("where")))
         if name not in LOCK:
-            raise SystemExit(f"phino has an UNLOCKED rule '{name}' — add it to LOCK and to Step/conformance")
-        check(name, got, LOCK[name]["expect"])
+            raise SystemExit(f"phino has an UNLOCKED rule '{name}' — add it to LOCK and to Step")
+        check(name, (r["pattern"], r["result"], r["cond"], r["wher"]), LOCK[name]["expect"])
         found[name] = LOCK[name]
     missing = set(LOCK) - set(found)
     if missing:

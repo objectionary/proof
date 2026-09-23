@@ -2,3 +2,4 @@
 build/
 *.olean
 .DS_Store
+__pycache__/
