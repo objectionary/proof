@@ -25,5 +25,12 @@ jobs:
           rm phino
           phino --version
       - uses: ./.github/actions/setup-lean
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Generate Rules.lean and RuleData.lean from pinned phino
+        run: |
+          pip install pyyaml==6.0.3
+          bash scripts/regen-rules.sh
       - name: Differential test — our reducer vs phino
         run: bash scripts/difftest.sh

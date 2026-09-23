@@ -3,3 +3,5 @@ build/
 *.olean
 .DS_Store
 __pycache__/
+PhiConfluence/Rules.lean
+PhiConfluence/RuleData.lean

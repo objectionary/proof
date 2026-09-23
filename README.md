@@ -43,13 +43,15 @@ stateful Morphing/Dataization functions, not term rewriting. The frozen contract
 ```bash
 curl -sSf https://elan.lean-lang.org/elan-init.sh | sh   # one-time: Lean's toolchain manager
 lake exe cache get          # download mathlib's prebuilt artifacts
+bash scripts/regen-rules.sh # generate the rule files from pinned phino (needs Python + PyYAML)
 lake build                  # green ⇒ every theorem is kernel-checked (CI also gates #print axioms)
 lake exe demo               # the eleven rules + example reductions, by the project's own reducer
 bash scripts/difftest.sh    # our reducer vs `phino rewrite --normalize` (needs phino on PATH)
 ```
 
-The displayed rule table (`Rules.lean`) is generated from phino's `resources/*.yaml` — the same
-source the paper's Fig. 4 renders from — so it cannot drift from phino. `reduce_sound` certifies
+The rule files (`Rules.lean`, `RuleData.lean`) are not kept in Git: they are generated from the
+`resources/*.yaml` of the phino pinned in `.phino-version` — the same source the paper's Fig. 4
+renders from — so they cannot drift from phino. `reduce_sound` certifies
 that every step the runnable reducer takes is a genuine `Step`, and `difftest` confirms our
 reducer's normal forms match phino's. Run `#print axioms <name>` on any result to inspect its axiom
 footprint.
