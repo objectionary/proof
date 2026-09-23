@@ -8,7 +8,7 @@ This mirrors how the PAPER renders its reduction figure: phino's YAML rule files
 rendered by both the paper (via `phino explain`) and this project (this script). The
 paper is the source of truth; phino is a secondary interpretation.
 
-Like `phino explain`'s renderer (CST.withoutXi), this script STRIPS `xi` (ξ-free)
+Like `phino explain`'s renderer (CST.withoutXi), this script STRIPS `xi-free` (ξ-free)
 side-conditions, so the displayed table matches the paper's figure. The ξ-free guard
 phino puts on `copy` is a phino-specific operational hack (it prevents a stack overflow
 on ξ-containing values under eager contextualization); it is NOT in the paper, and is
@@ -31,7 +31,7 @@ def main():
     if len(sys.argv) != 3:
         raise SystemExit("Usage: gen-rules.py <phino-resources-dir> <output-Rules.lean>")
     res_dir, out = sys.argv[1], sys.argv[2]
-    rules = rendered(res_dir)
+    rules = rendered(res_dir, strip_xi=True)
     lines = [
         # REUSE-IgnoreStart
         "-- SPDX-FileCopyrightText: Copyright (c) 2026 Objectionary.com",
@@ -48,7 +48,7 @@ def main():
         "",
         "The eleven rules rendered from phino's `resources/*.yaml` the same way the",
         "paper's reduction figure is (`phino explain`), including stripping `ξ`-free",
-        "side-conditions — so `copy` shows `nf(𝑒1)` only, as in the paper (phino's extra",
+        "side-conditions — so `copy` shows `nf(𝑒)` only, as in the paper (phino's extra",
         "`ξ`-free guard on `copy` is an operational anti-loop hack, not part of the",
         "calculus; see docs/M0-spec.md). The proof relation `Step` is hand-written.",
         "-/",

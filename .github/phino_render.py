@@ -3,7 +3,9 @@
 """
 The one rendering of phino's rule YAML into display strings, shared by gen-rules.py
 (the display table) and gen-rule-data.py (the fidelity lock), so the lock asserts
-against exactly the strings the display table shows.
+against exactly the strings the display table shows. Only the display table passes
+`strip_xi=True`, which drops phino's `xi-free` side-conditions the way `phino explain`
+does for the paper's figure; the lock keeps them, since `Step.copy` carries `xiFree`.
 """
 import glob
 import os
@@ -27,7 +29,7 @@ def rcmp(x):
     return rterm(x)
 
 
-def rcond(w):
+def rcond(w, strip_xi=False):
     if w is None:
         return ""
     if not isinstance(w, dict):
@@ -35,15 +37,17 @@ def rcond(w):
     k = next(iter(w))
     v = w[k]
     if k == "and":
-        return " and ".join(p for p in (rcond(x) for x in v) if p)
+        return " and ".join(p for p in (rcond(x, strip_xi) for x in v) if p)
     if k == "or":
-        return " or ".join(p for p in (rcond(x) for x in v) if p)
+        return " or ".join(p for p in (rcond(x, strip_xi) for x in v) if p)
     if k == "not":
-        return "¬(" + rcond(v) + ")"
+        return "¬(" + rcond(v, strip_xi) + ")"
     if k == "in":
         return f"{rterm(v[0])} ∈ {rterm(v[1])}"
     if k == "nf":
         return f"nf({rterm(v)})"
+    if k == "xi-free" and strip_xi:
+        return ""
     if k == "alpha":
         return f"α-attr({rterm(v)})"
     if k == "eq":
@@ -61,7 +65,7 @@ def rwhere(ws):
     return " and ".join(parts)
 
 
-def rules(res_dir):
+def rules(res_dir, strip_xi=False):
     """Every rule in `res_dir` rendered to name/pattern/result/cond/wher, failing on none."""
     paths = sorted(glob.glob(os.path.join(res_dir, "*.yaml")))
     if not paths:
@@ -77,7 +81,7 @@ def rules(res_dir):
             "name": str(d["name"]),
             "pattern": str(d["pattern"]),
             "result": str(d["result"]),
-            "cond": rcond(d.get("when")),
+            "cond": rcond(d.get("when"), strip_xi),
             "wher": rwhere(d.get("where")),
         })
     return out
