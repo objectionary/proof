@@ -11,7 +11,7 @@ import PhiConfluence.Render
 
 The eleven rules rendered from phino's `resources/*.yaml` the same way the
 paper's reduction figure is (`phino explain`), including stripping `ξ`-free
-side-conditions — so `copy` shows `nf(𝑒1)` only, as in the paper (phino's extra
+side-conditions — so `copy` shows `nf(𝑒)` only, as in the paper (phino's extra
 `ξ`-free guard on `copy` is an operational anti-loop hack, not part of the
 calculus; see docs/M0-spec.md). The proof relation `Step` is hand-written.
 -/
@@ -21,7 +21,7 @@ namespace PhiConfluence
 /-- The φ-calculus normalization rules, generated from phino's YAML. -/
 def normalizationRules : List RuleSpec :=
   [ { name := "alpha", pattern := "⟦𝐵1, 𝜏1 ↦ ∅, 𝐵2⟧(𝜏2 ↦ 𝑒)", result := "⟦𝐵1, 𝜏1 ↦ ∅, 𝐵2⟧(𝜏1 ↦ 𝑒)", cond := "index(𝜏2) = domain(𝐵1)", wher := "" }
-  , { name := "copy", pattern := "⟦ 𝐵1, 𝜏 ↦ ∅, 𝐵2 ⟧(𝜏 ↦ 𝑒)", result := "⟦ 𝐵1, 𝜏 ↦ 𝑒, 𝐵2 ⟧", cond := "xi-free(𝑒) and nf(𝑒)", wher := "" }
+  , { name := "copy", pattern := "⟦ 𝐵1, 𝜏 ↦ ∅, 𝐵2 ⟧(𝜏 ↦ 𝑒)", result := "⟦ 𝐵1, 𝜏 ↦ 𝑒, 𝐵2 ⟧", cond := "nf(𝑒)", wher := "" }
   , { name := "dc", pattern := "⊥(𝜏 ↦ 𝑒)", result := "⊥", cond := "", wher := "" }
   , { name := "dd", pattern := "⊥.𝜏", result := "⊥", cond := "", wher := "" }
   , { name := "dot", pattern := "⟦𝐵1, 𝜏 ↦ 𝑒1, 𝐵2⟧.𝜏", result := "𝑒2(ρ ↦ ⟦𝐵1, 𝜏 ↦ 𝑒1, 𝐵2⟧)", cond := "nf(𝑒1)", wher := "𝑒2 := contextualize(𝑒1, ⟦𝐵1, 𝜏 ↦ 𝑒1, 𝐵2⟧)" }

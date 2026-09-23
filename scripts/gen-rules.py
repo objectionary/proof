@@ -8,7 +8,7 @@ This mirrors how the PAPER renders its reduction figure: phino's YAML rule files
 rendered by both the paper (via `phino explain`) and this project (this script). The
 paper is the source of truth; phino is a secondary interpretation.
 
-Like `phino explain`'s renderer (CST.withoutXi), this script STRIPS `xi` (ξ-free)
+Like `phino explain`'s renderer (CST.withoutXi), this script STRIPS `xi-free` (ξ-free)
 side-conditions, so the displayed table matches the paper's figure. The ξ-free guard
 phino puts on `copy` is a phino-specific operational hack (it prevents a stack overflow
 on ξ-containing values under eager contextualization); it is NOT in the paper, and is
@@ -53,7 +53,7 @@ def rcond(w):
         return f"{rterm(v[0])} ∈ {rterm(v[1])}"
     if k == "nf":
         return f"nf({rterm(v)})"
-    if k == "xi":
+    if k == "xi-free":
         return ""
     if k == "alpha":
         return f"α-attr({rterm(v)})"
@@ -103,7 +103,7 @@ def main():
         "",
         "The eleven rules rendered from phino's `resources/*.yaml` the same way the",
         "paper's reduction figure is (`phino explain`), including stripping `ξ`-free",
-        "side-conditions — so `copy` shows `nf(𝑒1)` only, as in the paper (phino's extra",
+        "side-conditions — so `copy` shows `nf(𝑒)` only, as in the paper (phino's extra",
         "`ξ`-free guard on `copy` is an operational anti-loop hack, not part of the",
         "calculus; see docs/M0-spec.md). The proof relation `Step` is hand-written.",
         "-/",
