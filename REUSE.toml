@@ -5,6 +5,8 @@ version = 1
 [[annotations]]
 path = [
     ".gitignore",
+    ".phino-sha256",
+    ".phino-version",
     ".yamllint",
     "**.json",
     "**.md",

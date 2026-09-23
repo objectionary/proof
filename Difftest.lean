@@ -8,7 +8,7 @@ open PhiConfluence Term Attr Binding
 /-!
 Emits, for each example, a tab-separated line `<input>\t<our normal form>`, where the
 input is wrapped as a phino program with the `{ e }` sugar (= `Φ ↦ e`).
-`scripts/difftest.sh` feeds the input to `phino rewrite --normalize` and checks
+`.github/difftest.sh` feeds the input to `phino rewrite --normalize` and checks
 phino's normal form matches ours — the behavioral pin between our reducer and phino.
 Corpus exercises **all eleven** rules (`alpha` included — phino parses our printed `α0`).
 

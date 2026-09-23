@@ -1,0 +1,7 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Objectionary.com
+# SPDX-License-Identifier: MIT
+
+line-length = 140
+
+[lint]
+select = ["E", "F", "W", "I"]
