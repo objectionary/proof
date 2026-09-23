@@ -23,9 +23,9 @@ jobs:
       - name: Test the rule generators
         run: |
           pip install pyyaml==6.0.3 pyhamcrest==2.1.0 pytest==9.1.1
-          python -m pytest -p no:cacheprovider scripts/tests
+          python -m pytest -p no:cacheprovider .github
       - name: Generate Rules.lean and RuleData.lean from pinned phino
-        run: bash scripts/regen-rules.sh
+        run: bash .github/regen-rules.sh
       - name: Build the library and executables
         run: |
           lake build

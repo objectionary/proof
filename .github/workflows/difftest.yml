@@ -31,6 +31,6 @@ jobs:
       - name: Generate Rules.lean and RuleData.lean from pinned phino
         run: |
           pip install pyyaml==6.0.3
-          bash scripts/regen-rules.sh
+          bash .github/regen-rules.sh
       - name: Differential test — our reducer vs phino
-        run: bash scripts/difftest.sh
+        run: bash .github/difftest.sh

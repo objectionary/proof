@@ -43,10 +43,10 @@ stateful Morphing/Dataization functions, not term rewriting. The frozen contract
 ```bash
 curl -sSf https://elan.lean-lang.org/elan-init.sh | sh   # one-time: Lean's toolchain manager
 lake exe cache get          # download mathlib's prebuilt artifacts
-bash scripts/regen-rules.sh # generate the rule files from pinned phino (needs Python + PyYAML)
+bash .github/regen-rules.sh # generate the rule files from pinned phino (needs Python + PyYAML)
 lake build                  # green ⇒ every theorem is kernel-checked (CI also gates #print axioms)
 lake exe demo               # the eleven rules + example reductions, by the project's own reducer
-bash scripts/difftest.sh    # our reducer vs `phino rewrite --normalize` (needs phino on PATH)
+bash .github/difftest.sh    # our reducer vs `phino rewrite --normalize` (needs phino on PATH)
 ```
 
 The rule files (`Rules.lean`, `RuleData.lean`) are not kept in Git: they are generated from the
@@ -73,8 +73,9 @@ PhiConfluence/
   RuleSchema · RuleData             rule tags generated from phino by the fidelity lock
   Abstract/Rewriting                Diamond / Confluent vocabulary + the church_rosser bridge
 docs/      M0-spec.md (frozen contract) · DESIGN.md (design + provenance)
-scripts/   gen-rules.py · gen-rule-data.py · phino_render.py · regen-rules.sh · difftest.sh
-           confluence-probe.sh · tests/ (generator unit tests)
+.github/   regen-rules.sh · gen-rules.py · gen-rule-data.py · phino_render.py · difftest.sh
+           test_*.py (generator unit tests) · workflows/ · actions/
+scripts/   confluence-probe.sh (manual confluence probe, not run by CI)
 ```
 
 ## Stack

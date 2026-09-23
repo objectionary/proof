@@ -96,7 +96,7 @@ class Rules:
         for stem, doc in self.docs.items():
             (res / f"{stem}.yaml").write_text(yaml.safe_dump(doc, allow_unicode=True), encoding="utf-8")
         return subprocess.run(
-            [sys.executable, os.path.join(os.path.dirname(os.path.dirname(__file__)), script), str(res), str(tmp / "Out.lean")],
+            [sys.executable, os.path.join(os.path.dirname(__file__), script), str(res), str(tmp / "Out.lean")],
             capture_output=True,
             text=True,
             timeout=60,

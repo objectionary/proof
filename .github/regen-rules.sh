@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: MIT
 #
 # Regenerate PhiConfluence/Rules.lean (display table) and PhiConfluence/RuleData.lean
-# (structured data, guarded by the fidelity lock in scripts/gen-rule-data.py) from the
+# (structured data, guarded by the fidelity lock in .github/gen-rule-data.py) from the
 # PINNED phino rules on GitHub (objectionary/phino at the tag in .phino-version). The rule
 # source is phino's repo — the same source the paper's Fig. 4 is generated from — not any
 # local checkout. Both files are git-ignored, so run this before `lake build`. The tag is
@@ -11,7 +11,7 @@
 # regeneration deterministic; the phino-latest workflow reports when the pin falls behind
 # phino's newest release.
 #
-# Usage: bash scripts/regen-rules.sh
+# Usage: bash .github/regen-rules.sh
 
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -31,6 +31,6 @@ git clone --depth 1 --branch "$PHINO_TAG" "$PHINO_REPO" "$tmp/phino" >/dev/null 
 commit="$(git -C "$tmp/phino" rev-parse HEAD)"
 [ "$commit" = "$(cat .phino-commit)" ] || { echo "FATAL: phino tag $PHINO_TAG points to $commit, not to the commit in .phino-commit" >&2; exit 1; }
 
-python3 scripts/gen-rules.py "$tmp/phino/resources" PhiConfluence/Rules.lean
-python3 scripts/gen-rule-data.py "$tmp/phino/resources" PhiConfluence/RuleData.lean
+python3 .github/gen-rules.py "$tmp/phino/resources" PhiConfluence/Rules.lean
+python3 .github/gen-rule-data.py "$tmp/phino/resources" PhiConfluence/RuleData.lean
 echo "done — Rules.lean and RuleData.lean regenerated from phino $PHINO_VERSION"

@@ -5,11 +5,11 @@
 # Schema for the generated rule data
 
 The typed vocabulary that `PhiConfluence/RuleData.lean` (generated from phino by
-`scripts/gen-rule-data.py`) is written in: each normalization rule is a `RuleEntry` of
+`.github/gen-rule-data.py`) is written in: each normalization rule is a `RuleEntry` of
 tags — the redex it fires on, its side-conditions, and its contractum. These are *data*
 describing the eleven `phino` rules; the proof relation `Step` (`Step.lean`) is the
 authoritative hand-written object. `RuleData.lean` is not tracked by Git:
-`scripts/regen-rules.sh` generates it from the pinned phino before every build.
+`.github/regen-rules.sh` generates it from the pinned phino before every build.
 -/
 
 namespace PhiConfluence

@@ -154,7 +154,7 @@ independent directions:
   and is not kept in Git, so it cannot drift from phino. The
   *proof relation* `Step` is hand-written (constructors are needed for case-analysis) and
   pinned to phino **behaviorally** by `difftest`.
-* **Differential testing against phino.** `Difftest.lean` + `scripts/difftest.sh` normalize
+* **Differential testing against phino.** `Difftest.lean` + `.github/difftest.sh` normalize
   each program with both `phino rewrite --normalize` and our reducer and assert equality —
   **20/20**, exercising all eleven rules (incl. `alpha`'s domain-ordinal skip of `Δ`/`λ` assets) on `⊥`-collapse *and* real formation results. This is the same `phino rewrite` mechanism the
   paper's Appendix A is generated from, so it doubles as reproducing the paper's examples
@@ -229,20 +229,20 @@ proves every printed step is a genuine `Step`, so the runnable behavior is tied 
 relation the confluence theorem governs.
 
 **Single-source rules.** `Rules.lean` and `RuleData.lean` are git-ignored and generated
-before every build by `scripts/regen-rules.sh` from the `resources/*.yaml` of the phino
+before every build by `.github/regen-rules.sh` from the `resources/*.yaml` of the phino
 pinned in `.phino-version` and `.phino-commit` — the same source the paper's Fig. 4 is
 rendered from — so the rules cannot drift from phino/the paper by construction.
 
 **CI** (single-purpose workflows, each on push to `master` + PRs, against pinned phino):
 
 * **build** — install elan and `lake exe cache get`; run the generator unit tests
-  (`scripts/tests`); generate `Rules.lean` and `RuleData.lean` from the pinned phino
-  (`scripts/regen-rules.sh`); `lake
+  (`.github/test_*.py`); generate `Rules.lean` and `RuleData.lean` from the pinned phino
+  (`.github/regen-rules.sh`); `lake
   build`; then a `sorry`/`admit`/`axiom` source gate **and** a `#print axioms` gate on the
   headline results. (`gen-rule-data.py`'s fidelity lock fails the build on rule-structure
   drift.)
 * **difftest** — install the pinned phino binary (`.phino-version`, verified against
-  `.phino-sha256`), generate the rule files, build `difftest`, run `scripts/difftest.sh`; fails if our reducer
+  `.phino-sha256`), generate the rule files, build `difftest`, run `.github/difftest.sh`; fails if our reducer
   disagrees with phino.
 * **phino-latest** — weekly, fails when `.phino-version` lags behind phino's newest
   release, so a stale pin is reported instead of silently narrowing `difftest`.
