@@ -230,8 +230,7 @@ relation the confluence theorem governs.
 
 **Single-source rules.** `Rules.lean` and `RuleData.lean` are git-ignored and generated
 before every build by `.github/regen-rules.sh` from the `resources/*.yaml` of the phino
-pinned in `.phino-version` and `.phino-commit` — the same source the paper's Fig. 4 is
-rendered from — so the rules cannot drift from phino/the paper by construction.
+pinned in `.phino-version` — the same source the paper's Fig. 4 is rendered from — so the rules cannot drift from phino/the paper by construction.
 
 **CI** (single-purpose workflows, each on push to `master` + PRs, against pinned phino):
 
