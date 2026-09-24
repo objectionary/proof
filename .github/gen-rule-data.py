@@ -2,7 +2,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 Objectionary.com
 # SPDX-License-Identifier: MIT
 """
-Generate PhiConfluence/RuleData.lean from phino's resources/*.yaml.
+Generate PhiConfluence/RuleData.lean from phino's resources/normalize/*.yaml.
 
 Unlike `gen-rules.py` (which emits *display strings* for the demo), this emits the
 **structured** rule data: each rule becomes a `RuleEntry` of typed tags (redex shape,
@@ -50,44 +50,58 @@ def norm(s):
 # exists so far. Adding/removing a phino rule trips the name-set assertion in `main`.
 
 LOCK = {
+    "alpha": dict(
+        expect=("⟦𝐵1, 𝜏1 ↦ ∅, 𝐵2⟧(α𝑖1 ↦ 𝑒1)", "⟦𝐵1, 𝜏1 ↦ ∅, 𝐵2⟧(𝜏1 ↦ 𝑒1)",
+                "𝑖1 = domain(𝐵1) and ¬(𝜏1 = ρ)", ""),
+        shape=".appForm", conds="[.attrIsAlpha, .ordinalVoid]", rhs=".alphaRename"),
+    "amiss": dict(
+        expect=("⟦𝐵1⟧(α𝑖1 ↦ 𝑒)", "⊥", "¬(domain(𝐵1) > 𝑖1)", ""),
+        shape=".appForm", conds="[.attrIsAlpha, .ordinalAbsent]", rhs=".bot"),
+    # NOTE — copy's guards live in phino's `𝑘` sigil (ξ-free and normal), not in `when`.
+    "copy": dict(
+        expect=("⟦ 𝐵1, 𝜏1 ↦ ∅, 𝐵2 ⟧(𝜏1 ↦ 𝑘1)", "⟦ 𝐵1, 𝜏1 ↦ 𝑘1, 𝐵2 ⟧", "", ""),
+        shape=".appForm", conds="[.attrNotAlpha, .slotVoid, .argXiFree, .argNf]", rhs=".copyFill"),
+    "dc": dict(
+        expect=("⊥(𝜏 ↦ 𝑒)", "⊥", "", ""),
+        shape=".appBot", conds="[.attrNotAlpha]", rhs=".bot"),
+    "dca": dict(
+        expect=("⊥(α𝑖 ↦ 𝑒)", "⊥", "", ""),
+        shape=".appBot", conds="[.attrIsAlpha]", rhs=".bot"),
     "dd": dict(
         expect=("⊥.𝜏", "⊥", "", ""),
         shape=".dispatchBot", conds="[]", rhs=".bot"),
-    "dc": dict(
-        expect=("⊥(𝜏 ↦ 𝑒)", "⊥", "", ""),
-        shape=".appBot", conds="[]", rhs=".bot"),
+    "dl": dict(
+        expect=("⟦𝐵1, λ ⤍ 𝑓, 𝐵2⟧", "⊥", "Δ ∈ 𝐵1 or Δ ∈ 𝐵2", ""),
+        shape=".form", conds="[.lambdaPresent, .deltaPresent]", rhs=".bot"),
+    # NOTE — dot's normal-form guard lives in phino's `𝑛` sigil, not in `when`.
+    "dot": dict(
+        expect=("⟦𝐵1, 𝜏1 ↦ 𝑛1, 𝐵2⟧.𝜏1", "𝑒2(ρ ↦ ⟦𝐵1, 𝜏1 ↦ 𝑛1, 𝐵2⟧)",
+                "¬(⟦𝐵1, 𝜏1 ↦ 𝑛1, 𝐵2⟧ = 𝑒1) and ([λ] ∩ [𝐵1, 𝐵2] = ∅ or [Δ] ∩ [𝐵1, 𝐵2] = ∅)", "𝑒2 := contextualize(𝑛1, ⟦𝐵1, 𝐵2⟧)"),
+        shape=".dispatchForm", conds="[.slotAttached, .valNf, .notUniverse, .notLambdaWithDelta]", rhs=".dotFeedback"),
+    # NOTE — dotg fires only on the whole program, which `phino rewrite` never knows,
+    # so `Step` leaves it out and `dot` answers every dispatch.
+    "dotg": dict(
+        expect=("⟦𝐵1, 𝜏1 ↦ 𝑛1, 𝐵2⟧.𝜏1", "𝑒2(ρ ↦ Φ)",
+                "⟦𝐵1, 𝜏1 ↦ 𝑛1, 𝐵2⟧ = 𝑒1 and ([λ] ∩ [𝐵1, 𝐵2] = ∅ or [Δ] ∩ [𝐵1, 𝐵2] = ∅)", "𝑒2 := contextualize(𝑛1, ⟦𝐵1, 𝐵2⟧)"),
+        shape=".dispatchForm", conds="[.slotAttached, .valNf, .isUniverse, .notLambdaWithDelta]", rhs=".dotGlobal"),
+    "miss": dict(
+        expect=("⟦𝐵1⟧(𝜏1 ↦ 𝑒)", "⊥", "¬(𝜏1 ∈ 𝐵1)", ""),
+        shape=".appForm", conds="[.attrNotAlpha, .slotAbsent]", rhs=".bot"),
     "null": dict(
-        expect=("⟦𝐵1, 𝜏 ↦ ∅, 𝐵2⟧.𝜏", "⊥", "", ""),
+        expect=("⟦𝐵1, 𝜏1 ↦ ∅, 𝐵2⟧.𝜏1", "⊥", "", ""),
         shape=".dispatchForm", conds="[.slotVoid]", rhs=".bot"),
     "over": dict(
-        expect=("⟦𝐵1, 𝜏 ↦ 𝑒1, 𝐵2⟧(𝜏 ↦ 𝑒2)", "⊥", "¬(𝜏 = ρ)", ""),
+        expect=("⟦𝐵1, 𝜏1 ↦ 𝑒1, 𝐵2⟧(𝜏1 ↦ 𝑒2)", "⊥", "¬(𝜏1 = ρ)", ""),
         shape=".appForm", conds="[.slotAttached, .attrNeRho]", rhs=".bot"),
-    "stop": dict(
-        expect=("⟦𝐵⟧.𝜏", "⊥", "¬(𝜏 ∈ 𝐵) and ¬(φ ∈ 𝐵) and ¬(λ ∈ 𝐵)", ""),
-        shape=".dispatchForm", conds="[.slotAbsent, .phiAbsent, .noLambda]", rhs=".bot"),
-    "miss": dict(
-        expect=("⟦𝐵⟧(𝜏 ↦ 𝑒)", "⊥", "¬(𝜏 ∈ 𝐵) and ¬(α-attr(𝜏))", ""),
-        shape=".appForm", conds="[.slotAbsent, .attrNotAlpha]", rhs=".bot"),
+    "overa": dict(
+        expect=("⟦𝐵1, 𝜏1 ↦ 𝑒1, 𝐵2⟧(α𝑖1 ↦ 𝑒2)", "⊥", "𝑖1 = domain(𝐵1) and ¬(𝜏1 = ρ)", ""),
+        shape=".appForm", conds="[.attrIsAlpha, .ordinalAttached]", rhs=".bot"),
     "stay": dict(
         expect=("⟦𝐵1, ρ ↦ 𝑒1, 𝐵2⟧(ρ ↦ 𝑒2)", "⟦𝐵1, ρ ↦ 𝑒1, 𝐵2⟧", "", ""),
         shape=".appForm", conds="[.attrIsRho, .slotAttached]", rhs=".formSame"),
-    "phi": dict(
-        expect=("⟦𝐵⟧.𝜏", "⟦𝐵⟧.φ.𝜏", "φ ∈ 𝐵 and ¬(𝜏 ∈ 𝐵)", ""),
-        shape=".dispatchForm", conds="[.phiPresent, .slotAbsent]", rhs=".phiExpand"),
-    "alpha": dict(
-        expect=("⟦𝐵1, 𝜏1 ↦ ∅, 𝐵2⟧(𝜏2 ↦ 𝑒)", "⟦𝐵1, 𝜏1 ↦ ∅, 𝐵2⟧(𝜏1 ↦ 𝑒)",
-                "index(𝜏2) = domain(𝐵1)", ""),
-        shape=".appForm", conds="[.alphaVoidOrdinal]", rhs=".alphaRename"),
-    "dot": dict(
-        expect=("⟦𝐵1, 𝜏 ↦ 𝑒1, 𝐵2⟧.𝜏", "𝑒2(ρ ↦ ⟦𝐵1, 𝜏 ↦ 𝑒1, 𝐵2⟧)", "nf(𝑒1)",
-                "𝑒2 := contextualize(𝑒1, ⟦𝐵1, 𝜏 ↦ 𝑒1, 𝐵2⟧)"),
-        shape=".dispatchForm", conds="[.slotAttached, .valNf]", rhs=".dotFeedback"),
-    # NOTE — copy keeps phino's `xi-free` guard in the DATA (Step.copy carries `xiFree`);
-    # only the DISPLAY table (gen-rules.py) strips ξ for paper-figure parity.
-    "copy": dict(
-        expect=("⟦ 𝐵1, 𝜏 ↦ ∅, 𝐵2 ⟧(𝜏 ↦ 𝑒)", "⟦ 𝐵1, 𝜏 ↦ 𝑒, 𝐵2 ⟧",
-                "xi-free(𝑒) and nf(𝑒)", ""),
-        shape=".appForm", conds="[.slotVoid, .argXiFree, .argNf]", rhs=".copyFill"),
+    "stop": dict(
+        expect=("⟦𝐵1⟧.𝜏1", "⊥", "¬(𝜏1 ∈ 𝐵1) and ¬(φ ∈ 𝐵1) and ¬(λ ∈ 𝐵1)", ""),
+        shape=".dispatchForm", conds="[.slotAbsent, .phiAbsent, .noLambda]", rhs=".bot"),
 }
 
 
@@ -125,7 +139,7 @@ def main():
         "-- SPDX-License-Identifier: MIT",
         # REUSE-IgnoreEnd
         "",
-        "-- AUTO-GENERATED by .github/gen-rule-data.py from objectionary/phino resources/*.yaml.",
+        "-- AUTO-GENERATED by .github/gen-rule-data.py from objectionary/phino resources/normalize/*.yaml.",
         "-- Not tracked by Git: `bash .github/regen-rules.sh` regenerates it from pinned phino.",
         "",
         "import PhiConfluence.RuleSchema",
@@ -133,7 +147,7 @@ def main():
         "/-!",
         "# Normalization rules as structured data, generated from phino",
         "",
-        "The eleven rules as `RuleEntry` tags (types in PhiConfluence/RuleSchema.lean), emitted",
+        "The fifteen rules as `RuleEntry` tags (types in PhiConfluence/RuleSchema.lean), emitted",
         "by the fidelity-lock deriver `.github/gen-rule-data.py`. This file is not tracked by",
         "Git: it is regenerated from pinned phino before every build.",
         "-/",

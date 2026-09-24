@@ -19,24 +19,20 @@ with a *bespoke cons-structured* `ParB` — the `List.Forall₂ ParBind` alterna
 kernel-rejected as a nested inductive carrying `Par`. The append index of `Step.congForm`
 is crossed exactly once, by `parB_set`.
 
-This module defines `Par`/`ParB` for the **rules currently in `Step`** (the `⊥`-collapse
-six + `stay` + `phi` + `alpha` + congruence), connects the two relations (`step_to_par`,
-`par_to_red`, the headline `redMany_eq` : `ReflTransGen Step = ReflTransGen Par`), and builds
-the **Takahashi triangle**: the total complete development `devel`/`develB`, `par_devel`
-(`e ⇒ devel e`), the `ParB` inversions (`parB_preserves`/`parB_lookup_*`/`parB_get_void`,
-`par_form_inv`, `tri_dispatch`/`tri_app`), the `WF`-consuming `lookup_alpha_absent_of_wf`, and
-`par_triangle` (now **`WF`-scoped**: `WF e → Par e u → Par u (devel e)`, since `alpha` makes the
-unconditional triangle false — dev. #8). The triangle feeds `Diamond.lean`'s `parWF_diamond`
-and, via `redMany_eq`, `Confluence.lean`'s headline `confluence`. The `nf`-guarded `dot`/`copy`
-join both relations later (they need the `nf` guard, and then `devel` must guard on the
-*developed* subterm).
+This module connects `Step` and `Par` (`step_to_par`, `par_to_red`, the headline `redMany_eq` :
+`ReflTransGen Step = ReflTransGen Par`) and builds the **Takahashi triangle**: the total complete
+development `devel`/`develB`, `par_devel` (`e ⇒ devel e`), the `ParB` inversions, and
+`par_triangle` (**`WF`-scoped**: `WF e → Par e u → Par u (devel e)`, since a positional `αᵢ` used
+as a key makes `alpha` and `copy` disagree — dev. #8). The triangle feeds `Diamond.lean`'s
+`parWF_diamond` and, via `redMany_eq`, `Confluence.lean`'s headline `confluence`.
 
-Note: the discard constructors (`dc`/`null`/`over`/`stop`/`miss`) carry premises
-(`ParB bs bs'`, `Par e e'`) that are unused in their `⊥` result, and `stay` carries an
-unused argument-`Par` (only its `ParB`, used to build `form bs'`, matters). This is the
-standard parallel-reduction shape — a single `⇒` step may develop subterms even while
-collapsing — and `step_to_par`/`par_to_red`/the triangle simply discharge or discard
-them; harmless, could be slimmed.
+Besides one constructor per `Step` rule, `Par` has `ddl` and `dcl`: a dispatch or an application
+on a formation holding both `λ` and `Δ` collapses to `⊥` in one parallel step (`dl` inside, then
+`dd`/`dc` outside). They let `devel` answer `⊥` for such a redex whichever rule fires first.
+
+Note: the discard constructors carry premises (`ParB bs bs'`, `Par e e'`) that are unused in their
+`⊥` result, and `stay` carries an unused argument-`Par`. This is the standard parallel-reduction
+shape — a single `⇒` step may develop subterms even while collapsing.
 -/
 
 namespace PhiConfluence
@@ -63,18 +59,29 @@ inductive Par : Term → Term → Prop where
   | stay {bs bs' : List Binding} {e₁ e₂ e₂' : Term} :
       ParB bs bs' → lookup bs .rho = .attached e₁ → Par e₂ e₂' →
       Par (.app (.form bs) .rho e₂) (.form bs')
-  | phi {bs bs' : List Binding} {a : Attr} :
-      ParB bs bs' → lookup bs .phi ≠ .absent → lookup bs a = .absent →
-      Par (.dispatch (.form bs) a) (.dispatch (.dispatch (.form bs') .phi) a)
   | alpha {bs bs' : List Binding} {i : Nat} {τ1 : Attr} {e e' : Term} :
-      ParB bs bs' → voidAtOrdinal bs i = some τ1 → Par e e' →
+      ParB bs bs' → ordinal bs i = some τ1 → lookup bs τ1 = .void → Par e e' →
       Par (.app (.form bs) (.alpha i) e) (.app (.form bs') τ1 e')
+  | overa {bs bs' : List Binding} {i : Nat} {τ1 : Attr} {e₁ e e' : Term} :
+      ParB bs bs' → ordinal bs i = some τ1 → lookup bs τ1 = .attached e₁ → Par e e' →
+      Par (.app (.form bs) (.alpha i) e) .bot
+  | amiss {bs bs' : List Binding} {i : Nat} {e e' : Term} :
+      ParB bs bs' → ordinal bs i = none → Par e e' →
+      Par (.app (.form bs) (.alpha i) e) .bot
   | dot {bs bs' : List Binding} {a : Attr} {e₀ e₁ : Term} :
       ParB bs bs' → lookup bs a = .attached e₀ → lookup bs' a = .attached e₁ → nf e₁ = true →
-      Par (.dispatch (.form bs) a) (.app (contextualize e₁ (.form bs')) .rho (.form bs'))
+      (hasLambda bs && hasDelta bs) = false →
+      Par (.dispatch (.form bs) a)
+        (.app (contextualize e₁ (.form (ensureRho (erase bs' a)))) .rho (.form bs'))
   | copy {bs bs' : List Binding} {a : Attr} {arg arg' : Term} :
       ParB bs bs' → lookup bs a = .void → Par arg arg' → xiFree arg' = true → nf arg' = true →
       Par (.app (.form bs) a arg) (.form (fill bs' a arg'))
+  | dl {bs : List Binding} :
+      hasLambda bs = true → hasDelta bs = true → Par (.form bs) .bot
+  | ddl {bs : List Binding} {a : Attr} :
+      hasLambda bs = true → hasDelta bs = true → Par (.dispatch (.form bs) a) .bot
+  | dcl {bs : List Binding} {a : Attr} {e : Term} :
+      hasLambda bs = true → hasDelta bs = true → Par (.app (.form bs) a e) .bot
   | congDispatch {e e' : Term} {a : Attr} :
       Par e e' → Par (.dispatch e a) (.dispatch e' a)
   | congApp {e e' : Term} {a : Attr} {arg arg' : Term} :
@@ -109,21 +116,6 @@ lookup hypothesis is needed). The engine behind the triangle's `copy` case. -/
 theorem parB_fill {cs ds : List Binding} (h : ParB cs ds) (a : Attr) (v : Term) :
     ParB (fill cs a v) (fill ds a v) := by
   induction h using ParB.rec (motive_1 := fun _ _ _ => True) with
-  | refl => trivial
-  | dd => trivial
-  | dc => trivial
-  | null => trivial
-  | «over» => trivial
-  | stop => trivial
-  | miss => trivial
-  | stay => trivial
-  | phi => trivial
-  | alpha => trivial
-  | dot => trivial
-  | copy => trivial
-  | congDispatch => trivial
-  | congApp => trivial
-  | congForm => trivial
   | nil => exact .nil
   | consVoid hb ih =>
       rename_i c bs bs'
@@ -143,6 +135,29 @@ theorem parB_fill {cs ds : List Binding} (h : ParB cs ds) (a : Attr) (v : Term) 
   | consLambda hb ih =>
       rename_i f bs bs'
       simp only [fill]; exact .consLambda ih
+  | _ => trivial
+
+/-- `ParB` lifts through `erase`: dropping the same key from both lists keeps them pointwise
+related. The engine behind the triangle's `dot` context. -/
+theorem parB_erase {cs ds : List Binding} (h : ParB cs ds) (a : Attr) :
+    ParB (erase cs a) (erase ds a) := by
+  induction h using ParB.rec (motive_1 := fun _ _ _ => True) with
+  | nil => exact .nil
+  | consVoid hb ih =>
+      rename_i c bs bs'
+      simp only [erase]
+      by_cases hc : c = a
+      · simp only [if_pos hc]; exact hb
+      · simp only [if_neg hc]; exact .consVoid ih
+  | consAttached hvv hb ihv ihb =>
+      rename_i c v0 v0' bs bs'
+      simp only [erase]
+      by_cases hc : c = a
+      · simp only [if_pos hc]; exact hb
+      · simp only [if_neg hc]; exact .consAttached hvv ihb
+  | consDelta hb ih => simp only [erase]; exact .consDelta ih
+  | consLambda hb ih => simp only [erase]; exact .consLambda ih
+  | _ => trivial
 
 /-- Reducing one attached binding's value lifts to a pointwise binding-list reduction
 (the bridge across `Step.congForm`'s append index). -/
@@ -158,34 +173,19 @@ theorem parB_set {bs₁ bs₂ : List Binding} {a : Attr} {e e' : Term} (h : Par 
       | lambda f => exact ParB.consLambda ih
 
 /-- `ParB` preserves each attribute's lookup-shape (`void`/`absent`/`attached`) and the
-`hasLambda` flag: it reduces values, never keys, presence, or the `λ`-asset flag. The
-engine behind the triangle's side-condition transport (a redex's guard still holds on the
-developed binding list). -/
+`hasLambda`/`hasDelta` flags: it reduces values, never keys, presence, or assets. The engine
+behind the triangle's side-condition transport (a redex's guard still holds on the developed
+binding list). -/
 theorem parB_preserves {bs bs' : List Binding} (h : ParB bs bs') :
     (∀ a, lookup bs a = .void → lookup bs' a = .void)
       ∧ (∀ a, lookup bs a = .absent → lookup bs' a = .absent)
       ∧ (∀ a v, lookup bs a = .attached v → ∃ w, lookup bs' a = .attached w)
-      ∧ hasLambda bs = hasLambda bs' := by
+      ∧ hasLambda bs = hasLambda bs' ∧ hasDelta bs = hasDelta bs' := by
   induction h using ParB.rec (motive_1 := fun _ _ _ => True) with
-  | refl => trivial
-  | dd => trivial
-  | dc => trivial
-  | null => trivial
-  | «over» => trivial
-  | stop => trivial
-  | miss => trivial
-  | stay => trivial
-  | phi => trivial
-  | alpha => trivial
-  | dot => trivial
-  | copy => trivial
-  | congDispatch => trivial
-  | congApp => trivial
-  | congForm => trivial
-  | nil => refine ⟨?_, ?_, ?_, ?_⟩ <;> simp [lookup, hasLambda]
+  | nil => refine ⟨?_, ?_, ?_, ?_, ?_⟩ <;> simp [lookup, hasLambda, hasDelta]
   | consVoid hb ih =>
-      obtain ⟨iv, ia, iat, ih⟩ := ih
-      refine ⟨?_, ?_, ?_, ?_⟩
+      obtain ⟨iv, ia, iat, il, id⟩ := ih
+      refine ⟨?_, ?_, ?_, ?_, ?_⟩
       · intro a ha; simp only [lookup] at ha ⊢; split at ha
         · next hc => rw [if_pos hc]
         · next hc => rw [if_neg hc]; exact iv a ha
@@ -195,10 +195,11 @@ theorem parB_preserves {bs bs' : List Binding} (h : ParB bs bs') :
       · intro a v ha; simp only [lookup] at ha ⊢; split at ha
         · nomatch ha
         · next hc => rw [if_neg hc]; exact iat a v ha
-      · simp only [hasLambda]; exact ih
+      · simp only [hasLambda]; exact il
+      · simp only [hasDelta]; exact id
   | consAttached hvv hb _ ih =>
-      obtain ⟨iv, ia, iat, ih⟩ := ih
-      refine ⟨?_, ?_, ?_, ?_⟩
+      obtain ⟨iv, ia, iat, il, id⟩ := ih
+      refine ⟨?_, ?_, ?_, ?_, ?_⟩
       · intro a ha; simp only [lookup] at ha ⊢; split at ha
         · nomatch ha
         · next hc => rw [if_neg hc]; exact iv a ha
@@ -208,21 +209,25 @@ theorem parB_preserves {bs bs' : List Binding} (h : ParB bs bs') :
       · intro a v ha; simp only [lookup] at ha ⊢; split at ha
         · next hc => rw [if_pos hc]; exact ⟨_, rfl⟩
         · next hc => rw [if_neg hc]; exact iat a v ha
-      · simp only [hasLambda]; exact ih
+      · simp only [hasLambda]; exact il
+      · simp only [hasDelta]; exact id
   | consDelta hb ih =>
-      obtain ⟨iv, ia, iat, ih⟩ := ih
-      refine ⟨?_, ?_, ?_, ?_⟩
+      obtain ⟨iv, ia, iat, il, id⟩ := ih
+      refine ⟨?_, ?_, ?_, ?_, ?_⟩
       · intro a ha; simp only [lookup] at ha ⊢; exact iv a ha
       · intro a ha; simp only [lookup] at ha ⊢; exact ia a ha
       · intro a v ha; simp only [lookup] at ha ⊢; exact iat a v ha
-      · simp only [hasLambda]; exact ih
+      · simp only [hasLambda]; exact il
+      · simp only [hasDelta]
   | consLambda hb ih =>
-      obtain ⟨iv, ia, iat, ih⟩ := ih
-      refine ⟨?_, ?_, ?_, ?_⟩
+      obtain ⟨iv, ia, iat, il, id⟩ := ih
+      refine ⟨?_, ?_, ?_, ?_, ?_⟩
       · intro a ha; simp only [lookup] at ha ⊢; exact iv a ha
       · intro a ha; simp only [lookup] at ha ⊢; exact ia a ha
       · intro a v ha; simp only [lookup] at ha ⊢; exact iat a v ha
       · simp only [hasLambda]
+      · simp only [hasDelta]; exact id
+  | _ => trivial
 
 /-- `ParB` keeps a `void` slot `void`. -/
 theorem parB_lookup_void {bs bs' : List Binding} (h : ParB bs bs') {a : Attr}
@@ -235,7 +240,102 @@ theorem parB_lookup_attached {bs bs' : List Binding} (h : ParB bs bs') {a : Attr
     (ha : lookup bs a = .attached v) : ∃ w, lookup bs' a = .attached w := (parB_preserves h).2.2.1 a v ha
 /-- `ParB` preserves the `hasLambda` flag. -/
 theorem parB_hasLambda {bs bs' : List Binding} (h : ParB bs bs') :
-    hasLambda bs = hasLambda bs' := (parB_preserves h).2.2.2
+    hasLambda bs = hasLambda bs' := (parB_preserves h).2.2.2.1
+/-- `ParB` preserves the `hasDelta` flag. -/
+theorem parB_hasDelta {bs bs' : List Binding} (h : ParB bs bs') :
+    hasDelta bs = hasDelta bs' := (parB_preserves h).2.2.2.2
+
+/-- `ParB` keeps an attribute present: a slot that is not `absent` stays not `absent`. -/
+theorem parB_lookup_present {bs bs' : List Binding} (h : ParB bs bs') {a : Attr}
+    (ha : lookup bs a ≠ .absent) : lookup bs' a ≠ .absent := by
+  cases hl : lookup bs a with
+  | absent => exact absurd hl ha
+  | void => rw [parB_lookup_void h hl]; nofun
+  | attached v => obtain ⟨w, hw⟩ := parB_lookup_attached h hl; rw [hw]; nofun
+
+/-- `ParB` lifts through `ensureRho`: both lists agree on whether `ρ` is present, so both get the
+same `ρ↦∅` appended or neither does. -/
+theorem parB_ensureRho {bs bs' : List Binding} (h : ParB bs bs') :
+    ParB (ensureRho bs) (ensureRho bs') := by
+  have happ : ∀ {cs ds : List Binding}, ParB cs ds → ParB (cs ++ [.void .rho]) (ds ++ [.void .rho]) := by
+    intro cs ds hcd
+    induction hcd using ParB.rec (motive_1 := fun _ _ _ => True) with
+    | nil => exact .consVoid .nil
+    | consVoid _ ih => exact .consVoid ih
+    | consAttached hv _ _ ih => exact .consAttached hv ih
+    | consDelta _ ih => exact .consDelta ih
+    | consLambda _ ih => exact .consLambda ih
+    | _ => trivial
+  unfold ensureRho
+  cases hl : lookup bs .rho with
+  | absent => rw [parB_lookup_absent h hl]; exact happ h
+  | void => rw [parB_lookup_void h hl]; exact h
+  | attached v => obtain ⟨w, hw⟩ := parB_lookup_attached h hl; rw [hw]; exact h
+
+/-- `ParB` keeps every domain ordinal on the same key: it never touches keys. -/
+theorem parB_ordinal {bs bs' : List Binding} (h : ParB bs bs') :
+    ∀ i, ordinal bs i = ordinal bs' i := by
+  induction h using ParB.rec (motive_1 := fun _ _ _ => True) with
+  | nil => intro i; rfl
+  | consVoid _ ih => intro i; simp only [ordinal]; split <;> cases i <;> simp_all
+  | consAttached _ _ _ ih => intro i; simp only [ordinal]; split <;> cases i <;> simp_all
+  | consDelta _ ih => intro i; simp only [ordinal]; exact ih i
+  | consLambda _ ih => intro i; simp only [ordinal]; exact ih i
+  | _ => trivial
+
+/-- `fill` keeps the assets, so it keeps the `hasLambda` flag. -/
+theorem hasLambda_fill (bs : List Binding) (a : Attr) (v : Term) :
+    hasLambda (fill bs a v) = hasLambda bs := by
+  induction bs with
+  | nil => rfl
+  | cons b r ih =>
+      cases b with
+      | void c => by_cases hc : c = a <;> simp [fill, hasLambda, hc, ih]
+      | attached c w => by_cases hc : c = a <;> simp [fill, hasLambda, hc, ih]
+      | delta d => simp [fill, hasLambda, ih]
+      | lambda f => simp [fill, hasLambda]
+
+/-- `fill` keeps the assets, so it keeps the `hasDelta` flag. -/
+theorem hasDelta_fill (bs : List Binding) (a : Attr) (v : Term) :
+    hasDelta (fill bs a v) = hasDelta bs := by
+  induction bs with
+  | nil => rfl
+  | cons b r ih =>
+      cases b with
+      | void c => by_cases hc : c = a <;> simp [fill, hasDelta, hc, ih]
+      | attached c w => by_cases hc : c = a <;> simp [fill, hasDelta, hc, ih]
+      | delta d => simp [fill, hasDelta]
+      | lambda f => simp [fill, hasDelta, ih]
+
+/-- The key at a domain ordinal is present in the formation: `ordinal` only ever returns the key
+of a void or attached binding, so `lookup` finds some binding under it. -/
+theorem ordinal_lookup : ∀ {bs : List Binding} {i : Nat} {τ : Attr},
+    ordinal bs i = some τ → lookup bs τ ≠ .absent
+  | [], _, _, h => by simp [ordinal] at h
+  | .delta _ :: r, i, τ, h => by simp only [ordinal] at h; simp only [lookup]; exact ordinal_lookup h
+  | .lambda _ :: r, i, τ, h => by simp only [ordinal] at h; simp only [lookup]; exact ordinal_lookup h
+  | .void c :: r, i, τ, h => by
+      simp only [lookup]
+      by_cases hc : c = τ
+      · simp [hc]
+      · rw [if_neg hc]
+        simp only [ordinal] at h
+        split at h
+        · exact ordinal_lookup h
+        · cases i with
+          | zero => simp at h; exact absurd h hc
+          | succ j => exact ordinal_lookup h
+  | .attached c v :: r, i, τ, h => by
+      simp only [lookup]
+      by_cases hc : c = τ
+      · simp [hc]
+      · rw [if_neg hc]
+        simp only [ordinal] at h
+        split at h
+        · exact ordinal_lookup h
+        · cases i with
+          | zero => simp at h; exact absurd h hc
+          | succ j => exact ordinal_lookup h
 
 /-- Every single step is a parallel step (`Step ⊆ Par`). -/
 theorem step_to_par {e e' : Term} (h : e ↝ e') : Par e e' := by
@@ -247,35 +347,44 @@ theorem step_to_par {e e' : Term} (h : e ↝ e') : Par e e' := by
   | stop habs hphi hlam => exact .stop (ParB.refl' _) habs hphi hlam
   | miss habs hna => exact .miss (ParB.refl' _) habs hna (.refl _)
   | stay hs => exact .stay (ParB.refl' _) hs (.refl _)
-  | phi hpres habs => exact .phi (ParB.refl' _) hpres habs
-  | alpha hget => exact .alpha (ParB.refl' _) hget (.refl _)
-  | dot hl hnf => exact .dot (ParB.refl' _) hl hl hnf
+  | alpha hord hv => exact .alpha (ParB.refl' _) hord hv (.refl _)
+  | overa hord hat => exact .overa (ParB.refl' _) hord hat (.refl _)
+  | amiss hord => exact .amiss (ParB.refl' _) hord (.refl _)
+  | dot hl hnf hld => exact .dot (ParB.refl' _) hl hl hnf hld
   | copy hl hxi hnf => exact .copy (ParB.refl' _) hl (.refl _) hxi hnf
+  | dl hl hd => exact .dl hl hd
   | congDispatch _ ih => exact .congDispatch ih
   | congAppFn _ ih => exact .congApp ih (.refl _)
   | congAppArg _ ih => exact .congApp (.refl _) ih
   | congForm _ ih => exact .congForm (parB_set ih)
 
 /-- A single step between formations lifts by prepending a binding (it is a `congForm`
-on the extended prefix). -/
+on the extended prefix; `dl` cannot land on a formation). -/
 theorem step_form_cons {bs bs' : List Binding} (b : Binding) (h : Step (.form bs) (.form bs')) :
     Step (.form (b :: bs)) (.form (b :: bs')) := by
-  obtain ⟨cs₁, c, f, f', cs₂, hbs, hbs', hf⟩ := form_step_inv h
-  subst hbs
-  injection hbs' with hbs'
-  subst hbs'
-  exact Step.congForm (bs₁ := b :: cs₁) hf
+  rcases form_step_inv h with ⟨cs₁, c, f, f', cs₂, hbs, hbs', hf⟩ | ⟨hb, _, _⟩
+  · subst hbs
+    injection hbs' with hbs'
+    subst hbs'
+    exact Step.congForm (bs₁ := b :: cs₁) hf
+  · nomatch hb
 
-/-- Anything reachable from a formation is itself a formation (every step from a `form`
-is a `congForm`). -/
+/-- Nothing steps out of `⊥`. -/
+theorem bot_step_inv {t : Term} (h : Step .bot t) : False := by
+  cases h
+
+/-- Anything reachable from a formation is a formation or `⊥` (a formation steps by `congForm`
+or collapses by `dl`, and `⊥` is stuck). -/
 theorem redMany_form_target {bs : List Binding} {t : Term} (h : (Term.form bs) ↝∗ t) :
-    ∃ cs, t = .form cs := by
+    t = .bot ∨ ∃ cs, t = .form cs := by
   induction h with
-  | refl => exact ⟨bs, rfl⟩
+  | refl => exact .inr ⟨bs, rfl⟩
   | tail _ hstep ih =>
-      obtain ⟨cs, rfl⟩ := ih
-      obtain ⟨_, _, _, _, _, _, ht, _⟩ := form_step_inv hstep
-      exact ⟨_, ht⟩
+      rcases ih with rfl | ⟨cs, rfl⟩
+      · exact (bot_step_inv hstep).elim
+      · rcases form_step_inv hstep with ⟨_, _, _, _, _, _, ht, _⟩ | ⟨ht, _, _⟩
+        · exact .inr ⟨_, ht⟩
+        · exact .inl ht
 
 /-- Multi-step reduction between formations lifts by prepending a binding — proved by
 hand (NOT `ReflTransGen.lift`, which is unsound here since `stay` turns app→form, so
@@ -288,9 +397,10 @@ theorem redMany_form_cons {bs : List Binding} (b : Binding) {t : Term}
   | tail h1 hstep ih =>
       intro bs' ht
       subst ht
-      obtain ⟨cs, hc⟩ := redMany_form_target h1
-      subst hc
-      exact (ih rfl).tail (step_form_cons b hstep)
+      rcases redMany_form_target h1 with hc | ⟨cs, hc⟩
+      · subst hc; exact (bot_step_inv hstep).elim
+      · subst hc
+        exact (ih rfl).tail (step_form_cons b hstep)
 
 /-- Every parallel step is realized by zero-or-more single steps (`Par ⊆ Step∗`). Proved
 by the two-motive mutual recursor: `motive₂` on a binding-list reduction is the
@@ -306,17 +416,22 @@ theorem par_to_red {e e' : Term} (h : Par e e') : e ↝∗ e' := by
   | stop hb h1 h2 h3 ihb => exact .single (Step.stop h1 h2 h3)
   | miss hb hl hna he ihb ihe => exact .single (Step.miss hl hna)
   | stay hb hl he ihb ihe => exact .head (Step.stay hl) ihb
-  | phi hb hpres habs ihb =>
-      exact .head (Step.phi hpres habs)
-        (redMany_congDispatch _ (redMany_congDispatch Attr.phi ihb))
-  | alpha hb hget he ihb ihe =>
-      exact .head (Step.alpha hget)
+  | alpha hb hord hv he ihb ihe =>
+      exact .head (Step.alpha hord hv)
         ((redMany_congAppFn _ _ ihb).trans (redMany_congAppArg _ _ ihe))
-  | dot hb hl0 hl1 hnf ihb =>
-      exact (redMany_congDispatch _ ihb).tail (Step.dot hl1 hnf)
+  | overa hb hord hat he ihb ihe => exact .single (Step.overa hord hat)
+  | amiss hb hord he ihb ihe => exact .single (Step.amiss hord)
+  | dot hb hl0 hl1 hnf hld ihb =>
+      rename_i bs bs' a e₀ e₁
+      have hld' : (hasLambda bs' && hasDelta bs') = false := by
+        rw [← parB_hasLambda hb, ← parB_hasDelta hb]; exact hld
+      exact (redMany_congDispatch _ ihb).tail (Step.dot hl1 hnf hld')
   | copy hb hl harg hxi hnf ihb iharg =>
       exact ((redMany_congAppFn _ _ ihb).trans (redMany_congAppArg _ _ iharg)).tail
         (Step.copy (parB_lookup_void hb hl) hxi hnf)
+  | dl hl hd => exact .single (Step.dl hl hd)
+  | ddl hl hd => exact .head (Step.congDispatch (Step.dl hl hd)) (.single (Step.dd _))
+  | dcl hl hd => exact .head (Step.congAppFn (Step.dl hl hd)) (.single (Step.dc _ _))
   | congDispatch he ih => exact redMany_congDispatch _ ih
   | congApp he harg ihe iharg =>
       exact (redMany_congAppFn _ _ ihe).trans (redMany_congAppArg _ _ iharg)
@@ -344,55 +459,67 @@ theorem redMany_eq : RedMany = Relation.ReflTransGen Par := by
     | refl => exact .refl
     | tail _ pt ih => exact ih.trans (par_to_red pt)
 
+/-- The development of a dispatch `⟦bs⟧.a` on a formation without both `λ` and `Δ`, given the
+developed bindings `bsd`: `null` and `stop` collapse it, `dot` fires when the developed value is
+normal (contextualized against the developed formation without `a`), anything else develops
+inside. -/
+def develDispatch (bs bsd : List Binding) (a : Attr) : Term :=
+  match lookup bs a with
+  | .void => .bot
+  | .attached _ =>
+      match lookup bsd a with
+      | .attached e₁ =>
+          if nf e₁ then .app (contextualize e₁ (.form (ensureRho (erase bsd a)))) .rho (.form bsd)
+          else .dispatch (.form bsd) a
+      | _ => .dispatch (.form bsd) a
+  | .absent =>
+      match lookup bs .phi with
+      | .absent => if hasLambda bs then .dispatch (.form bsd) a else .bot
+      | _ => .dispatch (.form bsd) a
+
+/-- The development of a positional application `⟦bs⟧(αᵢ ↦ e)`, given the developed bindings
+`bsd` and argument `argd`: `amiss` and `overa` collapse it, `alpha` renames `αᵢ` to the key at
+domain ordinal `i` (without firing the `copy` it creates). -/
+def develAlpha (bs bsd : List Binding) (i : Nat) (argd : Term) : Term :=
+  match ordinal bs i with
+  | none => .bot
+  | some τ =>
+      match lookup bs τ with
+      | .void => .app (.form bsd) τ argd
+      | .attached _ => .bot
+      | .absent => .app (.form bsd) (.alpha i) argd
+
+/-- The development of an application `⟦bs⟧(a ↦ e)` by a non-positional `a`, given the developed
+bindings `bsd` and argument `argd`: `stay` keeps the formation, `over` and `miss` collapse it,
+`copy` fills the void slot when the developed argument is `ξ`-free and normal. -/
+def develAttr (bs bsd : List Binding) (a : Attr) (argd : Term) : Term :=
+  match lookup bs a with
+  | .attached _ => if a = .rho then .form bsd else .bot
+  | .absent => .bot
+  | .void => if xiFree argd && nf argd then .form (fill bsd a argd) else .app (.form bsd) a argd
+
 mutual
 
 /-- **Complete development** (Takahashi's `e*`): contract *every* redex present in `e` in one
 sweep. It is the apex of the `Par`-diamond — `par_triangle` shows any single `⇒` out of a
 well-formed `e` is itself followed by a `⇒` into `devel e`, so `d := devel a` joins any fork.
-The `alpha` arm renames a positional `αᵢ` to the domain-ordinal-`i` void slot's key (`voidAtOrdinal`) but does
-NOT fire the `copy`/`over` redex it creates — a single development contracts redexes *present*,
-not created ones. `dot`/`copy` (M4.3/4.4) will need the guard-on-developed-subterm treatment.
-Pattern order is load-bearing (the `.bot`-subject and `.form`-subject cases precede the
-catch-alls), and `devel`'s side-condition matches mirror the `Par` constructors' guards exactly
-so the triangle's `simp only [devel, …]` lines unfold cleanly. -/
+A formation holding both `λ` and `Δ` develops to `⊥`, and so does every dispatch and application
+on it, since `dl` wins every fork there. The positional arm renames `αᵢ` but does NOT fire the
+`copy` it creates — a single development contracts redexes *present*, not created ones. -/
 def devel : Term → Term
   | .bot => .bot
   | .glob => .glob
   | .xi => .xi
-  | .form bs => .form (develB bs)
+  | .form bs => if hasLambda bs && hasDelta bs then .bot else .form (develB bs)
   | .dispatch .bot _ => .bot
   | .dispatch (.form bs) a =>
-      match lookup bs a with
-      | .void => .bot
-      | .attached _ =>
-          match lookup (develB bs) a with
-          | .attached e₁d =>
-              if nf e₁d then .app (contextualize e₁d (.form (develB bs))) .rho (.form (develB bs))
-              else .dispatch (.form (develB bs)) a
-          | _ => .dispatch (.form (develB bs)) a
-      | .absent =>
-          match lookup bs .phi with
-          | .absent =>
-              match hasLambda bs with
-              | false => .bot
-              | true => .dispatch (.form (develB bs)) a
-          | _ => .dispatch (.dispatch (.form (develB bs)) .phi) a
+      if hasLambda bs && hasDelta bs then .bot else develDispatch bs (develB bs) a
   | .dispatch e a => .dispatch (devel e) a
   | .app .bot _ _ => .bot
+  | .app (.form bs) (.alpha i) e₂ =>
+      if hasLambda bs && hasDelta bs then .bot else develAlpha bs (develB bs) i (devel e₂)
   | .app (.form bs) a e₂ =>
-      match lookup bs a, decide (a = .rho) with
-      | .attached _, true => .form (develB bs)
-      | .attached _, false => .bot
-      | .absent, _ =>
-          match a with
-          | .alpha i =>
-              match voidAtOrdinal bs i with
-              | some τ1 => .app (.form (develB bs)) τ1 (devel e₂)
-              | none => .app (.form (develB bs)) a (devel e₂)
-          | _ => .bot
-      | .void, _ =>
-          if xiFree (devel e₂) && nf (devel e₂) then .form (fill (develB bs) a (devel e₂))
-          else .app (.form (develB bs)) a (devel e₂)
+      if hasLambda bs && hasDelta bs then .bot else develAttr bs (develB bs) a (devel e₂)
   | .app e a e₂ => .app (devel e) a (devel e₂)
 
 /-- Complete development of a binding list (develop every attached value, keys/shape fixed). -/
@@ -403,6 +530,33 @@ def develB : List Binding → List Binding
   | .delta d :: rest => .delta d :: develB rest
   | .lambda f :: rest => .lambda f :: develB rest
 end
+
+/-- `devel` of a formation, unfolded. -/
+theorem devel_form (bs : List Binding) :
+    devel (.form bs) = if hasLambda bs && hasDelta bs then .bot else .form (develB bs) := by
+  simp only [devel]
+
+/-- `devel` of a dispatch on a formation, unfolded. -/
+theorem devel_dispatch (bs : List Binding) (a : Attr) :
+    devel (.dispatch (.form bs) a)
+      = if hasLambda bs && hasDelta bs then .bot else develDispatch bs (develB bs) a := by
+  simp only [devel]
+
+/-- `devel` of a positional application on a formation, unfolded. -/
+theorem devel_alpha (bs : List Binding) (i : Nat) (e : Term) :
+    devel (.app (.form bs) (.alpha i) e)
+      = if hasLambda bs && hasDelta bs then .bot else develAlpha bs (develB bs) i (devel e) := by
+  simp only [devel]
+
+/-- `devel` of a non-positional application on a formation, unfolded. -/
+theorem devel_attr (bs : List Binding) {a : Attr} (h : a.isAlpha = false) (e : Term) :
+    devel (.app (.form bs) a e)
+      = if hasLambda bs && hasDelta bs then .bot else develAttr bs (develB bs) a (devel e) := by
+  cases a with
+  | alpha i => simp [Attr.isAlpha] at h
+  | phi => simp only [devel]
+  | rho => simp only [devel]
+  | label nm => simp only [devel]
 
 /-- `develB` develops the value found by `lookup` — the bridge `devel`'s `dot` arm uses to read
 the developed dispatched value back (via `lookup (develB bs) a`), keeping `devel` structurally
@@ -438,6 +592,52 @@ theorem lookup_develB : ∀ (bs : List Binding) (a : Attr) (e₁ : Term),
           simp only [develB, lookup]
           exact ih a e₁ h
 
+/-- A formation holding both `λ` and `Δ` reaches `⊥` in one parallel step from any `ParB`-reduct
+of its bindings. -/
+theorem par_dl {bs bs' : List Binding} (h : ParB bs bs') (hl : hasLambda bs = true)
+    (hd : hasDelta bs = true) : Par (.form bs') .bot :=
+  .dl (by rw [← parB_hasLambda h]; exact hl) (by rw [← parB_hasDelta h]; exact hd)
+
+/-- A `Par`-reduct of a formation is a formation with pointwise-reduced bindings, or `⊥` when
+the formation holds both `λ` and `Δ` (the `Par`-level analogue of `form_step_inv`). -/
+theorem par_form_inv {bs : List Binding} {t : Term} (h : Par (.form bs) t) :
+    (∃ cs, t = .form cs ∧ ParB bs cs) ∨ (t = .bot ∧ hasLambda bs = true ∧ hasDelta bs = true) := by
+  cases h with
+  | refl => exact .inl ⟨bs, rfl, ParB.refl' bs⟩
+  | congForm hpb => rename_i cs; exact .inl ⟨cs, rfl, hpb⟩
+  | dl hl hd => exact .inr ⟨rfl, hl, hd⟩
+
+/-- A `Par`-reduct of a formation without both `λ` and `Δ` is a formation. -/
+theorem par_form_inv' {bs : List Binding} {t : Term} (h : Par (.form bs) t)
+    (hld : (hasLambda bs && hasDelta bs) = false) : ∃ cs, t = .form cs ∧ ParB bs cs := by
+  rcases par_form_inv h with hc | ⟨_, hl, hd⟩
+  · exact hc
+  · simp [hl, hd] at hld
+
+/-- `par_devel` for a non-positional application on a formation, given the argument's
+development and bindings. -/
+theorem par_devel_attr {bs : List Binding} {a : Attr} (hna : a.isAlpha = false) {e₂ : Term}
+    (hb : ParB bs (develB bs)) (he : Par e₂ (devel e₂)) : Par (.app (.form bs) a e₂) (devel (.app (.form bs) a e₂)) := by
+  rw [devel_attr bs hna]
+  by_cases hld : (hasLambda bs && hasDelta bs) = true
+  · obtain ⟨hl, hd⟩ := Bool.and_eq_true_iff.mp hld
+    rw [if_pos hld]; exact .dcl hl hd
+  · rw [if_neg hld]
+    simp only [develAttr]
+    match h : lookup bs a with
+    | .attached v =>
+        by_cases hr : a = .rho
+        · subst hr; simp only [if_true]; exact .stay hb h he
+        · simp only [hr, if_false]; exact .over hb h hr he
+    | .absent => exact .miss hb h hna he
+    | .void =>
+        by_cases hcp : xiFree (devel e₂) && nf (devel e₂)
+        · obtain ⟨hxi, hnf⟩ := Bool.and_eq_true_iff.mp hcp
+          simp only [hcp, if_true]
+          exact .copy hb h he hxi hnf
+        · simp only [hcp, Bool.false_eq_true, if_false]
+          exact .congApp (.congForm hb) he
+
 mutual
 
 /-- `e ⇒ devel e`: every term parallel-reduces to its own complete development (the
@@ -446,65 +646,63 @@ theorem par_devel : ∀ (e : Term), Par e (devel e)
   | .bot => .refl _
   | .glob => .refl _
   | .xi => .refl _
-  | .form bs => .congForm (parB_develB bs)
+  | .form bs => by
+      rw [devel_form]
+      by_cases hld : (hasLambda bs && hasDelta bs) = true
+      · obtain ⟨hl, hd⟩ := Bool.and_eq_true_iff.mp hld
+        rw [if_pos hld]; exact .dl hl hd
+      · rw [if_neg hld]; exact .congForm (parB_develB bs)
   | .dispatch .bot a => .dd a
   | .dispatch (.form bs) a => by
-      simp only [devel]
-      match h : lookup bs a with
-      | .void => exact .null (parB_develB bs) h
-      | .attached v =>
-          match hd : lookup (develB bs) a with
-          | .attached e₁d =>
-              by_cases hnf : nf e₁d
-              · simp only [hnf, if_pos]
-                exact .dot (parB_develB bs) h hd hnf
-              · simp only [hnf, if_neg, Bool.false_eq_true, not_false_iff]
-                exact .congDispatch (.congForm (parB_develB bs))
-          | .void =>
-              have : lookup (develB bs) a = .attached (devel v) := lookup_develB bs a v h
-              rw [this] at hd; nomatch hd
-          | .absent =>
-              have : lookup (develB bs) a = .attached (devel v) := lookup_develB bs a v h
-              rw [this] at hd; nomatch hd
-      | .absent =>
-          match hphi : lookup bs .phi with
-          | .absent =>
-              match hl : hasLambda bs with
-              | false => exact .stop (parB_develB bs) h hphi hl
-              | true => exact .congDispatch (.congForm (parB_develB bs))
-          | .void => exact .phi (parB_develB bs) (by rw [hphi]; intro hc; nomatch hc) h
-          | .attached v => exact .phi (parB_develB bs) (by rw [hphi]; intro hc; nomatch hc) h
+      rw [devel_dispatch]
+      by_cases hld : (hasLambda bs && hasDelta bs) = true
+      · obtain ⟨hl, hd⟩ := Bool.and_eq_true_iff.mp hld
+        rw [if_pos hld]; exact .ddl hl hd
+      · rw [if_neg hld]
+        simp only [Bool.not_eq_true] at hld
+        simp only [develDispatch]
+        match h : lookup bs a with
+        | .void => exact .null (parB_develB bs) h
+        | .attached v =>
+            have hd : lookup (develB bs) a = .attached (devel v) := lookup_develB bs a v h
+            simp only [hd]
+            by_cases hnf : nf (devel v)
+            · simp only [hnf, if_true]
+              exact .dot (parB_develB bs) h hd hnf hld
+            · simp only [hnf, Bool.false_eq_true, if_false]
+              exact .congDispatch (.congForm (parB_develB bs))
+        | .absent =>
+            match hphi : lookup bs .phi with
+            | .absent =>
+                by_cases hl : hasLambda bs = true
+                · simp only [hl, if_true]; exact .congDispatch (.congForm (parB_develB bs))
+                · simp only [Bool.not_eq_true] at hl
+                  simp only [hl, Bool.false_eq_true, if_false]
+                  exact .stop (parB_develB bs) h hphi hl
+            | .void => exact .congDispatch (.congForm (parB_develB bs))
+            | .attached _ => exact .congDispatch (.congForm (parB_develB bs))
   | .dispatch .glob a => .congDispatch (.refl _)
   | .dispatch .xi a => .congDispatch (.refl _)
   | .dispatch (.dispatch s b) a => .congDispatch (par_devel _)
   | .dispatch (.app s b arg) a => .congDispatch (par_devel _)
   | .app .bot a e₂ => .dc (par_devel e₂)
-  | .app (.form bs) a e₂ => by
-      simp only [devel]
-      match h : lookup bs a, hr : decide (a = .rho) with
-      | .attached v, true =>
-          have : a = .rho := by simpa using hr
-          subst this
-          exact .stay (parB_develB bs) h (par_devel e₂)
-      | .attached v, false =>
-          have : a ≠ .rho := by simp at hr; exact hr
-          exact .over (parB_develB bs) h this (par_devel e₂)
-      | .absent, b =>
-          cases a with
-          | alpha i =>
-              cases hget : voidAtOrdinal bs i with
-              | none => simp only [hget]; exact .congApp (.congForm (parB_develB bs)) (par_devel e₂)
-              | some τ1 => simp only [hget]; exact .alpha (parB_develB bs) hget (par_devel e₂)
-          | phi => exact .miss (parB_develB bs) h rfl (par_devel e₂)
-          | rho => exact .miss (parB_develB bs) h rfl (par_devel e₂)
-          | label nm => exact .miss (parB_develB bs) h rfl (par_devel e₂)
-      | .void, b =>
-          by_cases hcp : xiFree (devel e₂) && nf (devel e₂)
-          · obtain ⟨hxi, hnf⟩ := Bool.and_eq_true_iff.mp hcp
-            simp only [hcp, if_pos]
-            exact .copy (parB_develB bs) h (par_devel e₂) hxi hnf
-          · simp only [hcp, if_neg, Bool.false_eq_true, not_false_iff]
-            exact .congApp (.congForm (parB_develB bs)) (par_devel e₂)
+  | .app (.form bs) (.alpha i) e₂ => by
+      rw [devel_alpha]
+      by_cases hld : (hasLambda bs && hasDelta bs) = true
+      · obtain ⟨hl, hd⟩ := Bool.and_eq_true_iff.mp hld
+        rw [if_pos hld]; exact .dcl hl hd
+      · rw [if_neg hld]
+        simp only [develAlpha]
+        match hord : ordinal bs i with
+        | none => exact .amiss (parB_develB bs) hord (par_devel e₂)
+        | some τ =>
+            match hl : lookup bs τ with
+            | .void => simp only [hl]; exact .alpha (parB_develB bs) hord hl (par_devel e₂)
+            | .attached _ => simp only [hl]; exact .overa (parB_develB bs) hord hl (par_devel e₂)
+            | .absent => simp only [hl]; exact .congApp (.congForm (parB_develB bs)) (par_devel e₂)
+  | .app (.form bs) .phi e₂ => par_devel_attr rfl (parB_develB bs) (par_devel e₂)
+  | .app (.form bs) .rho e₂ => par_devel_attr rfl (parB_develB bs) (par_devel e₂)
+  | .app (.form bs) (.label nm) e₂ => par_devel_attr rfl (parB_develB bs) (par_devel e₂)
   | .app .glob a e₂ => .congApp (.refl _) (par_devel e₂)
   | .app .xi a e₂ => .congApp (.refl _) (par_devel e₂)
   | .app (.dispatch s c) a e₂ => .congApp (par_devel _) (par_devel e₂)
@@ -525,21 +723,6 @@ case (combined with `nf_par_eq` it pins the developed value to the `dot`-redex's
 theorem parB_lookup_attached_par {bs bs' : List Binding} (h : ParB bs bs') {a : Attr} {v : Term}
     (hl : lookup bs a = .attached v) : ∃ w, lookup bs' a = .attached w ∧ Par v w := by
   induction h using ParB.rec (motive_1 := fun _ _ _ => True) with
-  | refl => trivial
-  | dd => trivial
-  | dc => trivial
-  | null => trivial
-  | «over» => trivial
-  | stop => trivial
-  | miss => trivial
-  | stay => trivial
-  | phi => trivial
-  | alpha => trivial
-  | dot => trivial
-  | copy => trivial
-  | congDispatch => trivial
-  | congApp => trivial
-  | congForm => trivial
   | nil => simp [lookup] at hl
   | consVoid hb ih =>
       rename_i c _ _
@@ -557,49 +740,10 @@ theorem parB_lookup_attached_par {bs bs' : List Binding} (h : ParB bs bs') {a : 
           exact ⟨v0', rfl, hvv⟩
       · next hc => rw [if_neg hc]; exact ihb hl
   | consDelta hb ih =>
-      rename_i d _ _
       simp only [lookup] at hl ⊢; exact ih hl
   | consLambda hb ih =>
-      rename_i f _ _
       simp only [lookup] at hl ⊢; exact ih hl
-
-/-- A `Par`-reduct of a formation is a formation (the `Par`-level analogue of
-`form_step_inv`; `Par` from a `form` is `refl` or `congForm`). -/
-theorem par_form_inv {bs : List Binding} {t : Term} (h : Par (.form bs) t) :
-    ∃ cs, t = .form cs ∧ ParB bs cs := by
-  cases h with
-  | refl => exact ⟨bs, rfl, ParB.refl' bs⟩
-  | congForm hpb => rename_i cs; exact ⟨cs, rfl, hpb⟩
-
-/-- `ParB` keeps the `i`-th void binding a void binding with the same key (positional
-preservation, the engine behind the triangle's `alpha` side-condition transport). -/
-theorem parB_voidAtOrdinal {bs bs' : List Binding} (h : ParB bs bs') :
-    ∀ i, voidAtOrdinal bs i = voidAtOrdinal bs' i := by
-  induction h using ParB.rec (motive_1 := fun _ _ _ => True) with
-  | refl => trivial
-  | dd => trivial
-  | dc => trivial
-  | null => trivial
-  | «over» => trivial
-  | stop => trivial
-  | miss => trivial
-  | stay => trivial
-  | phi => trivial
-  | alpha => trivial
-  | dot => trivial
-  | copy => trivial
-  | congDispatch => trivial
-  | congApp => trivial
-  | congForm => trivial
-  | nil => intro i; rfl
-  | consVoid _ ih => intro i; cases i with
-      | zero => rfl
-      | succ j => simp only [voidAtOrdinal]; exact ih j
-  | consAttached _ _ _ ih => intro i; cases i with
-      | zero => rfl
-      | succ j => simp only [voidAtOrdinal]; exact ih j
-  | consDelta _ ih => intro i; simp only [voidAtOrdinal]; exact ih i
-  | consLambda _ ih => intro i; simp only [voidAtOrdinal]; exact ih i
+  | _ => trivial
 
 /-- The key well-formedness lemma: in a formation whose every key is legal (not a positional
 `αᵢ`), looking up a positional `αᵢ` is `absent` — otherwise `αᵢ` would be in the domain, but
@@ -636,8 +780,8 @@ theorem lookup_alpha_absent_of_wf {bs : List Binding} {i : Nat}
           exact ih (fun x hx => h x (by simp only [domain, Binding.key?]; exact hx))
 
 /-- Triangle, `congDispatch` case: case-split on the developed subject's shape; when it is a
-formation, the redex (`null`/`stop`/`phi`) still fires because `parB_preserves` carries the
-side condition to the reduct. -/
+formation, the redex (`null`/`stop`/`dot`) still fires because `parB_preserves` carries the
+side condition to the reduct, and a formation holding `λ` and `Δ` collapses by `ddl`/`dd`. -/
 theorem tri_dispatch {s s' : Term} {a : Attr}
     (h : Par s s') (ihs : Par s' (devel s)) :
     Par (.dispatch s' a) (devel (.dispatch s a)) := by
@@ -648,47 +792,91 @@ theorem tri_dispatch {s s' : Term} {a : Attr}
   | dispatch t b => exact .congDispatch ihs
   | app t b arg => exact .congDispatch ihs
   | form bs =>
-      obtain ⟨cs, rfl, hbc⟩ := par_form_inv h
-      obtain ⟨ds, hds, hcd⟩ := par_form_inv ihs
-      simp only [devel] at hds ⊢
-      injection hds with hds; subst hds
-      match hb : lookup bs a with
-      | .void => exact .null hcd (parB_lookup_void hbc hb)
-      | .attached v =>
-          match hd : lookup (develB bs) a with
-          | .attached e₁d =>
-              by_cases hnf : nf e₁d
-              · simp only [hnf, if_pos]
-                obtain ⟨w, hw⟩ := parB_lookup_attached hbc hb
-                exact .dot hcd hw hd hnf
-              · simp only [hnf, if_neg, Bool.false_eq_true, not_false_iff]
-                exact .congDispatch ihs
-          | .void =>
-              have := lookup_develB bs a v hb
-              rw [this] at hd; nomatch hd
-          | .absent =>
-              have := lookup_develB bs a v hb
-              rw [this] at hd; nomatch hd
-      | .absent =>
-          match hphi : lookup bs .phi with
-          | .absent =>
-              match hl : hasLambda bs with
-              | false =>
+      rw [devel_dispatch]
+      by_cases hld : (hasLambda bs && hasDelta bs) = true
+      · obtain ⟨hl, hd⟩ := Bool.and_eq_true_iff.mp hld
+        rw [if_pos hld]
+        rcases par_form_inv h with ⟨cs, rfl, hbc⟩ | ⟨rfl, _, _⟩
+        · exact .ddl (by rw [← parB_hasLambda hbc]; exact hl) (by rw [← parB_hasDelta hbc]; exact hd)
+        · exact .dd a
+      · rw [if_neg hld]
+        simp only [Bool.not_eq_true] at hld
+        obtain ⟨cs, rfl, hbc⟩ := par_form_inv' h hld
+        rw [devel_form, hld] at ihs
+        simp only [Bool.false_eq_true, if_false] at ihs
+        have hld' : (hasLambda cs && hasDelta cs) = false := by
+          rw [← parB_hasLambda hbc, ← parB_hasDelta hbc]; exact hld
+        obtain ⟨ds, hds, hcd⟩ := par_form_inv' ihs hld'
+        injection hds with hds; subst hds
+        simp only [develDispatch]
+        match hb : lookup bs a with
+        | .void => exact .null hcd (parB_lookup_void hbc hb)
+        | .attached v =>
+            have hdv : lookup (develB bs) a = .attached (devel v) := lookup_develB bs a v hb
+            simp only [hdv]
+            by_cases hnf : nf (devel v)
+            · simp only [hnf, if_true]
+              obtain ⟨w, hw⟩ := parB_lookup_attached hbc hb
+              exact .dot hcd hw hdv hnf hld'
+            · simp only [hnf, Bool.false_eq_true, if_false]
+              exact .congDispatch ihs
+        | .absent =>
+            match hphi : lookup bs .phi with
+            | .absent =>
+                by_cases hl : hasLambda bs = true
+                · simp only [hl, if_true]; exact .congDispatch ihs
+                · simp only [Bool.not_eq_true] at hl
+                  simp only [hl, Bool.false_eq_true, if_false]
                   exact .stop hcd (parB_lookup_absent hbc hb)
                     (parB_lookup_absent hbc hphi) (by rw [← parB_hasLambda hbc]; exact hl)
-              | true => exact .congDispatch ihs
-          | .void =>
-              exact .phi hcd (by rw [parB_lookup_void hbc hphi]; nofun) (parB_lookup_absent hbc hb)
-          | .attached v =>
-              obtain ⟨w, hw⟩ := parB_lookup_attached hbc hphi
-              exact .phi hcd (by rw [hw]; nofun) (parB_lookup_absent hbc hb)
+            | .void => exact .congDispatch ihs
+            | .attached _ => exact .congDispatch ihs
 
-/-- Triangle, `congApp` case (now `WF`-aware): case-split on the developed subject's shape; on a
-formation the redex (`stay`/`over`/`miss`/`alpha`) fires via `parB_preserves`. The extra
-`hwf : WF s` parameter discharges the formation-`alpha` sub-case via `lookup_alpha_absent_of_wf`
-(under `WF`, a positional `αᵢ` is never a key, so `devel` takes the positional `alpha` branch). -/
+/-- Triangle, `congApp` case on a formation subject by a non-positional attribute: the redex
+(`stay`/`over`/`miss`/`copy`) fires via `parB_preserves`. -/
+theorem tri_app_attr {bs cs : List Binding} {a : Attr} {arg arg' : Term} (hna : a.isAlpha = false)
+    (hbc : ParB bs cs) (hcd : ParB cs (develB bs)) (iharg : Par arg' (devel arg)) :
+    Par (.app (.form cs) a arg') (develAttr bs (develB bs) a (devel arg)) := by
+  simp only [develAttr]
+  match hb : lookup bs a with
+  | .attached v =>
+      obtain ⟨w, hw⟩ := parB_lookup_attached hbc hb
+      by_cases hr : a = .rho
+      · subst hr; simp only [if_true]; exact .stay hcd hw iharg
+      · simp only [hr, if_false]; exact .over hcd hw hr iharg
+  | .absent => exact .miss hcd (parB_lookup_absent hbc hb) hna iharg
+  | .void =>
+      by_cases hcp : xiFree (devel arg) && nf (devel arg)
+      · obtain ⟨hxi, hnf⟩ := Bool.and_eq_true_iff.mp hcp
+        simp only [hcp, if_true]
+        exact .copy hcd (parB_lookup_void hbc hb) iharg hxi hnf
+      · simp only [hcp, Bool.false_eq_true, if_false]
+        exact .congApp (.congForm hcd) iharg
+
+/-- Triangle, `congApp` case on a formation subject by a positional attribute: the redex
+(`alpha`/`overa`/`amiss`) fires via `parB_ordinal` and `parB_preserves`. -/
+theorem tri_app_alpha {bs cs : List Binding} {i : Nat} {arg arg' : Term}
+    (hbc : ParB bs cs) (hcd : ParB cs (develB bs)) (iharg : Par arg' (devel arg)) :
+    Par (.app (.form cs) (.alpha i) arg') (develAlpha bs (develB bs) i (devel arg)) := by
+  simp only [develAlpha]
+  match hord : ordinal bs i with
+  | none => exact .amiss hcd (parB_ordinal hbc i ▸ hord) iharg
+  | some τ =>
+      match hl : lookup bs τ with
+      | .void =>
+          simp only [hl]
+          exact .alpha hcd (parB_ordinal hbc i ▸ hord) (parB_lookup_void hbc hl) iharg
+      | .attached _ =>
+          simp only [hl]
+          obtain ⟨w, hw⟩ := parB_lookup_attached hbc hl
+          exact .overa hcd (parB_ordinal hbc i ▸ hord) hw iharg
+      | .absent => exact absurd hl (ordinal_lookup hord)
+
+/-- Triangle, `congApp` case: case-split on the developed subject's shape; on a formation the
+redex fires via `tri_app_alpha` or `tri_app_attr`, and a formation holding `λ` and `Δ`
+collapses by `dcl`/`dc`. -/
 theorem tri_app {s s' arg arg' : Term} {a : Attr}
-    (hwf : WF s) (h : Par s s') (ihs : Par s' (devel s)) (iharg : Par arg' (devel arg)) :
+    (h : Par s s') (ihs : Par s' (devel s)) (iharg : Par arg' (devel arg)) :
     Par (.app s' a arg') (devel (.app s a arg)) := by
   cases s with
   | bot => cases h with | refl => exact .dc iharg
@@ -697,45 +885,70 @@ theorem tri_app {s s' arg arg' : Term} {a : Attr}
   | dispatch t b => exact .congApp ihs iharg
   | app t b c => exact .congApp ihs iharg
   | form bs =>
-      obtain ⟨cs, rfl, hbc⟩ := par_form_inv h
-      obtain ⟨ds, hds, hcd⟩ := par_form_inv ihs
-      simp only [devel] at hds ⊢
-      injection hds with hds; subst hds
-      cases hwf with
-      | form _ _ _ =>
-          match hb : lookup bs a, hr : decide (a = .rho) with
-          | .attached v, true =>
-              have hrr : a = .rho := by simpa using hr
-              subst hrr
-              obtain ⟨w, hw⟩ := parB_lookup_attached hbc hb
-              exact .stay hcd hw iharg
-          | .attached v, false =>
-              have hrr : a ≠ .rho := by simp at hr; exact hr
-              obtain ⟨w, hw⟩ := parB_lookup_attached hbc hb
-              exact .over hcd hw hrr iharg
-          | .absent, _ =>
-              cases a with
-              | alpha i =>
-                  cases hget : voidAtOrdinal bs i with
-                  | none => simp only [hget]; exact .congApp ihs iharg
-                  | some τ1 => simp only [hget]; exact .alpha hcd (parB_voidAtOrdinal hbc i ▸ hget) iharg
-              | phi => exact .miss hcd (parB_lookup_absent hbc hb) rfl iharg
-              | rho => exact .miss hcd (parB_lookup_absent hbc hb) rfl iharg
-              | label nm => exact .miss hcd (parB_lookup_absent hbc hb) rfl iharg
-          | .void, _ =>
-              by_cases hcp : xiFree (devel arg) && nf (devel arg)
-              · obtain ⟨hxi, hnf⟩ := Bool.and_eq_true_iff.mp hcp
-                simp only [hcp, if_pos]
-                exact .copy hcd (parB_lookup_void hbc hb) iharg hxi hnf
-              · simp only [hcp, if_neg, Bool.false_eq_true, not_false_iff]
-                exact .congApp ihs iharg
+      have hdev : devel (.app (.form bs) a arg) = if hasLambda bs && hasDelta bs then .bot else
+          (match a with
+            | .alpha i => develAlpha bs (develB bs) i (devel arg)
+            | _ => develAttr bs (develB bs) a (devel arg)) := by
+        cases a with
+        | alpha i => exact devel_alpha bs i arg
+        | phi => exact devel_attr bs rfl arg
+        | rho => exact devel_attr bs rfl arg
+        | label nm => exact devel_attr bs rfl arg
+      rw [hdev]
+      by_cases hld : (hasLambda bs && hasDelta bs) = true
+      · obtain ⟨hl, hd⟩ := Bool.and_eq_true_iff.mp hld
+        rw [if_pos hld]
+        rcases par_form_inv h with ⟨cs, rfl, hbc⟩ | ⟨rfl, _, _⟩
+        · exact .dcl (by rw [← parB_hasLambda hbc]; exact hl) (by rw [← parB_hasDelta hbc]; exact hd)
+        · exact .dc iharg
+      · rw [if_neg hld]
+        simp only [Bool.not_eq_true] at hld
+        obtain ⟨cs, rfl, hbc⟩ := par_form_inv' h hld
+        rw [devel_form, hld] at ihs
+        simp only [Bool.false_eq_true, if_false] at ihs
+        have hld' : (hasLambda cs && hasDelta cs) = false := by
+          rw [← parB_hasLambda hbc, ← parB_hasDelta hbc]; exact hld
+        obtain ⟨ds, hds, hcd⟩ := par_form_inv' ihs hld'
+        injection hds with hds; subst hds
+        cases a with
+        | alpha i => exact tri_app_alpha hbc hcd iharg
+        | phi => exact tri_app_attr rfl hbc hcd iharg
+        | rho => exact tri_app_attr rfl hbc hcd iharg
+        | label nm => exact tri_app_attr rfl hbc hcd iharg
+
+/-- An application on a formation by an attached slot has a root redex (`stay`/`over`, or a
+positional rule). -/
+theorem appNF_attached {bs : List Binding} {a : Attr} {e₁ : Term} (h : lookup bs a = .attached e₁)
+    (arg : Term) : appNF (.form bs) a arg = false := by
+  cases a with
+  | alpha i => rfl
+  | _ => simp [appNF, h]
+
+/-- An application on a formation by an absent slot has a root redex (`miss`, or a positional
+rule). -/
+theorem appNF_absent {bs : List Binding} {a : Attr} (h : lookup bs a = .absent) (arg : Term) :
+    appNF (.form bs) a arg = false := by
+  cases a with
+  | alpha i => rfl
+  | _ => simp [appNF, h]
+
+/-- An application on a formation by a void slot with a `ξ`-free argument has a root redex
+(`copy`, or a positional rule). -/
+theorem appNF_void {bs : List Binding} {a : Attr} {arg : Term} (h : lookup bs a = .void)
+    (hx : xiFree arg = true) : appNF (.form bs) a arg = false := by
+  cases a with
+  | alpha i => rfl
+  | _ => simp [appNF, h, hx]
+
+/-- A normal formation has normal bindings and does not hold both `λ` and `Δ`. -/
+theorem nf_form {bs : List Binding} (h : nf (.form bs) = true) :
+    nfB bs = true ∧ (hasLambda bs && hasDelta bs) = false := by
+  simpa only [nf, Bool.and_eq_true, Bool.not_eq_true'] using h
 
 /-- **Normal forms only `Par`-reduce to themselves** (`nf e → Par e e' → e' = e`). Proved by the
 two-motive recursor (`motive₂` is the `ParB` companion); every redex constructor is *vacuous* under
-`nf e` because `nf` of that redex shape is `false` (the eleven-rule `nf` already classifies
-`dot`/`copy`/`alpha`/… redexes as reducible), and the congruences close by the IHs. This is the
-load-bearing fact for the M4.3c/M4.4 `dot`/`copy` triangle cases (`nf e₁' → Par e₁ e₁' → devel e₁ =
-e₁'`, combined with `par_triangle`). -/
+`nf e` because `nf` of that redex shape is `false`, and the congruences close by the IHs. This is
+the load-bearing fact for the `dot`/`copy` triangle cases. -/
 theorem nf_par_eq {e e' : Term} (hnf : nf e = true) (h : Par e e') : e' = e := by
   revert hnf
   induction h using Par.rec
@@ -743,71 +956,41 @@ theorem nf_par_eq {e e' : Term} (hnf : nf e = true) (h : Par e e') : e' = e := b
   | refl e => intro _; rfl
   | dd a => intro hnf; simp [nf, dispatchNF] at hnf
   | dc he ihe => intro hnf; simp [nf, appNF] at hnf
-  | null hb hl ihb => intro hnf; rename_i bs bs' a; simp [nf, dispatchNF, hl] at hnf
-  | «over» hb hl hne he ihb ihe =>
-      intro hnf; rename_i bs bs' a e₁ e₂ e₂'; simp [nf, appNF, hl] at hnf
-  | stop hb h1 h2 h3 ihb =>
-      intro hnf; rename_i bs bs' a; simp [nf, dispatchNF, h1, h2, h3] at hnf
-  | miss hb hl hna he ihb ihe =>
-      intro hnf; rename_i bs bs' a e e'
-      cases a with
-      | phi => simp [nf, appNF, hl] at hnf
-      | rho => simp [nf, appNF, hl] at hnf
-      | alpha i => simp [Attr.isAlpha] at hna
-      | label nm => simp [nf, appNF, hl] at hnf
-  | stay hb hl he ihb ihe =>
-      intro hnf; rename_i bs bs' e₁ e₂ e₂'; simp [nf, appNF, hl] at hnf
-  | phi hb hpres habs ihb =>
-      intro hnf; rename_i bs bs' a
-      cases hlphi : lookup bs .phi with
-      | absent => exact absurd hlphi hpres
-      | void => simp [nf, dispatchNF, habs, hlphi] at hnf
-      | attached v => simp [nf, dispatchNF, habs, hlphi] at hnf
-  | alpha hb hget he ihb ihe =>
-      intro hnf; rename_i bs bs' i τ1 e e'
-      simp only [nf, appNF, Bool.and_eq_true] at hnf
-      obtain ⟨⟨_, _⟩, hap⟩ := hnf
-      cases hl : lookup bs (.alpha i) with
-      | attached v => rw [hl] at hap; simp at hap
-      | void => rw [hl] at hap; simp at hap
-      | absent => rw [hl] at hap; rw [hget] at hap; simp at hap
-  | dot hb hl0 hl1 hnfe ihb =>
-      intro hnf; rename_i bs bs' a e₀ e₁
-      simp [nf, dispatchNF, hl0] at hnf
+  | null hb hl ihb => intro hnf; simp [nf, dispatchNF, hl] at hnf
+  | «over» hb hl hne he ihb ihe => intro hnf; simp [nf, appNF_attached hl] at hnf
+  | stop hb h1 h2 h3 ihb => intro hnf; simp [nf, dispatchNF, h1, h2, h3] at hnf
+  | miss hb hl hna he ihb ihe => intro hnf; simp [nf, appNF_absent hl] at hnf
+  | stay hb hl he ihb ihe => intro hnf; simp [nf, appNF_attached hl] at hnf
+  | alpha hb hord hv he ihb ihe => intro hnf; simp [nf, appNF] at hnf
+  | overa hb hord hat he ihb ihe => intro hnf; simp [nf, appNF] at hnf
+  | amiss hb hord he ihb ihe => intro hnf; simp [nf, appNF] at hnf
+  | dot hb hl0 hl1 hnfe hld ihb => intro hnf; simp [nf, dispatchNF, hl0] at hnf
   | copy hb hl harg hxi hnfe ihb ihe =>
-      intro hnf; rename_i bs bs' a arg arg'
-      have hclose : nf arg = true ∧ xiFree arg = false := by
-        cases a with
-        | alpha i => simp [nf, appNF, hl] at hnf
-        | phi =>
-            simp only [nf, appNF, hl, Bool.and_eq_true, Bool.not_eq_true'] at hnf
-            exact ⟨hnf.1.2, hnf.2⟩
-        | rho =>
-            simp only [nf, appNF, hl, Bool.and_eq_true, Bool.not_eq_true'] at hnf
-            exact ⟨hnf.1.2, hnf.2⟩
-        | label nm =>
-            simp only [nf, appNF, hl, Bool.and_eq_true, Bool.not_eq_true'] at hnf
-            exact ⟨hnf.1.2, hnf.2⟩
-      have hee := ihe hclose.1
+      intro hnf
+      simp only [nf, Bool.and_eq_true] at hnf
+      obtain ⟨⟨_, hna⟩, hap⟩ := hnf
+      have hee := ihe hna
       subst hee
-      rw [hxi] at hclose
-      exact absurd hclose.2 (by simp)
+      rw [appNF_void hl hxi] at hap
+      exact absurd hap (by simp)
+  | dl hl hd => intro hnf; simp [nf, hl, hd] at hnf
+  | ddl hl hd => intro hnf; simp [nf, hl, hd] at hnf
+  | dcl hl hd => intro hnf; simp [nf, hl, hd] at hnf
   | congDispatch he ihe =>
-      intro hnf; rename_i e e' a
+      intro hnf
       simp only [nf, Bool.and_eq_true] at hnf
       have hee := ihe hnf.1
       subst hee; rfl
   | congApp he harg ihe iharg =>
-      intro hnf; rename_i e e' a arg arg'
+      intro hnf
       simp only [nf, Bool.and_eq_true] at hnf
       obtain ⟨⟨hne, hnarg⟩, _⟩ := hnf
       have hee := ihe hne
       have haa := iharg hnarg
       subst hee; subst haa; rfl
   | congForm hb ihb =>
-      intro hnf; rename_i bs bs'
-      simp only [nf] at hnf
-      have := ihb hnf
+      intro hnf
+      have := ihb (nf_form hnf).1
       subst this; rfl
   | nil => rfl
   | consVoid hb ihb =>
@@ -833,8 +1016,7 @@ theorem nf_par_eq {e e' : Term} (hnf : nf e = true) (h : Par e e') : e' = e := b
       subst this; rfl
 
 /-- **The complete development fixes a normal form** (`nf e → devel e = e`): if no rule fires
-anywhere, `devel` rewrites nothing. By the `Term` recursor (`motive₃` the binding-list leg). Used
-with `nf_par_eq` to pin the `dot`/`copy` development at M4.3c/M4.4. -/
+anywhere, `devel` rewrites nothing. By the `Term` recursor (`motive₃` the binding-list leg). -/
 theorem nf_devel {e : Term} (hnf : nf e = true) : devel e = e := by
   induction e using Term.rec
     (motive_2 := fun b => ∀ a v, b = Binding.attached a v → nf v = true → devel v = v)
@@ -843,8 +1025,8 @@ theorem nf_devel {e : Term} (hnf : nf e = true) : devel e = e := by
   | glob => rfl
   | xi => rfl
   | form bs ih =>
-      simp only [nf] at hnf
-      simp only [devel, ih hnf]
+      obtain ⟨hb, hld⟩ := nf_form hnf
+      simp only [devel_form, hld, ih hb, Bool.false_eq_true, if_false]
   | dispatch e a ihe =>
       simp only [nf, Bool.and_eq_true] at hnf
       obtain ⟨hne, hdisp⟩ := hnf
@@ -855,20 +1037,21 @@ theorem nf_devel {e : Term} (hnf : nf e = true) : devel e = e := by
       | dispatch s b => simp only [devel, ihe hne]
       | app s b arg => simp only [devel, ihe hne]
       | form bs =>
-          simp only [nf] at hne
+          have hdf := ihe hne
+          obtain ⟨_, hld⟩ := nf_form hne
+          simp only [devel_form, hld, Bool.false_eq_true, if_false] at hdf
+          injection hdf with hb
+          simp only [devel_dispatch, hld, Bool.false_eq_true, if_false, develDispatch]
           cases hl : lookup bs a with
           | void => simp [dispatchNF, hl] at hdisp
           | attached v => simp [dispatchNF, hl] at hdisp
           | absent =>
-              have hb : develB bs = bs := by
-                have := ihe hne; simp only [devel] at this; injection this
-              simp only [devel, hl]
               cases hphi : lookup bs .phi with
               | absent =>
                   simp only [dispatchNF, hl, hphi] at hdisp
-                  simp only [hdisp, hb]
-              | void => simp [dispatchNF, hl, hphi] at hdisp
-              | attached v => simp [dispatchNF, hl, hphi] at hdisp
+                  simp only [hdisp, hb, if_true]
+              | void => simp only [hb]
+              | attached v => simp only [hb]
   | app e a arg ihe iharg =>
       simp only [nf, Bool.and_eq_true] at hnf
       obtain ⟨⟨hne, hnarg⟩, happ⟩ := hnf
@@ -879,34 +1062,29 @@ theorem nf_devel {e : Term} (hnf : nf e = true) : devel e = e := by
       | dispatch s b => simp only [devel, ihe hne, iharg hnarg]
       | app s b c => simp only [devel, ihe hne, iharg hnarg]
       | form bs =>
-          simp only [nf] at hne
-          have hb : develB bs = bs := by
-            have := ihe hne; simp only [devel] at this; injection this
+          have hdf := ihe hne
+          obtain ⟨_, hld⟩ := nf_form hne
+          simp only [devel_form, hld, Bool.false_eq_true, if_false] at hdf
+          injection hdf with hb
           cases hl : lookup bs a with
-          | attached v => simp [appNF, hl] at happ
+          | attached v => rw [appNF_attached hl] at happ; exact absurd happ (by simp)
+          | absent => rw [appNF_absent hl] at happ; exact absurd happ (by simp)
           | void =>
               have hda : devel arg = arg := iharg hnarg
               cases a with
-              | alpha i => simp [appNF, hl] at happ
+              | alpha i => simp [appNF] at happ
               | phi =>
                   simp only [appNF, hl, Bool.not_eq_true'] at happ
-                  simp only [devel, hl, hda, happ, Bool.false_and, Bool.false_eq_true, if_false, hb]
+                  simp only [devel_attr (a := .phi) bs rfl, hld, Bool.false_eq_true, if_false, develAttr, hl, hda,
+                    happ, Bool.false_and, hb]
               | rho =>
                   simp only [appNF, hl, Bool.not_eq_true'] at happ
-                  simp only [devel, hl, hda, happ, Bool.false_and, Bool.false_eq_true, if_false, hb]
+                  simp only [devel_attr (a := .rho) bs rfl, hld, Bool.false_eq_true, if_false, develAttr, hl, hda,
+                    happ, Bool.false_and, hb]
               | label nm =>
                   simp only [appNF, hl, Bool.not_eq_true'] at happ
-                  simp only [devel, hl, hda, happ, Bool.false_and, Bool.false_eq_true, if_false, hb]
-          | absent =>
-              cases a with
-              | alpha i =>
-                  simp only [appNF, hl] at happ
-                  cases hget : voidAtOrdinal bs i with
-                  | none => simp only [devel, hl, hget, hb, iharg hnarg]
-                  | some τ1 => rw [hget] at happ; simp at happ
-              | phi => simp [appNF, hl] at happ
-              | rho => simp [appNF, hl] at happ
-              | label nm => simp [appNF, hl] at happ
+                  simp only [devel_attr (a := (.label nm)) bs rfl, hld, Bool.false_eq_true, if_false, develAttr, hl, hda,
+                    happ, Bool.false_and, hb]
   | nil => rfl
   | cons b r ihb ihr =>
       rename_i hnf
@@ -958,14 +1136,23 @@ theorem par_contextualize_ctx {b b' : Term} (h : Par b b') :
   | .dispatch s _ => .congDispatch (par_contextualize_ctx h s)
   | .app s _ arg => .congApp (par_contextualize_ctx h s) (par_contextualize_ctx h arg)
 
-/-- **The Takahashi strict triangle**, now **WF-scoped**: any single `⇒`-step out of a
-well-formed `e` is followed by a `⇒`-step into the complete development `devel e`. With the
-`alpha` rule present this is no longer unconditional — the `alpha`-vs-`over` fork on malformed
-`αᵢ`-keyed formations is non-joinable (dev. #8) — so `WF e` is load-bearing: the `alpha` case
-consumes it via `lookup_alpha_absent_of_wf` to unfold `devel`. Proved by the two-motive recursor
-whose motives **carry** the `WF`/`WFB` hypothesis; `motive_1` is *inferred* from the reverted goal
-(supplying it explicitly conflicts with the eliminator's motive unification). This drives the
-`Abstract.Diamond ParWF` and the headline `confluence`. -/
+/-- A well-formed application on a formation has legal keys, well-formed bindings and a
+well-formed argument. -/
+theorem wf_app_form {bs : List Binding} {a : Attr} {e : Term} (h : WF (.app (.form bs) a e)) :
+    (∀ x ∈ domain bs, x.legalKey = true) ∧ WFB bs ∧ WF e := by
+  cases h with | app hf harg => cases hf with | form _ hl hb => exact ⟨hl, hb, harg⟩
+
+/-- A well-formed dispatch on a formation has well-formed bindings. -/
+theorem wf_dispatch_form {bs : List Binding} {a : Attr} (h : WF (.dispatch (.form bs) a)) :
+    WFB bs := by
+  cases h with | dispatch hf => cases hf with | form _ _ hb => exact hb
+
+/-- **The Takahashi strict triangle**, **WF-scoped**: any single `⇒`-step out of a well-formed
+`e` is followed by a `⇒`-step into the complete development `devel e`. `WF e` is load-bearing:
+the `over` and `copy` cases consume it via `lookup_alpha_absent_of_wf`, since a positional `αᵢ`
+used as a key makes `over`/`copy` disagree with the positional rules (dev. #8). Proved by the
+two-motive recursor whose motives **carry** the `WF`/`WFB` hypothesis; `motive_1` is *inferred*
+from the reverted goal. This drives the `Abstract.Diamond ParWF` and the headline `confluence`. -/
 theorem par_triangle {e u : Term} (hwf : WF e) (h : Par e u) : Par u (devel e) := by
   revert hwf
   induction h using Par.rec
@@ -974,81 +1161,107 @@ theorem par_triangle {e u : Term} (hwf : WF e) (h : Par e u) : Par u (devel e) :
   | dd a => intro _; exact .refl _
   | dc he ihe => intro _; exact .refl _
   | null hb hl ihb =>
-      rename_i bs bs' a
       intro _
-      show Par .bot (devel (.dispatch (.form bs) a))
-      simp only [devel, hl]; exact .refl _
+      rw [devel_dispatch]
+      simp only [develDispatch, hl, ite_self]
+      exact .refl _
   | «over» hb hl hne he ihb ihe =>
       rename_i bs bs' a e₁ e₂ e₂'
-      intro _
-      show Par .bot (devel (.app (.form bs) a e₂))
-      simp only [devel, hl, decide_eq_false hne]; exact .refl _
-  | stop hb h1 h2 h3 ihb =>
-      rename_i bs bs' a
-      intro _
-      show Par .bot (devel (.dispatch (.form bs) a))
-      simp only [devel, h1, h2, h3]; exact .refl _
-  | miss hb hl hna he ihb ihe =>
-      rename_i bs bs' a e e'
-      intro _
-      show Par .bot (devel (.app (.form bs) a e))
+      intro hwfa
       cases a with
-      | phi => simp only [devel, hl]; exact .refl _
-      | rho => simp only [devel, hl]; exact .refl _
-      | alpha i => exact absurd hna (by simp [Attr.isAlpha])
-      | label nm => simp only [devel, hl]; exact .refl _
+      | alpha i =>
+          rw [lookup_alpha_absent_of_wf (wf_app_form hwfa).1] at hl; nomatch hl
+      | rho => exact absurd rfl hne
+      | phi =>
+          rw [devel_attr bs rfl]; simp [develAttr, hl]; exact .refl _
+      | label nm =>
+          rw [devel_attr bs rfl]; simp [develAttr, hl]; exact .refl _
+  | stop hb h1 h2 h3 ihb =>
+      intro _
+      rw [devel_dispatch]
+      simp only [develDispatch, h1, h2, h3, Bool.false_and, Bool.false_eq_true, if_false]
+      exact .refl _
+  | miss hb hl hna he ihb ihe =>
+      intro _
+      rw [devel_attr _ hna]
+      simp only [develAttr, hl, ite_self]
+      exact .refl _
   | stay hb hl he ihb ihe =>
       rename_i bs bs' e₁ e₂ e₂'
       intro hwfa
-      show Par (.form bs') (devel (.app (.form bs) .rho e₂))
-      have hwfb : WFB bs := by cases hwfa with | app hf _ => cases hf with | form _ _ hb' => exact hb'
-      simp only [devel, hl]
-      exact .congForm (ihb hwfb)
-  | phi hb hpres habs ihb =>
-      rename_i bs bs' a
-      intro hwfd
-      show Par (.dispatch (.dispatch (.form bs') .phi) a) (devel (.dispatch (.form bs) a))
-      have hwfb : WFB bs := by cases hwfd with | dispatch hf => cases hf with | form _ _ hb' => exact hb'
-      simp only [devel, habs]
-      match hphi : lookup bs .phi with
-      | .absent => exact absurd hphi hpres
-      | .void => exact .congDispatch (.congDispatch (.congForm (ihb hwfb)))
-      | .attached v => exact .congDispatch (.congDispatch (.congForm (ihb hwfb)))
-  | alpha hb hget he ihb ihe =>
+      rw [devel_attr bs rfl]
+      by_cases hld : (hasLambda bs && hasDelta bs) = true
+      · obtain ⟨hl', hd⟩ := Bool.and_eq_true_iff.mp hld
+        rw [if_pos hld]; exact par_dl hb hl' hd
+      · rw [if_neg hld]
+        simp only [develAttr, hl, if_true]
+        exact .congForm (ihb (wf_app_form hwfa).2.1)
+  | alpha hb hord hv he ihb ihe =>
       rename_i bs bs' i τ1 e e'
       intro hwfa
-      show Par (.app (.form bs') τ1 e') (devel (.app (.form bs) (.alpha i) e))
-      have hwff : WF (.form bs) := by cases hwfa with | app hf _ => exact hf
-      have hwfb : WFB bs := by cases hwff with | form _ _ hb' => exact hb'
-      have hwfe : WF e := by cases hwfa with | app _ harg => exact harg
-      have hleg : ∀ a ∈ domain bs, a.legalKey = true := by cases hwff with | form _ hl _ => exact hl
-      have habs : lookup bs (.alpha i) = .absent := lookup_alpha_absent_of_wf hleg
-      simp only [devel, habs, hget]
-      exact .congApp (.congForm (ihb hwfb)) (ihe hwfe)
-  | dot hb hl0 hl1 hnfe ihb =>
+      rw [devel_alpha]
+      by_cases hld : (hasLambda bs && hasDelta bs) = true
+      · obtain ⟨hl', hd⟩ := Bool.and_eq_true_iff.mp hld
+        rw [if_pos hld]
+        exact .dcl (by rw [← parB_hasLambda hb]; exact hl') (by rw [← parB_hasDelta hb]; exact hd)
+      · rw [if_neg hld]
+        simp only [develAlpha, hord, hv]
+        exact .congApp (.congForm (ihb (wf_app_form hwfa).2.1)) (ihe (wf_app_form hwfa).2.2)
+  | overa hb hord hat he ihb ihe =>
+      intro _
+      rw [devel_alpha]
+      simp only [develAlpha, hord, hat, ite_self]
+      exact .refl _
+  | amiss hb hord he ihb ihe =>
+      intro _
+      rw [devel_alpha]
+      simp only [develAlpha, hord, ite_self]
+      exact .refl _
+  | dot hb hl0 hl1 hnfe hld ihb =>
       rename_i bs bs' a e₀ e₁
       intro hwfd
-      show Par (.app (contextualize e₁ (.form bs')) .rho (.form bs'))
-        (devel (.dispatch (.form bs) a))
-      have hwfb : WFB bs := by cases hwfd with | dispatch hf => cases hf with | form _ _ hb' => exact hb'
-      have hbd : ParB bs' (develB bs) := ihb hwfb
+      have hbd : ParB bs' (develB bs) := ihb (wf_dispatch_form hwfd)
       obtain ⟨w, hlw, hpw⟩ := parB_lookup_attached_par hbd hl1
       have hwe : w = e₁ := nf_par_eq hnfe hpw
       subst hwe
-      simp only [devel, hl0, hlw, hnfe, if_true]
-      exact .congApp (par_contextualize_ctx (.congForm hbd) w) (.congForm hbd)
+      rw [devel_dispatch]
+      simp only [hld, Bool.false_eq_true, if_false, develDispatch, hl0, hlw, hnfe, if_true]
+      exact .congApp (par_contextualize_ctx (.congForm (parB_ensureRho (parB_erase hbd a))) w)
+        (.congForm hbd)
   | copy hb hl harg hxi hnfe ihb ihe =>
       rename_i bs bs' a arg arg'
       intro hwfa
-      show Par (.form (fill bs' a arg')) (devel (.app (.form bs) a arg))
-      have hwff : WF (.form bs) := by cases hwfa with | app hf _ => exact hf
-      have hwfb : WFB bs := by cases hwff with | form _ _ hb' => exact hb'
-      have hwfarg : WF arg := by cases hwfa with | app _ harg => exact harg
-      have hbd : ParB bs' (develB bs) := ihb hwfb
-      have hpda : Par arg' (devel arg) := ihe hwfarg
-      have hda : devel arg = arg' := nf_par_eq hnfe hpda
-      simp only [devel, hl, hda, hxi, hnfe, Bool.and_self, if_true]
-      exact .congForm (parB_fill hbd a arg')
+      obtain ⟨hleg, hwfb, hwfarg⟩ := wf_app_form hwfa
+      have hna : a.isAlpha = false := by
+        cases a with
+        | alpha i => rw [lookup_alpha_absent_of_wf hleg] at hl; nomatch hl
+        | _ => rfl
+      rw [devel_attr bs hna]
+      by_cases hld : (hasLambda bs && hasDelta bs) = true
+      · obtain ⟨hl', hd⟩ := Bool.and_eq_true_iff.mp hld
+        rw [if_pos hld]
+        exact .dl (by rw [hasLambda_fill, ← parB_hasLambda hb]; exact hl')
+          (by rw [hasDelta_fill, ← parB_hasDelta hb]; exact hd)
+      · rw [if_neg hld]
+        have hda : devel arg = arg' := nf_par_eq hnfe (ihe hwfarg)
+        simp only [develAttr, hl, hda, hxi, hnfe, Bool.and_self, if_true]
+        exact .congForm (parB_fill (ihb hwfb) a arg')
+  | dl hl hd =>
+      intro _
+      rw [devel_form]
+      simp only [hl, hd, Bool.and_self, if_true]
+      exact .refl _
+  | ddl hl hd =>
+      intro _
+      rw [devel_dispatch]
+      simp only [hl, hd, Bool.and_self, if_true]
+      exact .refl _
+  | dcl hl hd =>
+      rename_i bs a e
+      intro _
+      cases a with
+      | alpha i => rw [devel_alpha]; simp only [hl, hd, Bool.and_self, if_true]; exact .refl _
+      | _ => rw [devel_attr bs rfl]; simp only [hl, hd, Bool.and_self, if_true]; exact .refl _
   | congDispatch he ihe =>
       intro hwfd
       cases hwfd with
@@ -1056,11 +1269,17 @@ theorem par_triangle {e u : Term} (hwf : WF e) (h : Par e u) : Par u (devel e) :
   | congApp he harg ihe iharg =>
       intro hwfa
       cases hwfa with
-      | app hwfs hwfg => exact tri_app hwfs he (ihe hwfs) (iharg hwfg)
+      | app hwfs hwfg => exact tri_app he (ihe hwfs) (iharg hwfg)
   | congForm hb ihb =>
+      rename_i bs bs'
       intro hwff
-      cases hwff with
-      | form _ _ hwfb => exact .congForm (ihb hwfb)
+      rw [devel_form]
+      by_cases hld : (hasLambda bs && hasDelta bs) = true
+      · obtain ⟨hl, hd⟩ := Bool.and_eq_true_iff.mp hld
+        rw [if_pos hld]; exact par_dl hb hl hd
+      · rw [if_neg hld]
+        cases hwff with
+        | form _ _ hwfb => exact .congForm (ihb hwfb)
   | nil => exact .nil
   | consVoid hb ihb =>
       rename_i hwfb
@@ -1080,11 +1299,10 @@ theorem par_triangle {e u : Term} (hwf : WF e) (h : Par e u) : Par u (devel e) :
 /-! ## `nf` decides irreducibility (`nf_iff`)
 
 The structural `nf` equals "no `Step` fires anywhere" — the faithful counterpart of phino's
-`isNF`. Forward (`step_nf_false`) is unconditional; the converse needs **`WF`** (consumed exactly
-once, via `lookup_alpha_absent_of_wf`): an `αᵢ`-keyed *void* slot is marked a redex by `appNF` but
-the `alpha` rule fires by domain ordinal (`voidAtOrdinal`), so the malformed term `⟦αᵢ↦∅⟧(αᵢ↦e)` with a
-non-`ξ`-free normal `e` has `nf = false` yet is irreducible — `WF` (legal-key invariant, dev. #8)
-bars that key. -/
+`isNF`. Both directions hold for every term: a positional application on a formation always
+has a redex (`alpha`, `overa` or `amiss` splits every ordinal), so even a malformed `αᵢ`-keyed
+slot cannot leave `appNF` and `Step` disagreeing. `nf_iff` keeps its `WF` hypothesis only as
+the scope the headline theorems share. -/
 
 /-- A binding list with a non-`nf` attached value anywhere is not `nf` (`congForm` is a redex). -/
 theorem nfB_set_false {bs₁ bs₂ : List Binding} {a : Attr} {e : Term}
@@ -1100,50 +1318,27 @@ theorem nfB_set_false {bs₁ bs₂ : List Binding} {a : Attr} {e : Term}
       | lambda f => simpa only [List.cons_append, nfB] using ih
 
 /-- **Forward (unconditional): a reducible term is not `nf`.** Induction on the `Step` derivation;
-each redex constructor falsifies the matching `dispatchNF`/`appNF` arm, each congruence falsifies via
-the IH (and `nfB_set_false` for `congForm`). -/
+each redex constructor falsifies the matching `dispatchNF`/`appNF` arm or the formation's `λ`/`Δ`
+test, each congruence falsifies via the IH (and `nfB_set_false` for `congForm`). -/
 theorem step_nf_false {e e' : Term} (h : e ↝ e') : nf e = false := by
   induction h with
   | dd a => simp [nf, dispatchNF]
   | dc a e => simp [nf, appNF]
-  | null hv => rename_i bs a; simp [nf, dispatchNF, hv]
-  | «over» hatt hne => rename_i bs a e₁ e₂; simp [nf, appNF, hatt]
-  | stop habs hphi hlam => rename_i bs a; simp [nf, dispatchNF, habs, hphi, hlam]
-  | miss habs hna =>
-      rename_i bs a e
-      cases a with
-      | phi => simp [nf, appNF, habs]
-      | rho => simp [nf, appNF, habs]
-      | alpha i => simp [Attr.isAlpha] at hna
-      | label nm => simp [nf, appNF, habs]
-  | stay hs => rename_i bs e₁ e₂; simp [nf, appNF, hs]
-  | phi hpres habs =>
-      rename_i bs a
-      cases hlphi : lookup bs .phi with
-      | absent => exact absurd hlphi hpres
-      | void => simp [nf, dispatchNF, habs, hlphi]
-      | attached v => simp [nf, dispatchNF, habs, hlphi]
-  | alpha hget =>
-      rename_i bs i τ₁ e
-      simp only [nf, appNF, Bool.and_eq_false_iff]
-      right
-      cases hl : lookup bs (.alpha i) with
-      | attached v => rfl
-      | void => rfl
-      | absent => rw [hget]
-  | dot hl hnfe => rename_i bs a e₁; simp [nf, dispatchNF, hl]
-  | copy hl hxi hnfe =>
-      rename_i bs a e₁
-      simp only [nf, appNF, hl]
-      cases a with
-      | alpha i => simp
-      | phi => simp [hxi]
-      | rho => simp [hxi]
-      | label nm => simp [hxi]
-  | congDispatch _ ih => rename_i e e' a; simp [nf, ih]
-  | congAppFn _ ih => rename_i e e' a arg; simp [nf, ih]
-  | congAppArg _ ih => rename_i e a arg arg'; simp [nf, ih]
-  | congForm _ ih => rename_i bs₁ bs₂ a e e'; simpa only [nf] using nfB_set_false ih
+  | null hv => simp [nf, dispatchNF, hv]
+  | «over» hatt hne => simp [nf, appNF_attached hatt]
+  | stop habs hphi hlam => simp [nf, dispatchNF, habs, hphi, hlam]
+  | miss habs hna => simp [nf, appNF_absent habs]
+  | stay hs => simp [nf, appNF_attached hs]
+  | alpha hord hv => simp [nf, appNF]
+  | overa hord hat => simp [nf, appNF]
+  | amiss hord => simp [nf, appNF]
+  | dot hl hnfe hld => simp [nf, dispatchNF, hl]
+  | copy hl hxi hnfe => simp [nf, appNF_void hl hxi]
+  | dl hl hd => simp [nf, hl, hd]
+  | congDispatch _ ih => simp [nf, ih]
+  | congAppFn _ ih => simp [nf, ih]
+  | congAppArg _ ih => simp [nf, ih]
+  | congForm _ ih => simp only [nf, nfB_set_false ih, Bool.false_and]
 
 /-- A non-`nf` binding list has an attached value that is not `nf`, exhibited by an append split. -/
 theorem nfB_split_false {bs : List Binding} (h : nfB bs = false) :
@@ -1195,11 +1390,30 @@ theorem lookup_attached_nf {bs : List Binding} {a : Attr} {v : Term}
       | lambda f =>
           simp only [lookup] at hl; simp only [nfB] at hnf; exact ih hnf hl
 
-/-- **Backward (`WF`-scoped): a non-`nf` well-formed term is reducible.** By the `Term` recursor
-(`motive₃` collects the binding-list split + the value's reduction). On a dispatch/application,
-reduce the subject/argument first; else case the formation's `lookup` and fire the head rule —
-`WF` (via `lookup_alpha_absent_of_wf`) rules out the `αᵢ`-keyed `void`/`absent` slots that `appNF`
-would otherwise flag without a matching `Step`. -/
+/-- An application on a formation by a non-positional attribute with a root redex reduces at the
+root, given a normal argument (`stay`/`over` on an attached slot, `copy` on a void one, `miss` on an
+absent one). -/
+theorem reducible_app_attr {bs : List Binding} {a : Attr} {arg : Term} (hna : a.isAlpha = false)
+    (h : appNF (.form bs) a arg = false) (hnarg : nf arg = true) :
+    Reducible (.app (.form bs) a arg) := by
+  cases hl : lookup bs a with
+  | attached v =>
+      by_cases hrho : a = .rho
+      · subst hrho; exact ⟨_, Step.stay hl⟩
+      · exact ⟨_, Step.over hl hrho⟩
+  | void =>
+      have happ : appNF (.form bs) a arg = !xiFree arg := by
+        cases a with
+        | alpha i => simp [Attr.isAlpha] at hna
+        | _ => simp [appNF, hl]
+      rw [happ] at h
+      exact ⟨_, Step.copy hl (by simpa using h) hnarg⟩
+  | absent => exact ⟨_, Step.miss hl hna⟩
+
+/-- **Backward: a non-`nf` well-formed term is reducible.** By the `Term` recursor (`motive₃`
+collects the binding-list split + the value's reduction). On a formation, reduce a binding value
+or collapse by `dl`; on a dispatch/application, reduce the subject/argument first, else case the
+formation's `lookup` (or the positional ordinal) and fire the head rule. -/
 theorem nf_false_reducible {e : Term} (hwf : WF e) (h : nf e = false) : Reducible e := by
   induction e using Term.rec
     (motive_2 := fun b => ∀ a v, b = Binding.attached a v → WF v → nf v = false → Reducible v)
@@ -1209,11 +1423,13 @@ theorem nf_false_reducible {e : Term} (hwf : WF e) (h : nf e = false) : Reducibl
   | glob => simp [nf] at h
   | xi => simp [nf] at h
   | form bs ihbs =>
-      simp only [nf] at h
-      have hwfb : WFB bs := by cases hwf with | form _ _ hb => exact hb
-      obtain ⟨bs₁, a, v, bs₂, hbs, v', hv'⟩ := ihbs hwfb h
-      subst hbs
-      exact ⟨_, Step.congForm hv'⟩
+      simp only [nf, Bool.and_eq_false_iff, Bool.not_eq_false', Bool.and_eq_true] at h
+      rcases h with h | ⟨hl, hd⟩
+      · have hwfb : WFB bs := by cases hwf with | form _ _ hb => exact hb
+        obtain ⟨bs₁, a, v, bs₂, hbs, v', hv'⟩ := ihbs hwfb h
+        subst hbs
+        exact ⟨_, Step.congForm hv'⟩
+      · exact ⟨_, Step.dl hl hd⟩
   | dispatch e a ihe =>
       by_cases hne : nf e = false
       · obtain ⟨e', he'⟩ := ihe (by cases hwf with | dispatch hs => exact hs) hne
@@ -1229,19 +1445,18 @@ theorem nf_false_reducible {e : Term} (hwf : WF e) (h : nf e = false) : Reducibl
         | dispatch hs => simp [dispatchNF] at h
         | app hs hg => simp [dispatchNF] at h
         | @form bs hnd hlegal hwfb =>
+            obtain ⟨hnb, hld⟩ := nf_form hne
             cases hl : lookup bs a with
             | void => exact ⟨_, Step.null hl⟩
-            | attached v =>
-                refine ⟨_, Step.dot hl ?_⟩
-                exact lookup_attached_nf (by simpa only [nf] using hne) hl
+            | attached v => exact ⟨_, Step.dot hl (lookup_attached_nf hnb hl) hld⟩
             | absent =>
                 simp only [dispatchNF, hl] at h
                 cases hphi : lookup bs .phi with
                 | absent =>
                     simp only [hphi] at h
                     exact ⟨_, Step.stop hl hphi h⟩
-                | void => exact ⟨_, Step.phi (by rw [hphi]; simp) hl⟩
-                | attached w => exact ⟨_, Step.phi (by rw [hphi]; simp) hl⟩
+                | void => simp [hphi] at h
+                | attached w => simp [hphi] at h
   | app e a arg ihe iharg =>
       by_cases hne : nf e = false
       · obtain ⟨e', he'⟩ := ihe (by cases hwf with | app hs _ => exact hs) hne
@@ -1260,37 +1475,18 @@ theorem nf_false_reducible {e : Term} (hwf : WF e) (h : nf e = false) : Reducibl
           | dispatch hs => simp [appNF] at h
           | app hs hg => simp [appNF] at h
           | @form bs hnd hlegal hwfb =>
-              cases hl : lookup bs a with
-              | attached v =>
-                  by_cases hrho : a = .rho
-                  · subst hrho; exact ⟨_, Step.stay hl⟩
-                  · exact ⟨_, Step.over hl hrho⟩
-              | void =>
-                  cases a with
-                  | alpha i =>
-                      rw [lookup_alpha_absent_of_wf hlegal] at hl
-                      exact absurd hl (by simp)
-                  | phi =>
-                      simp only [appNF, hl] at h
-                      exact ⟨_, Step.copy hl (by simpa using h) hnarg⟩
-                  | rho =>
-                      simp only [appNF, hl] at h
-                      exact ⟨_, Step.copy hl (by simpa using h) hnarg⟩
-                  | label nm =>
-                      simp only [appNF, hl] at h
-                      exact ⟨_, Step.copy hl (by simpa using h) hnarg⟩
-              | absent =>
-                  cases a with
-                  | alpha i =>
-                      rw [lookup_alpha_absent_of_wf hlegal] at hl
-                      simp only [appNF] at h
-                      rw [lookup_alpha_absent_of_wf hlegal] at h
-                      cases hget : voidAtOrdinal bs i with
-                      | none => rw [hget] at h; simp at h
-                      | some τ1 => exact ⟨_, Step.alpha hget⟩
-                  | phi => exact ⟨_, Step.miss hl (by simp [Attr.isAlpha])⟩
-                  | rho => exact ⟨_, Step.miss hl (by simp [Attr.isAlpha])⟩
-                  | label nm => exact ⟨_, Step.miss hl (by simp [Attr.isAlpha])⟩
+              cases a with
+              | alpha i =>
+                  cases hord : ordinal bs i with
+                  | none => exact ⟨_, Step.amiss hord⟩
+                  | some τ =>
+                      cases hl : lookup bs τ with
+                      | void => exact ⟨_, Step.alpha hord hl⟩
+                      | attached v => exact ⟨_, Step.overa hord hl⟩
+                      | absent => exact absurd hl (ordinal_lookup hord)
+              | phi => exact reducible_app_attr rfl h hnarg
+              | rho => exact reducible_app_attr rfl h hnarg
+              | label nm => exact reducible_app_attr rfl h hnarg
   | nil => rename_i _ hb; simp [nfB] at hb
   | cons b r ihb ihr =>
       rename_i hwfb hb

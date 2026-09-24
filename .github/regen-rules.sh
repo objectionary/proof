@@ -18,15 +18,12 @@ cd "$(dirname "$0")/.."
 [ -f .phino-version ] || { echo "FATAL: .phino-version is missing, cannot tell which phino to use" >&2; exit 1; }
 PHINO_REPO="${PHINO_REPO:-https://github.com/objectionary/phino}"
 PHINO_VERSION="$(cat .phino-version)"
-# phino's package/binary version is 4-part (0.0.0.74 — what --pin and the release
-# artifacts use), but its git tags drop the leading component (0.0.74).
-PHINO_TAG="${PHINO_VERSION#*.}"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
-echo "cloning $PHINO_REPO at tag $PHINO_TAG (phino $PHINO_VERSION, pinned via .phino-version) ..."
-git clone --depth 1 --branch "$PHINO_TAG" "$PHINO_REPO" "$tmp/phino" >/dev/null 2>&1
+echo "cloning $PHINO_REPO at tag $PHINO_VERSION, pinned via .phino-version ..."
+git clone --depth 1 --branch "$PHINO_VERSION" "$PHINO_REPO" "$tmp/phino" >/dev/null 2>&1
 
-python3 .github/gen-rules.py "$tmp/phino/resources" PhiConfluence/Rules.lean
-python3 .github/gen-rule-data.py "$tmp/phino/resources" PhiConfluence/RuleData.lean
+python3 .github/gen-rules.py "$tmp/phino/resources/normalize" PhiConfluence/Rules.lean
+python3 .github/gen-rule-data.py "$tmp/phino/resources/normalize" PhiConfluence/RuleData.lean
 echo "done — Rules.lean and RuleData.lean regenerated from phino $PHINO_VERSION"

@@ -58,17 +58,39 @@ def fill : List Binding → Attr → Term → List Binding
   | Binding.delta d :: r, a, e => Binding.delta d :: fill r a e
   | Binding.lambda f :: r, a, e => Binding.lambda f :: fill r a e
 
-/-- The key of the binding at **domain ordinal** `i` — counting only non-asset attributes
-(`Δ`/`λ` assets are skipped) — if that binding is `void`; otherwise `none`. This is `alpha`'s
-positional index *over the domain* (paper Def. Ordinal; phino #749), **not** the raw list
-position: `αᵢ` renames to the key of the `i`-th non-asset void slot. -/
-def voidAtOrdinal : List Binding → Nat → Option Attr
+/-- Does the formation carry a `Δ`-asset (is it data)? -/
+def hasDelta : List Binding → Bool
+  | [] => false
+  | Binding.delta _ :: _ => true
+  | _ :: rest => hasDelta rest
+
+/-- The key of the binding at **domain ordinal** `i`, counting only the bindings phino's
+`domain` counts: `Δ`/`λ` assets and `ρ` are skipped. This is the positional index that
+`alpha`, `overa` and `amiss` read, **not** the raw list position; `none` when the domain
+is shorter than `i + 1`. -/
+def ordinal : List Binding → Nat → Option Attr
   | [], _ => none
-  | Binding.delta _ :: r, i => voidAtOrdinal r i
-  | Binding.lambda _ :: r, i => voidAtOrdinal r i
-  | Binding.void a :: _, 0 => some a
-  | Binding.attached _ _ :: _, 0 => none
-  | Binding.void _ :: r, i + 1 => voidAtOrdinal r i
-  | Binding.attached _ _ :: r, i + 1 => voidAtOrdinal r i
+  | Binding.delta _ :: r, i => ordinal r i
+  | Binding.lambda _ :: r, i => ordinal r i
+  | Binding.void a :: r, i =>
+      if a = .rho then ordinal r i else match i with | 0 => some a | j + 1 => ordinal r j
+  | Binding.attached a _ :: r, i =>
+      if a = .rho then ordinal r i else match i with | 0 => some a | j + 1 => ordinal r j
+
+/-- Drop the first binding keyed on `a` (void or attached) — the `⟦B₁, B₂⟧` that `dot`
+contextualizes against, the formation without the dispatched binding. -/
+def erase : List Binding → Attr → List Binding
+  | [], _ => []
+  | Binding.void c :: r, a => if c = a then r else Binding.void c :: erase r a
+  | Binding.attached c v :: r, a => if c = a then r else Binding.attached c v :: erase r a
+  | Binding.delta d :: r, a => Binding.delta d :: erase r a
+  | Binding.lambda f :: r, a => Binding.lambda f :: erase r a
+
+/-- Ensure a binding list carries a parent: append `ρ↦∅` at the end iff no `ρ` key is present
+(phino's `withVoidRho`; explicit `ρ` is kept in place, never duplicated). -/
+def ensureRho (bs : List Binding) : List Binding :=
+  match lookup bs .rho with
+  | .absent => bs ++ [.void .rho]
+  | _       => bs
 
 end PhiConfluence

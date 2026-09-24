@@ -27,13 +27,6 @@ in place). This module models that canonicalisation, closing the implicit-`ρ` f
 
 namespace PhiConfluence
 
-/-- Ensure a binding list carries a parent: append `ρ↦∅` at the end iff no `ρ` key is present
-(matching `phino`; explicit `ρ` is kept in place, never duplicated). -/
-def ensureRho (bs : List Binding) : List Binding :=
-  match lookup bs .rho with
-  | .absent => bs ++ [.void .rho]
-  | _       => bs
-
 mutual
 /-- Canonicalise a term: make every formation carry a parent `ρ` (recursively). -/
 def canon : Term → Term
@@ -77,30 +70,6 @@ theorem domain_canonB (bs : List Binding) : domain (canonB bs) = domain bs := by
   | nil => rfl
   | cons b r ih => cases b <;> simp [canonB, domain, Binding.key?, ih]
 
-/-- An absent lookup means the key is not in the domain. -/
-theorem lookup_absent_not_mem {a : Attr} {bs : List Binding} (h : lookup bs a = .absent) :
-    a ∉ domain bs := by
-  induction bs with
-  | nil => simp [domain]
-  | cons b r ih =>
-      cases b with
-      | void c =>
-          simp only [lookup] at h
-          split at h
-          · exact absurd h (by simp)
-          · rename_i hc
-            simp only [domain, Binding.key?, List.mem_cons, not_or]
-            exact ⟨fun he => hc he.symm, ih h⟩
-      | attached c v =>
-          simp only [lookup] at h
-          split at h
-          · exact absurd h (by simp)
-          · rename_i hc
-            simp only [domain, Binding.key?, List.mem_cons, not_or]
-            exact ⟨fun he => hc he.symm, ih h⟩
-      | delta d => simp only [lookup] at h; simp only [domain, Binding.key?]; exact ih h
-      | lambda f => simp only [lookup] at h; simp only [domain, Binding.key?]; exact ih h
-
 /-- Looking up `ρ` in a list that lacks it, after appending `ρ↦∅`, finds the appended slot. -/
 theorem lookup_append_void_rho {bs : List Binding} (h : lookup bs .rho = .absent) :
     lookup (bs ++ [.void .rho]) .rho = .void := by
@@ -132,16 +101,6 @@ theorem ensureRho_has_rho (bs : List Binding) : lookup (ensureRho bs) .rho ≠ .
   | void => simp [ensureRho, hl]
   | attached v => simp [ensureRho, hl]
 
-/-- Appending a void binding preserves `WFB`. -/
-theorem wfb_append_void {a : Attr} : ∀ {bs : List Binding}, WFB bs → WFB (bs ++ [.void a])
-  | [], _ => .consVoid .nil
-  | _ :: _, h => by
-      cases h with
-      | consVoid hr => exact .consVoid (wfb_append_void hr)
-      | consAttached hv hr => exact .consAttached hv (wfb_append_void hr)
-      | consDelta hr => exact .consDelta (wfb_append_void hr)
-      | consLambda hr => exact .consLambda (wfb_append_void hr)
-
 /-- Appending a void binding preserves `CanonicalB`. -/
 theorem canonicalB_append_void {a : Attr} : ∀ {bs : List Binding}, CanonicalB bs → CanonicalB (bs ++ [.void a])
   | [], _ => .consVoid .nil
@@ -151,31 +110,6 @@ theorem canonicalB_append_void {a : Attr} : ∀ {bs : List Binding}, CanonicalB 
       | consAttached hv hr => exact .consAttached hv (canonicalB_append_void hr)
       | consDelta hr => exact .consDelta (canonicalB_append_void hr)
       | consLambda hr => exact .consLambda (canonicalB_append_void hr)
-
-/-- `WF (.form (ensureRho cs))` from the `WF` ingredients of `cs`: appending `ρ↦∅` (only when `ρ`
-is absent) keeps the domain duplicate-free (`ρ` was not present) and `ρ` is a legal key. -/
-theorem wf_form_ensureRho {cs : List Binding}
-    (hnd : (domain cs).Nodup) (hlk : ∀ a ∈ domain cs, a.legalKey = true) (hbb : WFB cs) :
-    WF (.form (ensureRho cs)) := by
-  cases hl : lookup cs .rho with
-  | absent =>
-      simp only [ensureRho, hl]
-      have hrho : domain [Binding.void Attr.rho] = [Attr.rho] := rfl
-      refine .form ?_ ?_ (wfb_append_void hbb)
-      · rw [domain_append, hrho]
-        refine List.nodup_append.mpr ⟨hnd, by simp, ?_⟩
-        intro x hx b hb
-        rw [List.mem_singleton] at hb
-        subst hb
-        intro he
-        exact lookup_absent_not_mem hl (he ▸ hx)
-      · intro x hx
-        rw [domain_append, hrho, List.mem_append, List.mem_singleton] at hx
-        rcases hx with hx | hx
-        · exact hlk x hx
-        · subst hx; rfl
-  | void => simp only [ensureRho, hl]; exact .form hnd hlk hbb
-  | attached v => simp only [ensureRho, hl]; exact .form hnd hlk hbb
 
 /-- `ensureRho` preserves `CanonicalB`. -/
 theorem canonicalB_ensureRho {bs : List Binding} (h : CanonicalB bs) : CanonicalB (ensureRho bs) := by
@@ -332,9 +266,29 @@ theorem canonical_fill {a : Attr} {e : Term} (he : Canonical e) :
   | .delta d :: r, hb => by cases hb with | consDelta hr => simp only [fill]; exact .consDelta (canonical_fill he hr)
   | .lambda f :: r, hb => by cases hb with | consLambda hr => simp only [fill]; exact .consLambda (canonical_fill he hr)
 
+/-- Dropping a binding preserves `CanonicalB`. -/
+theorem canonicalB_erase {a : Attr} : ∀ {bs : List Binding}, CanonicalB bs → CanonicalB (erase bs a)
+  | [], _ => .nil
+  | .void c :: _, h => by
+      cases h with
+      | consVoid hr =>
+          by_cases hc : c = a
+          · simp only [erase, if_pos hc]; exact hr
+          · simp only [erase, if_neg hc]; exact .consVoid (canonicalB_erase hr)
+  | .attached c _ :: _, h => by
+      cases h with
+      | consAttached hv hr =>
+          by_cases hc : c = a
+          · simp only [erase, if_pos hc]; exact hr
+          · simp only [erase, if_neg hc]; exact .consAttached hv (canonicalB_erase hr)
+  | .delta _ :: _, h => by
+      cases h with | consDelta hr => simp only [erase]; exact .consDelta (canonicalB_erase hr)
+  | .lambda _ :: _, h => by
+      cases h with | consLambda hr => simp only [erase]; exact .consLambda (canonicalB_erase hr)
+
 /-- **Reduction preserves `Canonical`.** One `Step` out of a canonical term lands in a canonical
 term — `phino`'s parent-everywhere term space is closed under our `Step`. Discard rules land in
-`Canonical.bot`; `stay` returns the (canonical) subject; `dot`/`copy` keep the formation's `ρ` (its
+`Canonical.bot`; `stay` returns the (canonical) subject; `dot` builds its context with `ρ` ensured, `copy` keeps the formation's `ρ` (its
 `domain` is unchanged by `contextualize`/`fill`, transported via `domain_fill`/`domain_set` +
 `mem_domain_lookup_ne_absent`) and rebuild the value canonically; `alpha` only renames a key. Mirrors
 `WF.step`. -/
@@ -347,16 +301,21 @@ theorem step_canonical {e e' : Term} (hc : Canonical e) (h : e ↝ e') : Canonic
   | stop habs hphi hlam => exact .bot
   | miss habs hna => exact .bot
   | stay hs => cases hc with | app hf _ => exact hf
-  | phi hpres habs => cases hc with | dispatch hf => exact .dispatch (.dispatch hf)
-  | alpha hget => cases hc with | app hf ha => exact .app hf ha
-  | dot hl hnf =>
+  | alpha hord hv => cases hc with | app hf ha => exact .app hf ha
+  | overa hord hat => exact .bot
+  | amiss hord => exact .bot
+  | dot hl hnf hld =>
+      rename_i bs a e₁
       cases hc with
       | dispatch hf =>
           cases hf with
           | form hrho hbb =>
               exact .app
-                (canonical_contextualize (.form hrho hbb) (canonicalB_lookup_attached hbb hl))
+                (canonical_contextualize
+                  (.form (ensureRho_has_rho _) (canonicalB_ensureRho (canonicalB_erase hbb)))
+                  (canonicalB_lookup_attached hbb hl))
                 (.form hrho hbb)
+  | dl hl hd => exact .bot
   | copy hl hxi hnf =>
       cases hc with
       | app hf harg =>

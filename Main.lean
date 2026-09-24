@@ -13,24 +13,28 @@ def examples : List (String × Term) :=
     ("missing attribute (Rmiss)",     app (form [attached phi xi]) (label "a") glob),
     ("already attached (Rover)",      app (form [attached (label "x") glob]) (label "x") xi),
     ("apply ρ, a no-op (Rstay)",      app (form [attached rho glob]) rho glob),
-    ("decorator dispatch (Rphi)",     dispatch (form [void phi]) (label "y")),
     ("positional rename (Ralpha)",    dispatch (app (form [void (label "x")]) (alpha 0) glob) (label "y")),
+    ("positional overwrite (Rovera)", app (form [attached (label "x") glob]) (alpha 0) glob),
+    ("positional overflow (Ramiss)",  app (form [void (label "x")]) (alpha 1) glob),
+    ("atom with data (Rdl)",          dispatch (form [lambda "Fn", delta [1]]) (label "x")),
     ("fill a void slot (Rcopy)",      dispatch (app (form [void (label "x")]) (label "x") glob) (label "y")),
     ("ρ-feedback dispatch (Rdot)",    dispatch (form [attached (label "x") bot]) (label "x")),
+    ("decorator dispatch (normal)",   dispatch (form [void phi]) (label "y")),
     ("normal form (no rule)",         dispatch glob (label "x")) ]
 
 def main : IO Unit := do
   IO.println "═══════════════════════════════════════════════════════════════"
   IO.println " φ-calculus normalization rules"
-  IO.println " (generated from phino's resources/*.yaml — the SAME source the"
+  IO.println " (generated from phino's resources/normalize/*.yaml — the SAME source the"
   IO.println "  paper's Fig. 4 is rendered from; compare directly)"
   IO.println "═══════════════════════════════════════════════════════════════"
   for r in normalizationRules do
     IO.println s!"  {ppRule r}"
   IO.println "  + congruence: a step may occur inside any subterm"
   IO.println ""
-  IO.println " (The reducer below implements all eleven rules — dd, dc, null, over, stop,"
-  IO.println "  miss, stay, phi, alpha, dot, copy — and `reduce_sound` proves every step it"
+  IO.println " (The reducer below implements every rule `phino rewrite` applies — dd, dc/dca,"
+  IO.println "  null, over, stop, miss, stay, alpha, overa, amiss, dot, copy, dl; dotg needs the"
+  IO.println "  whole-program universe and never fires — and `reduce_sound` proves every step it"
   IO.println "  takes is a genuine `Step`.)"
   IO.println ""
   IO.println "═══════════════════════════════════════════════════════════════"

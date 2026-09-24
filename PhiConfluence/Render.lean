@@ -37,6 +37,18 @@ def ppAttr : Attr → String
   | .alpha i => "α" ++ toString i
   | .label s => s
 
+/-- Render one byte as two upper-case hex digits. -/
+def ppByte (b : UInt8) : String :=
+  let digits := String.ofList ((Nat.toDigits 16 b.toNat).map Char.toUpper)
+  if digits.length = 1 then "0" ++ digits else digits
+
+/-- Render `Δ` data in phino's byte notation: `--` when empty, `01-` for one byte,
+`01-02-03` for several. -/
+def ppBytes : List UInt8 → String
+  | [] => "--"
+  | [b] => ppByte b ++ "-"
+  | bs => String.intercalate "-" (bs.map ppByte)
+
 mutual
 
 /-- Render a term in Unicode φ-notation. -/
@@ -58,7 +70,7 @@ partial def ppBindings : List Binding → String
 partial def ppBinding : Binding → String
   | .void a => ppAttr a ++ " ↦ ∅"
   | .attached a v => ppAttr a ++ " ↦ " ++ ppTerm v
-  | .delta _ => "Δ ⤍ …"
+  | .delta d => "Δ ⤍ " ++ ppBytes d
   | .lambda fn => "λ ⤍ " ++ fn
 
 end

@@ -11,7 +11,7 @@ paper's Fig. 4 verbatim"; the deviations are listed and justified below.
 ## The theorem
 
 Let `⟶` be the single-step reduction relation: the **compatible (congruence)
-closure** of the eleven rule schemas below, over `Term` (formations `⟦B⟧`,
+closure** of the rule schemas below — every rule of phino 0.0.138 but `dotg` (#10) — over `Term` (formations `⟦B⟧`,
 applications `e(τ↦e')`, dispatches `e.τ`, the locators `Φ`/`ξ`, and the terminator
 `⊥`). Let `⟶∗` be its reflexive-transitive closure.
 
@@ -33,7 +33,7 @@ carry **different weight** — worth stating precisely:
   `legalKey` violation: a *malformed* `⟦B₁, αᵢ↦e₁, B₂⟧(αᵢ↦e₂)` whose void slot sits at ordinal `i`
   lets `alpha` rename the argument (→ an object) while `over` fires (→ `⊥`), and object vs `⊥` never
   join (deviation #8). The diamond proof consumes exactly this clause (`lookup_alpha_absent_of_wf`,
-  the `alpha` case of `par_triangle`). Faithful, too: phino's parser bars `αᵢ` formation keys.
+  the `over` and `copy` cases of `par_triangle`). Faithful, too: phino's parser bars `αᵢ` formation keys.
 * **`Nodup` (unique keys, Def. Binding 4.8) is a *faithfulness* clause, not a demonstrated
   confluence-necessity.** No duplicate-key non-joinable fork is known, and the diamond proof binds
   the `Nodup` field of `WF.form` but never uses it (only `legalKey`). `Nodup` is carried because it
@@ -61,34 +61,33 @@ earlier `alpha`-free fragment was unconditionally confluent; that unconditional
 ## Rule ⇄ constructor table
 
 Source of truth: the **paper** (reduction figure, `operators.tex`); `phino`'s
-`resources/*.yaml` (`phino explain --normalize`) is the secondary interpretation that
+`resources/normalize/*.yaml` (`phino explain --normalize`) is the secondary interpretation that
 renders into it. `nf e` means "`e` is in normal form" (no rule matches anywhere in
-`e`); `|B₁|` is the number of bindings before the focus; `C(·⊳·)` is contextualization
-(Fig. "Contextualization by induction").
+`e`); `C(·⊳·)` is contextualization (Fig. "Contextualization by induction"); `ordinal(B, i)` is the
+key at position `i` of the *domain* of `B` (†).
 
 | `phino` rule | Lean `Step` constructor | Pattern → result | Side condition |
 |---|---|---|---|
-| `dot`   | `Step.dot`   | `⟦B₁,τ↦e₁,B₂⟧.τ → C(e₁⊳⟦…⟧)(ρ↦…)` | `nf e₁` |
-| `copy`  | `Step.copy`  | `⟦B₁,τ↦∅,B₂⟧(τ↦e₁) → ⟦B₁,τ↦e₁,B₂⟧` | `ξFree e₁` ∧ `nf e₁` (ξ-free KEPT; `scope`/`contextualize` vacuous — dev. #7) |
-| `alpha` | `Step.alpha` | `⟦B₁,τ₁↦∅,B₂⟧(τ₂↦e) → ⟦B₁,τ₁↦∅,B₂⟧(τ₁↦e)` | `index τ₂ = domain(B₁)` (†) |
-| `phi`   | `Step.phi`   | `⟦B⟧.τ → ⟦B⟧.φ.τ` | `φ∈B` ∧ `τ∉B` |
+| `dot`   | `Step.dot`   | `⟦B₁,τ↦e₁,B₂⟧.τ → C(e₁⊳⟦B₁,B₂,ρ↦∅⟧)(ρ↦⟦B₁,τ↦e₁,B₂⟧)` | `nf e₁` ∧ not both `λ∈B` and `Δ∈B` (`ρ↦∅` only when `B₁,B₂` lack `ρ`) |
+| `dotg`  | — (#10)      | same, `(ρ↦Φ)` instead | the formation is the whole-program universe |
+| `copy`  | `Step.copy`  | `⟦B₁,τ↦∅,B₂⟧(τ↦e₁) → ⟦B₁,τ↦e₁,B₂⟧` | `ξFree e₁` ∧ `nf e₁` (phino's `𝑘` sigil; `scope`/`contextualize` vacuous — dev. #7) |
+| `alpha` | `Step.alpha` | `⟦B⟧(αᵢ↦e) → ⟦B⟧(τ↦e)` | `τ = ordinal(B, i)` is void (†) |
+| `overa` | `Step.overa` | `⟦B⟧(αᵢ↦e) → ⊥` | `ordinal(B, i)` is attached |
+| `amiss` | `Step.amiss` | `⟦B⟧(αᵢ↦e) → ⊥` | `i ≥ |domain(B)|` |
 | `stay`  | `Step.stay`  | `⟦B₁,ρ↦e₁,B₂⟧(ρ↦e₂) → ⟦B₁,ρ↦e₁,B₂⟧` | — |
 | `over`  | `Step.over`  | `⟦B₁,τ↦e₁,B₂⟧(τ↦e₂) → ⊥` | `τ≠ρ` (attached slot) |
 | `stop`  | `Step.stop`  | `⟦B⟧.τ → ⊥` | `τ∉B` ∧ `φ∉B` ∧ `λ∉B` |
 | `null`  | `Step.null`  | `⟦B₁,τ↦∅,B₂⟧.τ → ⊥` | — (void slot) |
 | `miss`  | `Step.miss`  | `⟦B⟧(τ↦e) → ⊥` | `τ∉B` ∧ `τ` not positional `αᵢ` |
+| `dl`    | `Step.dl`    | `⟦B⟧ → ⊥` | `λ∈B` ∧ `Δ∈B` |
 | `dd`    | `Step.dd`    | `⊥.τ → ⊥` | — |
-| `dc`    | `Step.dc`    | `⊥(τ↦e) → ⊥` | — |
+| `dc`, `dca` | `Step.dc` | `⊥(τ↦e) → ⊥`, `⊥(αᵢ↦e) → ⊥` | — (one Lean rule covers both sorts) |
 
-(†) **`alpha`'s index counts the *domain* (assets excluded) — phino #749.** `Step.alpha` matches
-`voidAtOrdinal bs i` = the key of the `i`-th *non-asset* binding when that binding is void, so a
-`Δ`/`λ` asset before the void slot does **not** shift the ordinal. This is the paper's Def. Ordinal /
-Def. Domain (the domain excludes assets) and phino post-**#749** ("count alpha index over domain
-excluding assets" — `alpha.yaml`'s `index = domain` condition). *Earlier* phino (and its generated
-figure) counted assets raw (`|B₁|` = `length bds`), contradicting the paper's own prose and worked
-example (`tab:ordinals`: ordinal of `x` in `⟦L>Fn, x↦…⟧` is `0`); #749 fixed phino to match the
-prose, and `Step.alpha` matches the fixed semantics. The regenerated `Rules.lean` now shows
-`index(τ₂) = domain(B₁)`.
+(†) **Positional rules count the *domain*.** phino's `domain` excludes the `Δ`/`λ` assets
+(phino #749) and the parent `ρ` too, so `ordinal bs i` (`Attributes.lean`) skips
+both: in `⟦λ⤍Fn, x↦∅, ρ↦∅⟧` the ordinal of `x` is `0` and there is no ordinal `1`. This is the
+paper's Def. Ordinal / Def. Domain. The three positional rules partition every ordinal, so a
+positional application on a formation always has a redex.
 
 Plus the four congruence constructors `Step.congDispatch`, `Step.congAppFn`,
 `Step.congAppArg`, `Step.congForm` — covering every recursive `Term` position (dispatch
@@ -99,15 +98,16 @@ applied in any order"). `Step.congForm` uses the paper's `⟦B₁,τ↦e,B₂⟧
 Disjointness (the root rules are mutually exclusive on a given redex, with the noted
 exceptions):
 
-* dispatch `⟦B⟧.τ` is split by `dot` (τ attached) / `null` (τ void) / `phi` (τ absent,
-  φ present) / `stop` (τ absent, φ,λ absent); `⊥.τ` is `dd`. Terms outside all cases
-  (e.g. `Φ.τ`, `ξ.τ`) are stuck — this is a partition of *reducible* dispatch redexes,
-  not of all terms.
-* application `⟦B⟧(τ↦e)` is split by `stay` (τ=ρ attached) / `over` (τ≠ρ attached) /
-  `copy` (τ void, args normal) / `alpha` (positional `αᵢ`, void at ordinal `i`) /
-  `miss` (τ absent, non-`α`); `⊥(…)` is `dc`. **Exception:** `alpha` and `copy` can
-  *both* match when the applied attribute is a positional `αᵢ` whose ordinal slot is
-  void — a genuine (and expected-joinable) critical pair, not a clean partition.
+* dispatch `⟦B⟧.τ` is split by `dot` (τ attached) / `null` (τ void) / `stop` (τ absent,
+  φ,λ absent); `⊥.τ` is `dd`. A dispatch of an absent `τ` on a formation holding `φ` or `λ` is
+  normal (phino dropped its `phi` rule), as are terms like `Φ.τ` and `ξ.τ` — this is a partition
+  of *reducible* dispatch redexes, not of all terms.
+* application `⟦B⟧(τ↦e)` by a non-positional `τ` is split by `stay` (τ=ρ attached) / `over` (τ≠ρ
+  attached) / `copy` (τ void, argument `ξ`-free and normal) / `miss` (τ absent); by a positional
+  `αᵢ` it is split by `alpha` / `overa` / `amiss` on `ordinal(B, i)`; `⊥(…)` is `dc`.
+* **Exception:** `dl` overlaps every rule on a formation holding both `λ` and `Δ`. Each such fork
+  joins at `⊥`, except `dot`, which would carry the formation into `ρ` and leave a stuck
+  `…(ρ↦⊥)`; phino 0.0.138 therefore guards `dot` against it (phino #1395), and so does `Step.dot`.
 
 ## How our model relates to the paper
 
@@ -133,8 +133,8 @@ assumptions — not gaps against the current paper.
    rule (`C(e⊳eς) ⟶∗ n`), presupposing uniqueness of normal forms (= confluence). We
    follow the current small-step form, avoiding the circularity; against the current
    paper there is nothing to reconcile, and the superseded big-step form is not modelled.
-4. **`λ`/`Δ` atoms are outside the normalization relation `⟶`.** They have no rule among
-   the eleven (phino's `resources/*.yaml` has none). Their reduction is the paper's
+4. **`λ`/`Δ` atoms are outside the normalization relation `⟶`.** Only `dl` looks at them, and
+   only to collapse a formation holding both to `⊥`. Their reduction is the paper's
    *separate* **Morphing** (`fig:morphing` — `Mlambda` calls a host atom `f` by value) and
    **Dataization** (`fig:dataization`) partial functions: stateful, side-effecting,
    host-dependent — *functions*, not a term-rewriting relation (so the relevant property
@@ -146,9 +146,11 @@ assumptions — not gaps against the current paper.
 5. **`ρ`-feedback (landed).** `dot`'s `ρ`-introduction (which makes the system non-terminating)
    landed in `Step`/`Par` at **M4.3** with the `nf`-guard and `contextualize` (receiver = the
    dispatched formation, so no `scope`). `copy` landed at **M4.4** (see #7). `alpha` landed at
-   **M4.2b** (positional; now modelled by `voidAtOrdinal` — the domain ordinal, assets skipped,
-   matching the paper and phino post-#749 — see note †). So **all eleven
-   rules are now in `Step`/`Par`**, and `confluence` covers them. (Earlier drafts said "M1–M2 use a
+   **M4.2b** (positional; now modelled by `ordinal` — the domain ordinal, assets and `ρ` skipped,
+   matching the paper and phino — see note †). Issue #73 brought `Step` to phino 0.0.138:
+   `phi` is gone, `overa`, `amiss` and `dl` are new, `dot` contextualizes against `⟦B₁, B₂⟧`, and
+   `copy` accepts `⊥`. So **every rule `phino rewrite` applies is in `Step`/`Par`**, and
+   `confluence` covers them. (Earlier drafts said "M1–M2 use a
    simplified `dot`" — there was never a simplified `dot`; it arrived at M4.3 with full ρ-feedback.)
 6. **Unique-key well-formedness (Def. 4.8).** Formations are assumed to have unique
    attribute keys; under that invariant our first-match `lookup` coincides with phino's
@@ -184,3 +186,7 @@ assumptions — not gaps against the current paper.
    `WF`-preserving, and closed under reduction. Canonical terms are `WF`, so the headline governs
    them — the result is confluence of phino's *actual* calculus, `ρ` included (not a `ρ`-free
    fragment). `difftest` confirms the match on real formation results. Full account: `DESIGN.md` §9.
+10. **`dotg` is not modelled (universe-free).** phino's `dotg` fires instead of `dot` when the
+    dispatched formation is the whole program (`e-match` against the universe), and then puts `Φ`
+    in the result's `ρ`. `Step` models `phino rewrite` on a bare expression, where no formation is
+    the universe, so `dot` always fires and `dotg` never does.

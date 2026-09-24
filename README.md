@@ -11,7 +11,7 @@ SPDX-License-Identifier: MIT
 A complete, machine-checked proof — in [Lean 4](https://leanprover.github.io) — that the
 normalization (reduction) rules of the φ-calculus are **confluent (Church–Rosser)**: the order in
 which the rules fire never changes the result. It is about the calculus as implemented by the
-reference manipulator [`phino`][phino] — the same eleven rules the [paper][paper]'s Fig. 4 is
+reference manipulator [`phino`][phino] — the same rules the [paper][paper]'s Fig. 4 is
 generated from — and supersedes the earlier minimal/extended development kept in this repository's
 history (which finished only the minimal calculus).
 
@@ -20,8 +20,10 @@ history (which finished only the minimal calculus).
 
 ## The theorem
 
-`⟶` is the compatible (congruence) closure of the eleven `phino` rules
-(`dd, dc, null, over, stop, miss, stay, phi, alpha, dot, copy`) over `Term`. `PhiConfluence.confluence`:
+`⟶` is the compatible (congruence) closure of the `phino` 0.0.138 rules
+(`dd, dc, dca, null, over, stop, miss, stay, alpha, overa, amiss, dot, copy, dl`) over `Term`. The
+fifteenth rule, `dotg`, fires only on the whole-program universe, which `phino rewrite` never sees,
+so it is not modelled. `PhiConfluence.confluence`:
 
 > For all **well-formed** `e`, if `e ⟶* e₁` and `e ⟶* e₂`, then there exists `e₃` with `e₁ ⟶* e₃`
 > and `e₂ ⟶* e₃`.
@@ -35,7 +37,8 @@ formation key) that the deliberately-looser `Binding` encoding drops — it is *
 without it `alpha` and `over` form a non-joinable critical pair. The implicit parent attribute `ρ`
 that the paper and phino give every formation is modelled (`canon`), so the result governs phino's
 actual term space. `λ`/`Δ` atoms are not part of `⟶` — their evaluation is the paper's *separate*,
-stateful Morphing/Dataization functions, not term rewriting. The frozen contract is in
+stateful Morphing/Dataization functions, not term rewriting; only `dl` looks at them, collapsing a
+formation that holds both to `⊥`. The frozen contract is in
 [`docs/M0-spec.md`](docs/M0-spec.md); the design and provenance in [`docs/DESIGN.md`](docs/DESIGN.md).
 
 ## Verify it yourself
@@ -44,7 +47,7 @@ stateful Morphing/Dataization functions, not term rewriting. The frozen contract
 curl -sSf https://elan.lean-lang.org/elan-init.sh | sh   # one-time: Lean's toolchain manager
 pip install -r .github/requirements.txt                  # one-time: Python deps of the generators
 make                        # green ⇒ every theorem is kernel-checked and axiom-clean, as in CI
-lake exe demo               # the eleven rules + example reductions, by the project's own reducer
+lake exe demo               # the rules + example reductions, by the project's own reducer
 make difftest               # our reducer vs `phino rewrite --normalize` (needs phino on PATH)
 ```
 
@@ -54,7 +57,7 @@ runs the generator unit tests and `lake build`, and checks that no headline theo
 forbidden axiom.
 
 The rule files (`Rules.lean`, `RuleData.lean`) are not kept in Git: they are generated from the
-`resources/*.yaml` of the phino pinned in `.phino-version` — the same source the paper's Fig. 4
+`resources/normalize/*.yaml` of the phino pinned in `.phino-version` — the same source the paper's Fig. 4
 renders from — so they cannot drift from phino. `reduce_sound` certifies
 that every step the runnable reducer takes is a genuine `Step`, and `difftest` confirms our
 reducer's normal forms match phino's. Run `#print axioms <name>` on any result to inspect its axiom
@@ -65,8 +68,8 @@ footprint.
 ```
 Main.lean / Difftest.lean         demo + phino differential test
 PhiConfluence/
-  Syntax · Attributes · WellFormed  Term/Binding/Attr; lookup/fill/voidAtOrdinal; the WF predicate
-  Step                              the relation ⟶ — eleven rules + congruence closure
+  Syntax · Attributes · WellFormed  Term/Binding/Attr; lookup/fill/ordinal/erase; the WF predicate
+  Step                              the relation ⟶ — phino's rules + congruence closure
   Nf · Normal                       structural normal form (the counterpart of phino's isNF)
   Context · Canonical               contextualization C(e⊳ctx); the implicit-ρ canonicalisation
   Parallel                          Par/ParB, complete development `devel`, the Takahashi triangle

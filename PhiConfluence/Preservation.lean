@@ -51,26 +51,12 @@ theorem wfb_set {bs₁ bs₂ : List Binding} {a : Attr} {e e' : Term}
 Proved by induction on the `ParB` derivation, no well-formedness needed. -/
 theorem parB_domain {bs bs' : List Binding} (h : ParB bs bs') : domain bs = domain bs' := by
   induction h using ParB.rec (motive_1 := fun _ _ _ => True) with
-  | refl => trivial
-  | dd => trivial
-  | dc => trivial
-  | null => trivial
-  | «over» => trivial
-  | stop => trivial
-  | miss => trivial
-  | stay => trivial
-  | phi => trivial
-  | alpha => trivial
-  | dot => trivial
-  | copy => trivial
-  | congDispatch => trivial
-  | congApp => trivial
-  | congForm => trivial
   | nil => rfl
   | consVoid _ ih => simp only [domain, Binding.key?]; rw [ih]
   | consAttached _ _ _ ih => simp only [domain, Binding.key?]; rw [ih]
   | consDelta _ ih => simp only [domain, Binding.key?]; rw [ih]
   | consLambda _ ih => simp only [domain, Binding.key?]; rw [ih]
+  | _ => trivial
 
 /-- Bridge: a `ParB` step out of a well-formed binding list lands in a well-formed
 formation — the domain is transported by `parB_domain`, while the well-formed values
@@ -157,10 +143,112 @@ theorem wfb_fill {a : Attr} {e : Term} (he : WF e) : ∀ {bs : List Binding}, WF
   | .lambda f :: r, hb => by
       cases hb with | consLambda hr => simp only [fill]; exact .consLambda (wfb_fill he hr)
 
+/-- An absent lookup means the key is not in the domain. -/
+theorem lookup_absent_not_mem {a : Attr} {bs : List Binding} (h : lookup bs a = .absent) :
+    a ∉ domain bs := by
+  induction bs with
+  | nil => simp [domain]
+  | cons b r ih =>
+      cases b with
+      | void c =>
+          simp only [lookup] at h
+          split at h
+          · exact absurd h (by simp)
+          · rename_i hc
+            simp only [domain, Binding.key?, List.mem_cons, not_or]
+            exact ⟨fun he => hc he.symm, ih h⟩
+      | attached c v =>
+          simp only [lookup] at h
+          split at h
+          · exact absurd h (by simp)
+          · rename_i hc
+            simp only [domain, Binding.key?, List.mem_cons, not_or]
+            exact ⟨fun he => hc he.symm, ih h⟩
+      | delta d => simp only [lookup] at h; simp only [domain, Binding.key?]; exact ih h
+      | lambda f => simp only [lookup] at h; simp only [domain, Binding.key?]; exact ih h
+
+/-- `erase` drops at most one key, so its `domain` is a sublist of the original. -/
+theorem domain_erase (bs : List Binding) (a : Attr) : (domain (erase bs a)).Sublist (domain bs) := by
+  induction bs with
+  | nil => exact List.Sublist.slnil
+  | cons b r ih =>
+      cases b with
+      | void c =>
+          by_cases hc : c = a
+          · simp only [erase, if_pos hc, domain, Binding.key?]; exact List.sublist_cons_self _ _
+          · simp only [erase, if_neg hc, domain, Binding.key?]; exact ih.cons_cons _
+      | attached c v =>
+          by_cases hc : c = a
+          · simp only [erase, if_pos hc, domain, Binding.key?]; exact List.sublist_cons_self _ _
+          · simp only [erase, if_neg hc, domain, Binding.key?]; exact ih.cons_cons _
+      | delta d => simp only [erase, domain, Binding.key?]; exact ih
+      | lambda f => simp only [erase, domain, Binding.key?]; exact ih
+
+/-- Dropping a binding preserves `WFB`. -/
+theorem wfb_erase {a : Attr} : ∀ {bs : List Binding}, WFB bs → WFB (erase bs a)
+  | [], _ => .nil
+  | .void c :: _, h => by
+      cases h with
+      | consVoid hr =>
+          by_cases hc : c = a
+          · simp only [erase, if_pos hc]; exact hr
+          · simp only [erase, if_neg hc]; exact .consVoid (wfb_erase hr)
+  | .attached c _ :: _, h => by
+      cases h with
+      | consAttached hv hr =>
+          by_cases hc : c = a
+          · simp only [erase, if_pos hc]; exact hr
+          · simp only [erase, if_neg hc]; exact .consAttached hv (wfb_erase hr)
+  | .delta _ :: _, h => by cases h with | consDelta hr => simp only [erase]; exact .consDelta (wfb_erase hr)
+  | .lambda _ :: _, h => by cases h with | consLambda hr => simp only [erase]; exact .consLambda (wfb_erase hr)
+
+/-- Appending a void binding preserves `WFB`. -/
+theorem wfb_append_void {a : Attr} : ∀ {bs : List Binding}, WFB bs → WFB (bs ++ [.void a])
+  | [], _ => .consVoid .nil
+  | _ :: _, h => by
+      cases h with
+      | consVoid hr => exact .consVoid (wfb_append_void hr)
+      | consAttached hv hr => exact .consAttached hv (wfb_append_void hr)
+      | consDelta hr => exact .consDelta (wfb_append_void hr)
+      | consLambda hr => exact .consLambda (wfb_append_void hr)
+
+/-- `WF (.form (ensureRho cs))` from the `WF` ingredients of `cs`: appending `ρ↦∅` (only when `ρ`
+is absent) keeps the domain duplicate-free (`ρ` was not present) and `ρ` is a legal key. -/
+theorem wf_form_ensureRho {cs : List Binding}
+    (hnd : (domain cs).Nodup) (hlk : ∀ a ∈ domain cs, a.legalKey = true) (hbb : WFB cs) :
+    WF (.form (ensureRho cs)) := by
+  cases hl : lookup cs .rho with
+  | absent =>
+      simp only [ensureRho, hl]
+      have hrho : domain [Binding.void Attr.rho] = [Attr.rho] := rfl
+      refine .form ?_ ?_ (wfb_append_void hbb)
+      · rw [domain_append, hrho]
+        refine List.nodup_append.mpr ⟨hnd, by simp, ?_⟩
+        intro x hx b hb
+        rw [List.mem_singleton] at hb
+        subst hb
+        intro he
+        exact lookup_absent_not_mem hl (he ▸ hx)
+      · intro x hx
+        rw [domain_append, hrho, List.mem_append, List.mem_singleton] at hx
+        rcases hx with hx | hx
+        · exact hlk x hx
+        · subst hx; rfl
+  | void => simp only [ensureRho, hl]; exact .form hnd hlk hbb
+  | attached v => simp only [ensureRho, hl]; exact .form hnd hlk hbb
+
+/-- The context `dot` builds, `⟦B₁, B₂⟧` with a `ρ` ensured, is well-formed when the dispatched
+formation is. -/
+theorem wf_dot_context {bs : List Binding} (h : WF (.form bs)) (a : Attr) :
+    WF (.form (ensureRho (erase bs a))) := by
+  cases h with
+  | form hnd hlk hbb =>
+      exact wf_form_ensureRho ((domain_erase bs a).nodup hnd)
+        (fun x hx => hlk x ((domain_erase bs a).subset hx)) (wfb_erase hbb)
+
 /-- Preservation of well-formedness under one single step (`↝`), by ordinary structural
 induction on the `Step` derivation. The discard rules land in `WF.bot`; `stay` returns the
-(already well-formed) subject formation; `phi` rebuilds two nested dispatches over the same
-formation; `congForm` re-derives the value via `wfb_attached_wf`, the inductive hypothesis,
+(already well-formed) subject formation; `dot` embeds its value into the narrowed context `wf_dot_context`; `congForm` re-derives the value via `wfb_attached_wf`, the inductive hypothesis,
 and `wfb_set`, transporting `Nodup`/`legalKey` across the unchanged domain by `domain_set`. -/
 theorem WF.step {e e' : Term} (hwf : WF e) (h : e ↝ e') : WF e' := by
   induction h with
@@ -171,19 +259,17 @@ theorem WF.step {e e' : Term} (hwf : WF e) (h : e ↝ e') : WF e' := by
   | stop habs hphi hlam => exact .bot
   | miss habs hna => exact .bot
   | stay hs => cases hwf with | app hf _ => exact hf
-  | phi hpres habs =>
-      cases hwf with
-      | dispatch hf => exact .dispatch (.dispatch hf)
-  | alpha hget =>
+  | alpha hord hv =>
       cases hwf with | app hf ha => exact .app hf ha
-  | dot hl hnf =>
+  | overa hord hat => exact .bot
+  | amiss hord => exact .bot
+  | dot hl hnf hld =>
+      rename_i bs a e₁
       cases hwf with
       | dispatch hf =>
-          cases hf with
-          | form hnd hlk hbb =>
-              exact .app
-                (wf_contextualize (.form hnd hlk hbb) (wfb_lookup_attached hbb hl))
-                (.form hnd hlk hbb)
+          have hv : WF e₁ := by cases hf with | form _ _ hbb => exact wfb_lookup_attached hbb hl
+          exact .app (wf_contextualize (wf_dot_context hf a) hv) hf
+  | dl hl hd => exact .bot
   | copy hl hxi hnf =>
       cases hwf with
       | app hf harg =>
@@ -206,7 +292,7 @@ theorem WF.step {e e' : Term} (hwf : WF e) (h : e ↝ e') : WF e' := by
 
 /-- Preservation of well-formedness under one parallel step (`Par`), proved via the
 two-motive `Par.rec` recursor whose binding-list leg (`motive₂`) is exactly the
-`WFB xs → WFB ys` implication. Discard rules land in `WF.bot`; `stay`/`phi`/`congForm`
+`WFB xs → WFB ys` implication. Discard rules land in `WF.bot`; `stay`/`congForm`
 rebuild the target formation through the `parB_domain`+`motive₂` bridge `wf_form_of_parB`;
 the congruences thread the inductive hypotheses through the subterms. -/
 theorem WF.par {e e' : Term} (hwf : WF e) (h : Par e e') : WF e' := by
@@ -226,31 +312,28 @@ theorem WF.par {e e' : Term} (hwf : WF e) (h : Par e e') : WF e' := by
       | app hf _ =>
           cases hf with
           | form hnd hlk hbb => exact wf_form_of_parB hnd hlk (parB_domain hb) (ihb hbb)
-  | phi hb hpres habs ihb =>
-      intro hw
-      cases hw with
-      | dispatch hf =>
-          cases hf with
-          | form hnd hlk hbb =>
-              exact .dispatch (.dispatch (wf_form_of_parB hnd hlk (parB_domain hb) (ihb hbb)))
-  | alpha hb hget he ihb ihe =>
+  | alpha hb hord hv he ihb ihe =>
       intro hw
       cases hw with
       | app hf harg =>
           cases hf with
           | form hnd hlk hbb =>
               exact .app (wf_form_of_parB hnd hlk (parB_domain hb) (ihb hbb)) (ihe harg)
-  | dot hb hl0 hl1 hnf ihb =>
+  | overa hb hord hat he ihb ihe => exact fun _ => .bot
+  | amiss hb hord he ihb ihe => exact fun _ => .bot
+  | dot hb hl0 hl1 hnf hld ihb =>
+      rename_i bs bs' a e₀ e₁
       intro hw
       cases hw with
       | dispatch hf =>
           cases hf with
           | form hnd hlk hbb =>
-              cases wf_form_of_parB hnd hlk (parB_domain hb) (ihb hbb) with
-              | form hnd' hlk' hbb' =>
-                  exact .app
-                    (wf_contextualize (.form hnd' hlk' hbb') (wfb_lookup_attached hbb' hl1))
-                    (.form hnd' hlk' hbb')
+              have hf' := wf_form_of_parB hnd hlk (parB_domain hb) (ihb hbb)
+              have hv : WF e₁ := by cases hf' with | form _ _ hbb' => exact wfb_lookup_attached hbb' hl1
+              exact .app (wf_contextualize (wf_dot_context hf' a) hv) hf'
+  | dl hl hd => exact fun _ => .bot
+  | ddl hl hd => exact fun _ => .bot
+  | dcl hl hd => exact fun _ => .bot
   | copy hb hl harg hxi hnf ihb iharg =>
       intro hw
       cases hw with

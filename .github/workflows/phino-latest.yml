@@ -18,7 +18,7 @@ jobs:
         run: |
           pinned="$(cat .phino-version)"
           latest="$(gh api repos/objectionary/phino/releases/latest --jq .tag_name)"
-          if [ "${pinned#*.}" != "$latest" ]; then
+          if [ "$pinned" != "$latest" ]; then
             echo "::error::.phino-version pins phino $pinned, but the newest release is $latest, bump .phino-version and .phino-sha256"
             exit 1
           fi

@@ -22,7 +22,7 @@ binding's *value* never changes the `domain`, so `WF` survives reduction (`Prese
 
 Scope note: `Nodup` is over `domain`, which **excludes** `Δ`/`λ` assets, so `WF` does not
 forbid duplicate assets (e.g. `⟦λ↦F, λ↦G⟧` is `WF`). That is fine for this theorem
-(`λ`/`Δ` assets are inert — they have no rule among the eleven, so they never fire) but is
+(`λ`/`Δ` assets are inert — only `dl` tests whether both are present, never how many) but is
 a latent looseness to tighten if asset reduction is ever modelled.
 -/
 
