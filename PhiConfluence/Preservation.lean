@@ -5,7 +5,7 @@ import PhiConfluence.Parallel
 import PhiConfluence.WellFormed
 
 /-!
-# Preservation of well-formedness (M4.1)
+# Preservation of well-formedness
 
 The headline diamond and confluence theorems are stated for well-formed terms, so the
 reduction relations must not break that invariant. This module proves that one `Step`
@@ -14,8 +14,7 @@ and one `Par` step both preserve `WF`, adding no new rules. The engine is
 (hence `Nodup`/`legalKey`) is fixed, and only the attached values must be re-proved
 well-formed — `wfb_set` for `Step.congForm`'s append index and `wf_form_of_parB` for the
 `Par` formation cases. `WF.par`'s binding-list leg is handled inline by the recursor's
-`motive₂` (no separate `ParB` companion — that would duplicate the case analysis, a sync
-liability once `alpha`/`dot`/`copy` arrive).
+`motive₂` (no separate `ParB` companion — that would duplicate the case analysis).
 -/
 
 namespace PhiConfluence

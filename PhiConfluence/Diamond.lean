@@ -17,15 +17,13 @@ diamond to a single apex `devel e`.
 *unconditional* diamond is FALSE (`alpha`-vs-`over` on malformed `αᵢ`-keyed formations, dev. #8),
 but `church_rosser` demands an unconditional strong-confluence premise. The fix: relativize to
 `ParWF a b := WF a ∧ Par a b` and prove `Diamond ParWF` — with `d := devel a`, any fork
-`ParWF a b`, `ParWF a c` rejoins because the (now WF-scoped) triangle sends both `b` and `c` to
+`ParWF a b`, `ParWF a c` rejoins because the WF-scoped triangle sends both `b` and `c` to
 `devel a`; the targets stay `WF`-rooted by `WF.par`. Crucially `Diamond ParWF` needs `WF` of the
 *source* `a` only (not of `devel a`), so it discharges the unconditional premise for the relation
 `ParWF`. The SAME generic `Abstract.Diamond.confluent` then gives `Confluent ParWF`, which
-`Confluence.lean` bridges to the `WF`-scoped headline `confluence`. As `dot`/`copy` land
-(M4.3/4.4), only `par_triangle`/`devel`/`Step`/`Par` change, not this plumbing. (De-risked: no
-root critical pairs, no divergence over a fixed corpus of 7 hand-crafted probe programs + the
-paper's Appendix-A examples — README "Why confluence holds"; a fixed corpus, not random fuzzing.) There is
-deliberately no unconditional `par_diamond`/`step_confluent` now — they would be false.
+`Confluence.lean` bridges to the `WF`-scoped headline `confluence`. (Why no root critical pairs
+exist: README "Why confluence holds".) There is deliberately no unconditional
+`par_diamond`/`step_confluent` — they would be false.
 -/
 
 namespace PhiConfluence
@@ -38,10 +36,9 @@ transparent to `⟨·,·⟩`/`rcases`. -/
 abbrev ParWF (a b : Term) : Prop := WF a ∧ Par a b
 
 /-- The Takahashi triangle, **WF-scoped** (`WF e → Par e u → Par u (devel e)`); a thin alias of
-`par_triangle` (now itself WF-scoped, since `alpha` makes the unconditional triangle false).
-Stating the diamond against this name keeps `parWF_diamond` and the headline path stable as the
-calculus grows. (There is deliberately no *unconditional* `par_diamond`/`par_confluent`/
-`step_confluent` once `alpha` is present — those would be false; see `Confluence.lean`.) -/
+`par_triangle` (itself WF-scoped, since `alpha` makes the unconditional triangle false).
+(There is deliberately no *unconditional* `par_diamond`/`par_confluent`/`step_confluent` — those
+would be false; see `Confluence.lean`.) -/
 theorem wf_par_triangle {e u : Term} (hwf : WF e) (h : Par e u) : Par u (devel e) :=
   par_triangle hwf h
 

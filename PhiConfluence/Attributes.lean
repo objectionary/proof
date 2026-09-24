@@ -15,10 +15,8 @@ computable.
 Well-formedness assumption: by the paper's Def. 4.8 a binding is "a sequence of
 key-value pairs, where all keys are unique." Under that invariant, `lookup`'s
 first-match-wins coincides with `phino`'s matcher, which can match a binding at any
-position (`⟦B₁, τ↦…, B₂⟧`) since no duplicate can shadow it. We will carry this
-unique-key invariant as a hypothesis (or a `Record`-style indexed type) once the
-formation-rebuilding rules arrive; for the current `⊥`-collapse fragment nothing
-depends on it.
+position (`⟦B₁, τ↦…, B₂⟧`) since no duplicate can shadow it. The invariant is the
+`Nodup` clause of `WF` (`WellFormed.lean`), carried as a hypothesis by the headline.
 -/
 
 namespace PhiConfluence

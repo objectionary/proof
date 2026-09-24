@@ -11,12 +11,8 @@ values are terms.
 Encoding of the special forms: `Term.bot` is `⊥`, `Term.glob` is `Φ`, `Term.xi` is
 the scope locator `ξ`, `Binding.void` is `τ↦∅`, `Binding.attached` is `τ↦e`,
 `Binding.delta` is the `Δ`-asset (data), `Binding.lambda` is the `λ`-asset
-(function). Assets (`Δ`/`λ`) are present in the syntax but **excluded from the
-first confluence theorem**.
-
-This is the M0 starting proposal — open to refinement (e.g. a unique-key `Record`
-for bindings as in `objectionary/proof` `Minimal/Record.lean`, well-formedness of
-formations, and the canonical `B₁,τ,B₂` splitting used by `dot`/`copy`/`null`).
+(function). Assets (`Δ`/`λ`) are present in the syntax but never reduced: only `dl`
+looks at them.
 -/
 
 namespace PhiConfluence

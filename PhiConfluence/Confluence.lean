@@ -25,11 +25,10 @@ violation; the diamond proof consumes exactly it — dev. #8); the **unique-key 
 See README "Why only well-formed terms". (The paper itself proves no confluence theorem; it *presupposes*
 it when defining `≡` as "normal forms are syntactically identical" — we prove it.)
 
-The statement does NOT change as `Step` grows — adding `dot`/`copy` (M4.3/4.4) only re-establishes
-`par_triangle`/`devel`. There is deliberately no unconditional `step_confluent` now: it would be
-false with `alpha`. The paper's `λ`/`Δ` semantics (its *separate*, stateful Morphing/Dataization
-partial functions, `fig:morphing`/`fig:dataization`) and the superseded big-step `Rcopy` are
-outside the normalization relation `⟶` — hence outside this theorem by construction, not pending work.
+There is deliberately no unconditional `step_confluent`: it would be false with `alpha`. The
+paper's `λ`/`Δ` semantics (its *separate*, stateful Morphing/Dataization partial functions,
+`fig:morphing`/`fig:dataization`) are outside the normalization relation `⟶` — hence outside this
+theorem by construction, not pending work.
 -/
 
 namespace PhiConfluence
@@ -62,9 +61,7 @@ theorem parWF_to_par {a b : Term} (h : Relation.ReflTransGen ParWF a b) :
 `redMany_eq` turns `↝∗` into `Par∗`, `redMany_par_to_parWF` lifts the well-formed forks to
 `ParWF∗`, `parWF_confluent` joins them, and `parWF_to_par`+`redMany_eq` carry the join back to `↝∗`.
 
-This is the headline's frozen *statement* — it did not change as `Step` grew; adding `dot`/`copy`
-(M4.3/4.4) only re-established `par_triangle`/`devel`. It governs every rule `phino rewrite`
-applies (the `⊥`-collapse rules + `stay` + `alpha` + `dot` + `copy`). It is proved through the relativized bridge — *not*
+It governs every rule `phino rewrite` applies (the `⊥`-collapse rules + `stay` + `alpha` + `dot` + `copy`). It is proved through the relativized bridge — *not*
 via an unconditional `Confluent Step`, which is false with `alpha` present. The `WF e` hypothesis's
 **`αᵢ`-not-a-formation-key clause is necessary** (dev. #8 — the `alpha`-vs-`over` counterexample);
 its **unique-key clause is faithfulness** (Def. Binding + `lookup` agreement), carried but unused by

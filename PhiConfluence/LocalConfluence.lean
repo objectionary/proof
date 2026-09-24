@@ -10,14 +10,6 @@ Lemmas that lift multi-step reduction `↝∗` through each recursive `Term` pos
 dispatch subject, an application subject/argument, and a formation binding's value), plus
 the inversion `form_step_inv` (the only way a formation steps is `congForm`). They feed the
 parallel-reduction layer (`Parallel.lean`'s `par_to_red`, `redMany_form_cons`, etc.).
-
-History: this module also held `local_confluence` — weak Church-Rosser of the `⊥`-collapse
-fragment — proved at M1. It was **retired at M4.2b**: once `alpha` joins `Step`, unconditional
-WCR is *false* (the `alpha`-vs-`over` fork on a malformed `αᵢ`-keyed formation is non-joinable,
-dev. #8), and the headline `confluence` (via the parallel-reduction diamond, `Diamond.lean`/
-`Confluence.lean`) subsumes local confluence anyway. The helper lemmas it relied on
-(`cong_commute`, `lookup_set_*`, `hasLambda_set`) went with it; only the reduction-lifting
-lemmas below — used elsewhere — remain.
 -/
 
 namespace PhiConfluence

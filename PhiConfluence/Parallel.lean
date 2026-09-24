@@ -443,7 +443,7 @@ theorem par_to_red {e e' : Term} (h : Par e e') : e ↝∗ e' := by
   | consDelta hb ihb => exact redMany_form_cons _ ihb rfl
   | consLambda hb ihb => exact redMany_form_cons _ ihb rfl
 
-/-- **First M3 headline:** single-step and parallel reduction have the *same*
+/-- Single-step and parallel reduction have the *same*
 reflexive-transitive closure (`Step ⊆ Par ⊆ Step∗`). So confluence of `Par` transports
 to confluence of `Step`. -/
 theorem redMany_eq : RedMany = Relation.ReflTransGen Par := by

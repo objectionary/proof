@@ -21,9 +21,7 @@ diamond, with NO termination assumption, by discharging mathlib's
 `Relation.church_rosser`. The φ-calculus proof gives the diamond for *parallel
 reduction* and feeds it here.
 
-We use mathlib's `Prop`-valued relations (the idiomatic choice) rather than the
-`Type`-valued library of `objectionary/proof`'s `Minimal/ARS.lean`; we keep that
-older file only as a proof-skeleton reference.
+We use mathlib's `Prop`-valued relations, the idiomatic choice.
 -/
 
 namespace PhiConfluence.Abstract

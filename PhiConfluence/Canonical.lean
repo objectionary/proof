@@ -21,8 +21,7 @@ in place). This module models that canonicalisation, closing the implicit-`ρ` f
   and `ρ` is a legal key).
 * `step_canonical` — reduction **preserves** `Canonical`: `phino`'s term space (parent everywhere) is
   closed under our `Step`. With `canon` establishing it and reduction preserving it, the `WF`-scoped
-  `confluence` (which already covers these `WF` terms) governs exactly `phino`'s canonical calculus —
-  the headline no longer needs the "`ρ`-injection-free fragment" qualifier.
+  `confluence` (which already covers these `WF` terms) governs exactly `phino`'s canonical calculus.
 -/
 
 namespace PhiConfluence

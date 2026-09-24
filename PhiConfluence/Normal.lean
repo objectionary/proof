@@ -8,10 +8,9 @@ import Mathlib.Tactic
 # Reducibility and normal forms
 
 A term is `Reducible` if some single step applies to it, and a `NormalForm` if no
-step applies. For the `⊥`-collapse fragment this relational definition is enough and
-carries no circularity (none of these rules have a guard that mentions normal
-forms). When the `nf`-guarded `dot`/`copy` rules arrive, we will add a *structural*
-`nf` (mirroring `phino`'s `isNF`) and prove it agrees with `NormalForm` here.
+step applies. The `nf`-guarded rules `dot`/`copy` use the *structural* `nf` instead
+(`Nf.lean`, mirroring `phino`'s `isNF`); `nf_iff` (`Parallel.lean`) proves the two agree on
+well-formed terms.
 -/
 
 namespace PhiConfluence

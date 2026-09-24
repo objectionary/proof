@@ -13,14 +13,12 @@ phino's normal form matches ours — the behavioral pin between our reducer and 
 Corpus exercises every rule `phino rewrite` applies (all fifteen but `dotg`, which needs the
 whole-program universe; `alpha` included — phino parses our printed `α0`).
 
-**The implicit parent (`ρ`) is now modelled — `canon`.** The paper (`foundations.tex`, Def. Parent)
+**The implicit parent (`ρ`) is modelled by `canon`.** The paper (`foundations.tex`, Def. Parent)
 and phino put a parent `ρ`, void until set, in *every* formation; phino materialises it as a `ρ↦∅`
 appended where absent. `normalForm` below first applies `canon` (`PhiConfluence.canon`) — exactly
-that injection — so our reducer runs on phino's term space. This **closes the former `ρ`-injection
-gap**: the corpus now includes **non-`⊥` formation results that match phino exactly**, including the
-cases that previously diverged — `⟦⟧(ρ↦Φ)` (phino fills the implicit `ρ` via `copy`) and bare
-value formations
-(`⟦x↦Φ⟧ ↦ ⟦x↦Φ, ρ↦∅⟧`). The remaining `⊥`-cases keep the trace bounded (`dot`'s `ρ`-feedback can
+that injection — so our reducer runs on phino's term space. The corpus includes **non-`⊥` formation
+results that match phino exactly**, such as `⟦⟧(ρ↦Φ)` (phino fills the implicit `ρ` via `copy`)
+and bare value formations (`⟦x↦Φ⟧ ↦ ⟦x↦Φ, ρ↦∅⟧`). The remaining `⊥`-cases keep the trace bounded (`dot`'s `ρ`-feedback can
 diverge) and exercise the collapse rules. `canon`'s correctness is proved: `canon_canonical`
 (every formation gets a `ρ`), `wf_canon` (`WF` preserved), `step_canonical` (reduction stays
 canonical — phino's term space is closed under `Step`).
@@ -50,10 +48,10 @@ def cases : List Term :=
     app (form [void (label "x")]) (alpha 0) glob,                       -- Ralpha→x, Rcopy → ⟦x↦Φ, ρ↦∅⟧
     app (form [void (label "x")]) (alpha 1) glob,                       -- Ramiss: ordinals skip ρ → ⊥
     app (form [attached (label "x") glob]) (alpha 0) glob,              -- Rovera: α0 is attached → ⊥
-    -- alpha indexes over the DOMAIN (skips the λ asset; phino #749):
+    -- alpha indexes over the DOMAIN (skips the λ asset):
     app (form [lambda "Fn", void (label "x")]) (alpha 0) glob,          -- α0 skips λ, hits x → ⟦λ↦Fn, x↦Φ, ρ↦∅⟧
     app (form [lambda "Fn", void (label "x")]) (alpha 1) glob,          -- α1 past the domain (Ramiss) → ⊥
-    -- a formation with both λ and Δ collapses (Rdl), even under a dispatch (phino #1395):
+    -- a formation with both λ and Δ collapses (Rdl), even under a dispatch:
     form [lambda "Fn", delta [1]],                                      -- Rdl → ⊥
     dispatch (form [attached (label "x") (dispatch glob (label "y")), lambda "Fn", delta [0]])
       (label "x"),                                                      -- Rdl, Rdd → ⊥ (not Rdot)
@@ -61,7 +59,7 @@ def cases : List Term :=
     -- dot contextualizes against the formation without the dispatched binding:
     dispatch (form [attached (label "x") xi]) (label "x"),              -- Rdot, Rcopy → ⟦ρ↦⟦x↦ξ, ρ↦∅⟧⟧
     dispatch (form [attached rho xi]) rho,                              -- Rdot, Rcopy → ⟦ρ↦⟦ρ↦ξ⟧⟧
-    form [attached rho (form [])] ]                                     -- parent: single ρ, no dup (phino #748) → ⟦ρ↦⟦ρ↦∅⟧⟧
+    form [attached rho (form [])] ]                                     -- parent: single ρ, no dup → ⟦ρ↦⟦ρ↦∅⟧⟧
 
 /-- Our reducer's normal form (bounded), on the **canonicalised** term — `canon` injects the implicit
 parent `ρ` exactly as phino does, so the result matches phino's normal form. -/

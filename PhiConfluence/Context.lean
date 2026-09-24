@@ -22,12 +22,12 @@ formation-boundary case.
 `Term`, a harmless generalization since `b` is only ever a formation and the definition
 treats it opaquely.) `contextualize` is total and structurally recursive by construction.
 The load-bearing **"`C` commutes with reduction"** lemma — the one `Diamond` consumes —
-is the next step here and lands with the `dot`/`copy` rules.
+is `par_contextualize_ctx` in `Parallel.lean`.
 
 `scope(e)` (`ς`, defined in the paper `sections/foundations.tex`: the formation where
 `e` stays, or the scope of the subject of the application where `e` is the argument) is
 deliberately **not** modelled — it depends on `e`'s surrounding context, not on `e` alone.
-Neither rule as landed needs it: `dot`'s receiver is the dispatched formation itself, and
+Neither rule needs it: `dot`'s receiver is the dispatched formation itself, and
 `copy` is `ξ`-free, so `C(e₁ ⊳ scope) = e₁` (`contextualize_eq_self`, `Parallel.lean`) makes any
 `scope` vacuous. `scope` is therefore absent from the model by design (README difference #7).
 -/

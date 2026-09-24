@@ -10,9 +10,8 @@ The confluence theorem is stated for **well-formed** terms. A formation is well-
 when its attribute `domain` (the keys, with `Δ`/`λ` assets excluded — paper Def. Domain,
 `foundations.tex`) has **no duplicates** (Def. Binding "all keys are unique", README
 difference #6) and **every key is legal** — i.e. not a positional `αᵢ` (the paper grammar
-puts `αᵢ` solely in application-argument pairs, README difference #8). Both invariants
-are load-bearing now that `alpha`/`dot`/`copy` are in `Step`: without deviation #8,
-`alpha` vs `over` is a non-joinable critical pair.
+puts `αᵢ` solely in application-argument pairs, README difference #8). Without the
+second invariant, `alpha` vs `over` is a non-joinable critical pair.
 
 `WF`/`WFB` are a **recursive `Prop` predicate** carried as a *hypothesis* on the diamond
 and headline theorems — not an indexed `Binding` type (which would force re-deriving all
