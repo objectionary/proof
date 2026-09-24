@@ -24,7 +24,7 @@ but `church_rosser` demands an unconditional strong-confluence premise. The fix:
 `Confluence.lean` bridges to the `WF`-scoped headline `confluence`. As `dot`/`copy` land
 (M4.3/4.4), only `par_triangle`/`devel`/`Step`/`Par` change, not this plumbing. (De-risked: no
 root critical pairs, no divergence over a fixed corpus of 7 hand-crafted probe programs + the
-paper's Appendix-A examples — README "Proof strategy"; a fixed corpus, not random fuzzing.) There is
+paper's Appendix-A examples — README "Why confluence was expected to hold"; a fixed corpus, not random fuzzing.) There is
 deliberately no unconditional `par_diamond`/`step_confluent` now — they would be false.
 -/
 

@@ -22,7 +22,7 @@ re-imposes the paper's own *grammar* our looser `Binding` drops. Of its two clau
 a-formation-key is *necessary*** for confluence (the `alpha`-vs-`over` counterexample is that
 violation; the diamond proof consumes exactly it — dev. #8); the **unique-key `Nodup` clause is
 *faithfulness*** (Def. Binding + `lookup`-vs-matcher agreement), carried but unused by the diamond.
-See README "Why `WF`-scoped". (The paper itself proves no confluence theorem; it *presupposes*
+See README "Why only well-formed terms". (The paper itself proves no confluence theorem; it *presupposes*
 it when defining `≡` as "normal forms are syntactically identical" — we prove it.)
 
 The statement does NOT change as `Step` grows — adding `dot`/`copy` (M4.3/4.4) only re-establishes

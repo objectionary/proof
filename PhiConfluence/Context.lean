@@ -29,7 +29,7 @@ is the next step here and lands with the `dot`/`copy` rules.
 deliberately **not** modelled — it depends on `e`'s surrounding context, not on `e` alone.
 Neither rule as landed needs it: `dot`'s receiver is the dispatched formation itself, and
 `copy` is `ξ`-free, so `C(e₁ ⊳ scope) = e₁` (`contextualize_eq_self`, `Parallel.lean`) makes any
-`scope` vacuous. `scope` is therefore absent from the model by design (README deviation #7).
+`scope` vacuous. `scope` is therefore absent from the model by design (README difference #7).
 -/
 
 namespace PhiConfluence

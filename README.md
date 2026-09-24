@@ -8,78 +8,137 @@ SPDX-License-Identifier: MIT
 [![build](https://github.com/objectionary/proof/actions/workflows/build.yml/badge.svg)](https://github.com/objectionary/proof/actions/workflows/build.yml)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](https://github.com/objectionary/proof/blob/master/LICENSE.txt)
 
-A complete, machine-checked proof — in [Lean 4](https://leanprover.github.io) —
-  that the normalization (reduction) rules of the φ-calculus
-  are **confluent (Church–Rosser)**:
-  the order in which the rules fire never changes the result.
-It is about the calculus as implemented by the reference manipulator
-  [`phino`][phino] — the same rules the [paper][paper]'s Fig. 4
-  is generated from — and supersedes the earlier minimal/extended development
-  kept in this repository's history (which finished only the minimal calculus).
+This repository holds a computer-checked proof
+  that simplifying a φ-calculus program gives the same result
+  no matter in which order you apply the simplification rules.
 
-**`#print axioms PhiConfluence.confluence` = `[propext, Quot.sound]`**
-  — no `sorry`, no `Classical.choice`.
+The φ-calculus is the small formal language behind [EO].
+A program in it is a *term*,
+  and a fixed set of *rules* rewrites a term, one step at a time,
+  into a simpler one.
+Often several rules apply at once, or one rule applies in several places,
+  so you have a choice of what to rewrite next.
+The property proved here, called **confluence** (or **Church–Rosser**),
+  says that the choice never matters:
+  any two ways of rewriting the same term
+  can always be continued until they meet at the same term.
+
+The proof is written in [Lean 4],
+  a programming language that is also a *proof assistant*:
+  a program that checks every step of a mathematical proof.
+If Lean accepts the proof,
+  you do not need to trust the reasoning,
+  only the statement of the theorem and the few definitions it uses.
+
+The rules are the ones implemented by [`phino`][phino],
+  the reference tool for the φ-calculus.
+The [paper] that defines the calculus
+  generates its table of rules (Fig. 4) from `phino` too,
+  so this proof, the paper, and the tool all talk about the same rules.
+The proof replaces an earlier one, still in this repository's history,
+  that covered only a smaller version of the calculus.
+
+Lean reports that the main theorem, `PhiConfluence.confluence`,
+  depends only on the axioms `propext` and `Quot.sound`,
+  two standard parts of Lean's logic.
+It uses no `sorry` (Lean's placeholder for a missing proof)
+  and no `Classical.choice` (the axiom of choice).
+
+## Key terms
+
+* **Term** — a φ-calculus expression.
+  It is one of six kinds:
+    a *formation* `⟦B⟧`, an object with a list `B`
+    of named attributes (its *bindings*);
+    an *application* `e(τ↦e')`, which gives attribute `τ` of `e`
+    the value `e'`;
+    a *dispatch* `e.τ`, which takes attribute `τ` of `e`;
+    the global object `Φ`;
+    the current object `ξ`;
+    or `⊥`, the dead object that results from an error.
+* **Attribute** — the name of a binding.
+  It is a plain label such as `x`,
+    one of the special names `φ` and `ρ` (`ρ` is the object's parent),
+    or a *positional* name `αᵢ`, meaning "the attribute at position `i`".
+  A binding `x↦∅` is *void*, because it has no value yet;
+    a binding `x↦e` is *attached*.
+  The special bindings `λ` and `Δ` hold native code and raw data;
+    they are called *assets*.
+* **Step** — `e ⟶ e'` means one rule rewrites `e` into `e'`,
+    anywhere inside it.
+  `e ⟶∗ e'` means zero or more steps.
+* **Redex** — a place inside a term where a rule can fire.
+* **Normal form** — a term with no redex, so no rule can fire.
+  `nf e` means "`e` is in normal form".
+* **Well-formed** — a term with no repeated attribute names in any formation
+    and no positional name used as a formation's attribute.
+  Lean calls this `WF`.
 
 ## The theorem
 
-`⟶` is the compatible (congruence) closure of the `phino` 0.0.138 rules
-  (`dd, dc, dca, null, over, stop, miss, stay, alpha, overa, amiss, dot, copy, dl`)
-  over `Term` (formations `⟦B⟧`, applications `e(τ↦e')`, dispatches `e.τ`,
-  the locators `Φ`/`ξ`, and the terminator `⊥`).
-The fifteenth rule, `dotg`, fires only on the whole-program universe,
-  which `phino rewrite` never sees, so it is not modelled.
-`⟶∗` is the reflexive-transitive closure.
-`PhiConfluence.confluence`:
+The relation `⟶` uses the rules of `phino` version 0.0.138
+  (`dd, dc, dca, null, over, stop, miss, stay, alpha, overa, amiss, dot, copy, dl`),
+  applied anywhere inside a term.
+The fifteenth `phino` rule, `dotg`,
+  fires only on a whole program,
+  which `phino rewrite` never receives,
+  so the proof leaves it out.
 
-> For all **well-formed** `e`, if `e ⟶∗ e₁` and `e ⟶∗ e₂`,
-> then there exists `e₃` with `e₁ ⟶∗ e₃` and `e₂ ⟶∗ e₃`.
+The theorem, `PhiConfluence.confluence`, says:
 
-`WF` is `PhiConfluence.WF` from `WellFormed.lean`:
-  a formation's domain is duplicate-free and free of positional `αᵢ` keys.
-The theorem is proved via **parallel reduction**
-  and the **Takahashi diamond** (mathlib's `Relation.church_rosser`);
-  the system is non-terminating (`⟦x↦y,y↦x⟧.x` diverges),
-  so Newman's lemma does not apply.
+> For every well-formed term `e`, if `e ⟶∗ e₁` and `e ⟶∗ e₂`,
+> then some term `e₃` exists with `e₁ ⟶∗ e₃` and `e₂ ⟶∗ e₃`.
 
-The contract is deliberately *narrower* than "the paper's Fig. 4 verbatim";
-  the deviations are listed and justified
-  [below](#how-the-model-relates-to-the-paper).
-The paper itself proves no confluence theorem:
-  it *presupposes* confluence when it defines `≡`
-  as "normal forms are syntactically identical".
+Some terms rewrite forever: `⟦x↦y,y↦x⟧.x` never reaches a normal form.
+So the usual shortcut, Newman's lemma,
+  which derives confluence only for systems where rewriting always stops,
+  does not apply.
+The proof uses *parallel reduction* instead,
+  explained in [Proof strategy][strategy].
 
-### Why `WF`-scoped
+The theorem is deliberately narrower
+  than "the rules of Fig. 4 exactly as printed";
+  the [differences from the paper][differences] are listed and explained below.
+The paper itself proves no confluence theorem.
+It *assumes* confluence when it defines two terms as equal
+  if their normal forms are identical.
 
-`WF` re-imposes exactly the paper's own grammar restrictions
-  that the deliberately looser `Binding` encoding drops.
-Its two clauses carry **different weight**:
+### Why only well-formed terms
 
-* **`legalKey` (no positional `αᵢ` as a formation key)
-    is *necessary for confluence*.**
-  The counterexample that makes unconditional `Confluent Step` **false**
-    once `alpha` is present is a `legalKey` violation:
-    a *malformed* `⟦B₁, αᵢ↦e₁, B₂⟧(αᵢ↦e₂)` whose void slot sits at ordinal `i`
-    lets `alpha` rename the argument (→ an object) while `over` fires (→ `⊥`),
-    and object vs `⊥` never join (deviation 8).
-  The diamond proof consumes exactly this clause
+The Lean definition of a formation is deliberately looser
+  than the paper's grammar:
+  it allows repeated attribute names and positional names as attributes.
+The well-formedness condition `WF` puts back the paper's own two restrictions.
+They matter for different reasons.
+
+* **No positional name as a formation attribute (`legalKey`)
+    is required for confluence.**
+  Without it, the theorem is false.
+  Take a malformed term `⟦B₁, αᵢ↦e₁, B₂⟧(αᵢ↦e₂)`
+    whose void attribute sits at position `i`.
+  The `alpha` rule renames the argument and yields an object,
+    while the `over` rule yields `⊥`,
+    and those two results can never meet (difference 8).
+  The proof uses exactly this condition
     (`lookup_alpha_absent_of_wf`,
-    the `over` and `copy` cases of `par_triangle`).
-  It is faithful, too: phino's parser bars `αᵢ` formation keys.
-* **`Nodup` (unique keys, Def. Binding 4.8) is a *faithfulness* clause,
-    not a demonstrated confluence-necessity.**
-  No duplicate-key non-joinable fork is known,
-    and the diamond proof binds the `Nodup` field of `WF.form`
-    but never uses it.
-  `Nodup` is carried because it matches the paper's Def. Binding
-    and makes our first-match `lookup` coincide with phino's matcher
-    (deviation 6), and because `WF.step`/`WF.par` preserve it.
+    and the `over` and `copy` cases of `par_triangle`).
+  It matches `phino`, whose parser rejects such terms.
+* **Unique attribute names (`Nodup`, Def. Binding 4.8)
+    keep the model faithful to the paper;
+    no known example needs them for confluence.**
+  The proof carries this condition but never uses it.
+  It stays for three reasons:
+    the paper's Def. Binding requires it;
+    it makes our attribute lookup, which takes the first match,
+    agree with `phino`'s lookup (difference 6);
+    and every rewriting step preserves it.
 
-phino once printed a non-`Nodup` term:
-  `⟦ρ↦⟦⟧⟧` came out as `⟦ρ↦⟦ρ↦∅⟧, ρ↦∅⟧`, with two `ρ` keys.
-That printer bug, contradicting the Def. Binding its own parser enforces,
-  was fixed in phino **#748**.
-Our model never reproduced it and already gave `canon ⟦ρ↦⟦⟧⟧ = ⟦ρ↦⟦ρ↦∅⟧⟧`,
-  so model and phino now agree.
+`phino` once printed a term with a repeated name:
+  `⟦ρ↦⟦⟧⟧` came out as `⟦ρ↦⟦ρ↦∅⟧, ρ↦∅⟧`, with two `ρ` bindings.
+That was a printer bug, contradicting the paper's definition
+  that `phino`'s own parser enforces,
+  and `phino` fixed it in **#748**.
+Our model always gave `⟦ρ↦⟦ρ↦∅⟧⟧`, so it now agrees with `phino`.
 
 ## Verify it yourself
 
@@ -92,434 +151,475 @@ make difftest               # our reducer vs `phino rewrite --normalize` (needs 
 ```
 
 `make` needs GNU Make 4.3 or newer.
-It fetches mathlib's prebuilt artifacts,
-  generates the rule files from pinned phino
-  (and regenerates them only when `.phino-version` or a generator changes),
-  runs the generator unit tests and `lake build`,
-  and checks that no headline theorem depends on a forbidden axiom.
+It downloads prebuilt parts of [mathlib], Lean's standard mathematics library.
+It generates the rule files from the pinned version of `phino`,
+  and regenerates them only when `.phino-version` or a generator changes.
+It runs the generators' unit tests,
+  builds the proof with `lake build`,
+  and checks that no main theorem depends on a forbidden axiom.
 
-The rule files (`Rules.lean`, `RuleData.lean`) are not kept in Git:
-  they are generated from the `resources/normalize/*.yaml`
-  of the phino pinned in `.phino-version`
-  — the same source the paper's Fig. 4 renders from —
-  so they cannot drift from phino.
-`reduce_sound` certifies that every step the runnable reducer takes
-  is a genuine `Step`,
-  and `difftest` confirms our reducer's normal forms match phino's.
-Run `#print axioms <name>` on any result to inspect its axiom footprint.
+The rule files `Rules.lean` and `RuleData.lean` are not kept in Git.
+They are generated from the `resources/normalize/*.yaml` files
+  of the `phino` version named in `.phino-version`,
+  the same files the paper's Fig. 4 comes from,
+  so they cannot drift away from `phino`.
 
-The demo, `lake exe demo`, prints the normalization rules
-  in the paper's Unicode notation
-  and reduction traces of example φ-programs computed by our own `reduceStep`.
+The project also contains a small program that simplifies terms,
+  the *reducer*.
+The theorem `reduce_sound` proves every step the reducer takes
+  is a genuine `⟶` step.
+`make difftest` runs the reducer and `phino` on the same programs
+  and checks they reach the same normal forms.
+To see which axioms any result depends on,
+  run `#print axioms <name>` in Lean.
+
+`lake exe demo` prints the rules in the paper's notation,
+  then prints the reducer's step-by-step simplification of example programs.
 
 ## The rules
 
-Source of truth: the **paper** (reduction figure, `operators.tex`);
-  `phino`'s `resources/normalize/*.yaml` (`phino explain --normalize`)
-  is the secondary interpretation that renders into it.
-`nf e` means "`e` is in normal form" (no rule matches anywhere in `e`);
-  `C(·⊳·)` is contextualization (Fig. "Contextualization by induction");
-  `ordinal(B, i)` is the key at position `i` of the *domain* of `B` (†).
+The paper's rule figure (`operators.tex`) is the primary source,
+  and `phino`'s `resources/normalize/*.yaml` files
+  (shown by `phino explain --normalize`) are its executable version.
+In the table below, `C(e⊳ctx)` is *contextualization*:
+  it resolves the current-object references `ξ` inside `e` against `ctx`
+  (paper, Fig. "Contextualization by induction").
+`ordinal(B, i)` is the name of the attribute at position `i` of `B`,
+  counted as described in the note (†).
 
 | `phino` rule | Lean `Step` constructor | Pattern → result | Side condition |
 |---|---|---|---|
 | `dot`   | `Step.dot`   | `⟦B₁,τ↦e₁,B₂⟧.τ → C(e₁⊳⟦B₁,B₂,ρ↦∅⟧)(ρ↦⟦B₁,τ↦e₁,B₂⟧)` | `nf e₁` ∧ not both `λ∈B` and `Δ∈B` (`ρ↦∅` only when `B₁,B₂` lack `ρ`) |
-| `dotg`  | — (dev. 10)  | same, `(ρ↦Φ)` instead | the formation is the whole-program universe |
-| `copy`  | `Step.copy`  | `⟦B₁,τ↦∅,B₂⟧(τ↦e₁) → ⟦B₁,τ↦e₁,B₂⟧` | `ξFree e₁` ∧ `nf e₁` (phino's `𝑘` sigil; `scope`/`contextualize` vacuous — dev. 7) |
+| `dotg`  | — (difference 10) | same, `(ρ↦Φ)` instead | the formation is the whole program |
+| `copy`  | `Step.copy`  | `⟦B₁,τ↦∅,B₂⟧(τ↦e₁) → ⟦B₁,τ↦e₁,B₂⟧` | `e₁` has no `ξ` ∧ `nf e₁` (difference 7) |
 | `alpha` | `Step.alpha` | `⟦B⟧(αᵢ↦e) → ⟦B⟧(τ↦e)` | `τ = ordinal(B, i)` is void (†) |
 | `overa` | `Step.overa` | `⟦B⟧(αᵢ↦e) → ⊥` | `ordinal(B, i)` is attached |
-| `amiss` | `Step.amiss` | `⟦B⟧(αᵢ↦e) → ⊥` | `i ≥ |domain(B)|` |
+| `amiss` | `Step.amiss` | `⟦B⟧(αᵢ↦e) → ⊥` | `B` has no position `i` (†) |
 | `stay`  | `Step.stay`  | `⟦B₁,ρ↦e₁,B₂⟧(ρ↦e₂) → ⟦B₁,ρ↦e₁,B₂⟧` | — |
-| `over`  | `Step.over`  | `⟦B₁,τ↦e₁,B₂⟧(τ↦e₂) → ⊥` | `τ≠ρ` (attached slot) |
+| `over`  | `Step.over`  | `⟦B₁,τ↦e₁,B₂⟧(τ↦e₂) → ⊥` | `τ≠ρ` (attached attribute) |
 | `stop`  | `Step.stop`  | `⟦B⟧.τ → ⊥` | `τ∉B` ∧ `φ∉B` ∧ `λ∉B` |
-| `null`  | `Step.null`  | `⟦B₁,τ↦∅,B₂⟧.τ → ⊥` | — (void slot) |
-| `miss`  | `Step.miss`  | `⟦B⟧(τ↦e) → ⊥` | `τ∉B` ∧ `τ` not positional `αᵢ` |
+| `null`  | `Step.null`  | `⟦B₁,τ↦∅,B₂⟧.τ → ⊥` | — (void attribute) |
+| `miss`  | `Step.miss`  | `⟦B⟧(τ↦e) → ⊥` | `τ∉B` ∧ `τ` is not positional |
 | `dl`    | `Step.dl`    | `⟦B⟧ → ⊥` | `λ∈B` ∧ `Δ∈B` |
 | `dd`    | `Step.dd`    | `⊥.τ → ⊥` | — |
-| `dc`, `dca` | `Step.dc` | `⊥(τ↦e) → ⊥`, `⊥(αᵢ↦e) → ⊥` | — (one Lean rule covers both sorts) |
+| `dc`, `dca` | `Step.dc` | `⊥(τ↦e) → ⊥`, `⊥(αᵢ↦e) → ⊥` | — (one Lean rule covers both) |
 
-(†) **Positional rules count the *domain*.**
-phino's `domain` excludes the `Δ`/`λ` assets (phino #749)
-  and the parent `ρ` too,
-  so `ordinal bs i` (`Attributes.lean`) skips both:
-  in `⟦λ⤍Fn, x↦∅, ρ↦∅⟧` the ordinal of `x` is `0` and there is no ordinal `1`.
-This is the paper's Def. Ordinal / Def. Domain.
-The three positional rules partition every ordinal,
-  so a positional application on a formation always has a redex.
+(†) **Positions skip the assets and the parent.**
+When counting positions, `phino` skips the assets `λ` and `Δ` (phino #749)
+  and the parent `ρ`, and so does `ordinal` in `Attributes.lean`.
+In `⟦λ⤍Fn, x↦∅, ρ↦∅⟧`, `x` is at position `0`,
+  and there is no position `1`.
+This follows the paper's Def. Ordinal and Def. Domain.
+The three positional rules `alpha`, `overa`, and `amiss`
+  cover every possible position,
+  so one of them always applies to a positional argument of a formation.
 
-Plus the four congruence constructors `Step.congDispatch`, `Step.congAppFn`,
-  `Step.congAppArg`, `Step.congForm`
-  — covering every recursive `Term` position
-  (dispatch subject, application subject, application argument,
-  and a formation binding's value),
-  so reduction may occur *anywhere*,
-  matching the paper (`operators.tex`: "rules may be applied in any order").
-`Step.congForm` uses the paper's `⟦B₁,τ↦e,B₂⟧` splitting.
+Four more rules, `Step.congDispatch`, `Step.congAppFn`, `Step.congAppArg`,
+  and `Step.congForm`, let any rule fire *inside* a term:
+  in the object of a dispatch, in either side of an application,
+  or in the value of a formation's binding.
+This matches the paper (`operators.tex`),
+  which says "rules may be applied in any order".
 
-The root rules are mutually exclusive on a given redex,
-  with the noted exception:
+At the top of a term, at most one rule applies, with one exception:
 
-* dispatch `⟦B⟧.τ` is split by `dot` (τ attached) / `null` (τ void)
-    / `stop` (τ absent, φ,λ absent); `⊥.τ` is `dd`.
-  A dispatch of an absent `τ` on a formation holding `φ` or `λ` is normal
-    (phino dropped its `phi` rule), as are terms like `Φ.τ` and `ξ.τ`
-    — this is a partition of *reducible* dispatch redexes, not of all terms.
-* application `⟦B⟧(τ↦e)` by a non-positional `τ` is split
-    by `stay` (τ=ρ attached) / `over` (τ≠ρ attached)
-    / `copy` (τ void, argument `ξ`-free and normal) / `miss` (τ absent);
-    by a positional `αᵢ` it is split by `alpha` / `overa` / `amiss`
-    on `ordinal(B, i)`; `⊥(…)` is `dc`.
-* **Exception:** `dl` overlaps every rule
+* On a dispatch `⟦B⟧.τ`, the rule depends on attribute `τ`:
+    `dot` if it is attached, `null` if it is void,
+    and `stop` if it is missing and `B` holds neither `φ` nor `λ`.
+  On `⊥.τ`, `dd` applies.
+  A dispatch of a missing attribute on a formation holding `φ` or `λ`
+    is already normal, because `phino` dropped its `phi` rule,
+    and so are terms like `Φ.τ` and `ξ.τ`.
+* On an application `⟦B⟧(τ↦e)` with a named `τ`,
+    the rule depends on attribute `τ`:
+    `stay` if it is `ρ` and attached,
+    `over` if it is another attached name,
+    `copy` if it is void and `e` is normal and has no `ξ`,
+    and `miss` if it is missing.
+  With a positional `αᵢ`, the rule is `alpha`, `overa`, or `amiss`,
+    depending on `ordinal(B, i)`.
+  On `⊥(…)`, `dc` applies.
+* **The exception:** `dl` competes with every other rule
     on a formation holding both `λ` and `Δ`.
-  Each such fork joins at `⊥`, except `dot`,
-    which would carry the formation into `ρ` and leave a stuck `…(ρ↦⊥)`;
-    phino 0.0.138 therefore guards `dot` against it (phino #1395),
-    and so does `Step.dot`.
+  Each such conflict still ends at `⊥`, except with `dot`,
+    which would move the formation into a `ρ` binding
+    and leave a stuck `…(ρ↦⊥)`.
+  That is why `phino` 0.0.138 forbids `dot` on such a formation
+    (phino #1395), and `Step.dot` does too.
 
-## How the model relates to the paper
+## Differences from the paper
 
-We match the **current** paper,
-  whose Fig. 4 is generated from current phino (`phino explain --normalize`).
-The items below record (a) where *older/published* forms differed,
-  (b) scoping choices for the confluence theorem,
-  and (c) standing assumptions — not gaps against the current paper.
+The model follows the **current** paper,
+  whose Fig. 4 is generated by current `phino` (`phino explain --normalize`).
+The items below record where *older* published versions differed,
+  which choices limit the theorem's scope,
+  and which assumptions it makes.
+None of them is a gap against the current paper.
 
-1. **`over` requires an *attached* `τ`.**
-   The current Fig. 4 and our `over` both use
-     the disjoint attached-slot form `⟦B₁,τ↦e₁,B₂⟧(τ↦e₂)`.
-   A *naive* reading of the membership predicate `τ∈b`
-     (defined in Def. 4.9, Formation — it holds for void keys too)
-     would license a looser `over` overlapping `copy` on a void slot
-     (object vs `⊥`, which never join);
-     the published arXiv v9 PDF, built with an older phino,
-     rendered exactly that looser form.
-   We follow the current, disjoint form.
-2. **`dot`/`copy` are `nf`-guarded.**
-   They fire only when the relevant sub-expression is already normal.
-   This forces an inner-first order, makes each rule single-path,
-     and removes the `dot`↔`copy` ordering ambiguity that blocked the old proof.
-   It also makes `⟶` a *conditional* relation with non-monotone guards
-     — the main proof subtlety.
-3. **Small-step `copy` (not big-step).**
-   The current paper's `copy` is already
-     the small-step `nf`-guarded form we use.
-   Older forms (arXiv v9) had a big-step `Rcopy`
-     that normalizes its argument to `n` inside the rule (`C(e⊳eς) ⟶∗ n`),
-     presupposing uniqueness of normal forms (= confluence).
-   We follow the current form, avoiding the circularity;
-     the superseded big-step form is not modelled.
-4. **`λ`/`Δ` atoms are outside `⟶`.**
-   Only `dl` looks at them, to collapse a formation holding both to `⊥`.
-   Their reduction is the paper's *separate* **Morphing**
-     (`fig:morphing` — `Mlambda` calls a host atom `f` by value)
-     and **Dataization** (`fig:dataization`) partial functions:
-     stateful, side-effecting, host-dependent
-     — *functions*, not a term-rewriting relation,
-     so the relevant property there is determinism, not confluence.
-   `λ`/`Δ` are represented as **inert atoms**
-     (`Binding.lambda`/`Binding.delta`) that never fire.
-   This is a permanent scope boundary set by the paper's own structure,
-     not unfinished work,
-     and it is why the paper's Appendix-A examples are validated
-     through `difftest` (against a merged `runtime.phi`)
-     rather than re-encoded in Lean.
-5. **Every rule `phino rewrite` applies is in `Step`/`Par`.**
-   `dot`'s `ρ`-introduction (which makes the system non-terminating)
-     landed with the `nf`-guard and `contextualize`
-     (receiver = the dispatched formation, so no `scope`);
-     `copy` and the positional `alpha` followed.
-   Issue #73 brought `Step` to phino 0.0.138:
-     `phi` is gone, `overa`, `amiss` and `dl` are new,
-     `dot` contextualizes against `⟦B₁, B₂⟧`, and `copy` accepts `⊥`.
-6. **Unique-key well-formedness (Def. 4.8).**
-   Formations are assumed to have unique attribute keys;
-     under that invariant our first-match `lookup`
-     coincides with phino's any-position match.
-   It is carried as the `Nodup` clause of `WF`.
-7. **`copy`'s guards are `ξFree e₁` ∧ `nf e₁`.**
-   `Step.copy` is the local slot-fill `⟦B₁,τ↦∅,B₂⟧(τ↦e₁) → ⟦B₁,τ↦e₁,B₂⟧`
-     — **no `scope`, no `contextualize`.**
-   phino's printed figure renders `copy` with `nf(e₁)` only
-     (its renderer strips the `ξ` condition),
-     *but phino's engine enforces `ξ`-freeness*;
-     and under `ξ`-freeness, `contextualize(e₁, scope) = e₁` is **proved**
-     (`contextualize_eq_self`, `Parallel.lean`, `[propext]`),
-     so the figure's `scope`/`contextualize` are operationally vacuous
-     and dropping them is exact, not a weakening.
-   Keeping `ξ`-freeness also
-     (a) keeps `copy` a *local* rule needing no context-dependent `scope`,
-     (b) puts `copy` inside the de-risked fragment,
-     and (c) makes `difftest` valid
-     (the `ξ`-dropped `copy` diverges on `⟦x↦∅⟧(x↦ξ)` via `scope` re-injection).
-   The author is correcting the paper figure and phino to this form,
-     so this is a 1:1 match.
-   The single `nf` is `ξFree`-aware in its void-application case,
-     exactly as phino's one `isNF` is.
-8. **Formation keys are non-positional attributes only.**
-   The paper grammar (`syntax.tex`) puts positional `αᵢ`
-     solely in application-argument pairs;
-     a formation binding's key is an `Attribute` ∈ {`φ`, `ρ`, label}.
-   Our `Binding` accepts any `Attr` (including `Attr.alpha`),
-     so a malformed formation with an `αᵢ` key is representable;
-     the `legalKey` clause of `WF` excludes it.
-9. **Every formation carries an implicit parent `ρ`.**
-   This is modelled, not a deviation
-     — see [The implicit parent](#the-implicit-parent-ρ).
-10. **`dotg` is not modelled.**
-    phino's `dotg` fires instead of `dot`
-      when the dispatched formation is the whole program
-      (`e-match` against the universe), and then puts `Φ` in the result's `ρ`.
-    `Step` models `phino rewrite` on a bare expression,
-      where no formation is the universe,
+1. **`over` needs an *attached* attribute.**
+   The current Fig. 4 and our `over` both require `τ` to have a value,
+     as in `⟦B₁,τ↦e₁,B₂⟧(τ↦e₂)`.
+   Def. 4.9 (Formation) defines membership `τ∈b` to include void attributes,
+     so a careless reading would let `over` fire on a void attribute too.
+   There it would compete with `copy`,
+     and their results, an object and `⊥`, could never meet.
+   The published arXiv v9 PDF, built with an older `phino`,
+     printed exactly that looser form.
+   We follow the current form, where the two rules never compete.
+2. **`dot` and `copy` wait for normal forms.**
+   They fire only when the value they move is already normal.
+   This forces inner parts to simplify first,
+     gives each rule a single way to fire,
+     and removes the question of whether `dot` or `copy` goes first,
+     which blocked the old proof.
+   It also means that whether a rule may fire can change
+     as other parts of the term simplify,
+     which is the main difficulty of the proof.
+3. **`copy` takes one small step.**
+   The current paper's `copy` is the one-step, normal-form-guarded rule we use.
+   An older version (arXiv v9) had a rule `Rcopy`
+     that fully simplified its argument inside one rule (`C(e⊳eς) ⟶∗ n`).
+   That rule assumed normal forms are unique, which is confluence itself,
+     so a proof based on it would be circular.
+   The old form is not modelled.
+4. **Assets `λ` and `Δ` are not rewritten.**
+   Only `dl` looks at them, turning a formation that holds both into `⊥`.
+   The paper evaluates them separately, in its **Morphing**
+     (`fig:morphing`, where `Mlambda` calls native code)
+     and **Dataization** (`fig:dataization`) functions.
+   Those functions have state and side effects
+     and depend on the host machine,
+     so the question there is whether they are deterministic,
+     not whether they are confluent.
+   Here `λ` and `Δ` are inert values
+     (`Binding.lambda` and `Binding.delta`) that never fire.
+   This boundary comes from the paper's own structure;
+     it is not unfinished work.
+   It is also why the paper's Appendix-A examples are checked with `difftest`
+     (against a merged `runtime.phi`) instead of being rewritten in Lean.
+5. **Every rule `phino rewrite` applies is modelled.**
+   The rule `dot` puts the dispatched formation into the result's `ρ`,
+     which is what lets some terms rewrite forever.
+   It came first, with its normal-form guard and contextualization;
+     `copy` and `alpha` followed.
+   Issue #73 updated the rules to `phino` 0.0.138:
+     `phi` is gone;
+     `overa`, `amiss`, and `dl` are new;
+     `dot` contextualizes against `⟦B₁, B₂⟧`;
+     and `copy` accepts `⊥`.
+6. **Attribute names are unique (Def. 4.8).**
+   With unique names, our lookup, which takes the first match,
+     agrees with `phino`'s lookup, which accepts a match at any position.
+   The `Nodup` part of `WF` states this assumption.
+7. **`copy` requires its argument to be normal and free of `ξ`.**
+   `Step.copy` fills a void attribute,
+     `⟦B₁,τ↦∅,B₂⟧(τ↦e₁) → ⟦B₁,τ↦e₁,B₂⟧`,
+     with no contextualization.
+   `phino`'s printed figure shows only the normal-form condition,
+     because its printer hides the `ξ` condition,
+     but `phino`'s engine enforces it.
+   When `e₁` has no `ξ`, contextualization leaves it unchanged,
+     and Lean proves this (`contextualize_eq_self` in `Parallel.lean`).
+   So leaving contextualization out of `copy` changes nothing.
+   Requiring no `ξ` also
+     (a) keeps `copy` independent of the surrounding term,
+     (b) keeps `copy` inside the part of the calculus
+     tested before the proof began,
+     and (c) makes `difftest` meaningful:
+     without the condition, `⟦x↦∅⟧(x↦ξ)` would give a different result.
+   The paper's author is updating the paper's figure and `phino` to this form,
+     so the model and the paper match exactly.
+   The single normal-form test `nf` includes the `ξ` condition
+     for void applications, just as `phino`'s `isNF` does.
+8. **A formation's attributes are never positional.**
+   The paper's grammar (`syntax.tex`) uses positional names `αᵢ`
+     only in application arguments;
+     a formation's attributes are `φ`, `ρ`, or labels.
+   The Lean `Binding` accepts any name, including `Attr.alpha`,
+     so it can represent a malformed formation with a positional attribute.
+   The `legalKey` part of `WF` rules such formations out.
+9. **Every formation has a parent attribute `ρ`.**
+   This is modelled, not a difference;
+     see [The parent attribute][parent].
+10. **The rule `dotg` is not modelled.**
+    `phino` uses `dotg` instead of `dot`
+      when the dispatched formation is the whole program,
+      and it puts `Φ` into the result's `ρ`.
+    The model follows `phino rewrite` on a single expression,
+      which is never the whole program,
       so `dot` always fires and `dotg` never does.
 
-A further, intentional looseness of the encoding:
-  `Step.alpha`/`Step.copy` carry no per-rule `Nodup`/`legalKey` premise
-  at the constructor,
-  relying on the headline's `WF` to exclude malformed redexes globally
-  (matching phino, which checks no such premise).
-Likewise `WF`'s `Nodup` is over `domain` (assets excluded),
-  so it does not forbid duplicate `λ`/`Δ` assets
-  — fine while assets are inert,
-  a latent looseness to tighten only if asset reduction is modelled.
+Two more loose spots in the model are intentional.
+`Step.alpha` and `Step.copy` do not themselves require well-formedness;
+  the theorem's `WF` condition excludes malformed terms for all rules at once,
+  and `phino` does not check this per rule either.
+Also, `Nodup` ignores the assets,
+  so a formation may hold two `λ` or two `Δ` bindings.
+That is harmless while assets never fire,
+  and would need tightening only if they ever do.
 
-## The implicit parent (`ρ`)
+## The parent attribute
 
-The paper (`foundations.tex`, Def. Parent) and phino treat
-  **every formation as carrying a parent `ρ`, void until set**
-  (a `this`-pointer, void until a method is called).
-The paper *grammar* (`syntax.tex`) does **not** mandate `ρ`
-  — a formation may be written `⟦⟧` —
-  so the parent is supplied **semantically**:
-  phino appends a `ρ↦∅` **at the end** of every formation that lacks one
-  (`⟦x↦Φ⟧` ⟶ `⟦x↦Φ, ρ↦∅⟧`, recursively;
-  an explicit `ρ` is kept in place, never duplicated).
-Omitting it would diverge from phino *and* the paper three ways:
-  rule choice (`⟦⟧(ρ↦Φ)` is `copy→⟦ρ↦Φ⟧` for phino but `miss→⊥` without `ρ`),
-  `alpha` indexing
-  (its positional index counts the trailing `ρ`: `⟦x↦∅⟧(~1↦Φ) ⟶ ⟦x↦∅, ρ↦Φ⟧`),
-  and normal-form shape (every formation NF carries `ρ↦∅`).
+The paper (`foundations.tex`, Def. Parent) and `phino`
+  treat **every formation as having a parent attribute `ρ`**,
+  void until something sets it,
+  much like `this` in other languages.
+The paper's grammar (`syntax.tex`) does not require `ρ`,
+  so `⟦⟧` is a valid formation.
+Instead, `phino` adds `ρ↦∅` at the end of every formation that lacks one,
+  at every depth:
+  `⟦x↦Φ⟧` becomes `⟦x↦Φ, ρ↦∅⟧`.
+An explicit `ρ` stays where it is and is never duplicated.
 
-We model it as a canonicalisation in `Canonical.lean`:
+Without this, the model would disagree with `phino` and the paper
+  in three ways:
 
-* `canon` / `canonB` — the injection:
-    recursively append `ρ↦∅` to every `ρ`-less formation
-    (explicit `ρ` kept in place), exactly phino's behaviour.
-* `Canonical` / `CanonicalB` — the invariant "every formation carries a `ρ`".
-* `canon_canonical` (`[propext]`) — `canon` always establishes it;
-    `wf_canon` (`[propext, Quot.sound]`) — `canon` preserves `WF`
-    (it adds `ρ` only when absent, so no duplicate key, and `ρ` is legal);
-    **`step_canonical`** (`[propext]`) — **reduction preserves `Canonical`**,
-    so phino's parent-everywhere term space is *closed* under our `Step`.
+* A different rule could fire:
+    `phino` rewrites `⟦⟧(ρ↦Φ)` by `copy` to `⟦ρ↦Φ⟧`,
+    but without `ρ` the rule `miss` gives `⊥`.
+* Positional arguments would land elsewhere,
+    because the added `ρ` counts as a position for `alpha`:
+    `⟦x↦∅⟧(~1↦Φ) ⟶ ⟦x↦∅, ρ↦Φ⟧`,
+    where `~1` is `phino`'s spelling of `α₁`.
+* Normal forms would differ,
+    because every formation in a `phino` normal form carries `ρ↦∅`.
 
-Because canonical terms are `WF`,
-  the headline `confluence` already governs them,
-  so the result is confluence of **phino's actual calculus**,
-  not a `ρ`-free fragment.
-This was never a threat to confluence
-  (the implicit `ρ` is a representational default, not a rule;
-  routing `ρ`-application to `copy` removes the `miss`-on-`ρ` case
-  and adds no critical pair)
-  — it was a term-level *fidelity* obligation,
-  discharged both formally (the three lemmas)
-  and behaviourally
-  (`difftest`, including the cases that diverged before `canon`:
-  `⟦⟧(ρ↦Φ)` and bare value formations).
+`Canonical.lean` models the parent attribute:
+
+* `canon` and `canonB` add `ρ↦∅` to every formation without `ρ`,
+    at every depth, exactly as `phino` does.
+* `Canonical` and `CanonicalB` state that every formation has a `ρ`.
+* `canon_canonical` proves that `canon` always produces such a term.
+* `wf_canon` proves that `canon` keeps a term well-formed,
+    because it adds `ρ` only where none exists.
+* `step_canonical` proves that rewriting keeps every formation's `ρ`,
+    so the terms `phino` works with stay that way under `⟶`.
+
+Because such terms are well-formed, the main theorem covers them,
+  so it is a theorem about **the calculus `phino` actually implements**,
+  not a version without `ρ`.
+The added `ρ` never threatened confluence:
+  it is a default value, not a rule,
+  and it only moves `ρ`-applications from `miss` to `copy`,
+  which creates no new conflict between rules.
+It was a question of faithfulness,
+  settled by the three lemmas above
+  and by `difftest`, which now matches `phino`
+  even on the cases that differed before `canon` existed,
+  such as `⟦⟧(ρ↦Φ)` and plain value formations.
 
 ## Design decisions
 
-The artifacts relate as follows.
-The paper ([`objectionary/calculus-paper`][paper]) is the informal spec;
-  **its Fig. 4 rules and Appendix-A example reductions
-  are auto-generated by `phino`**
-  (`\iexec{phino explain --normalize}`, `phino rewrite`), checked in its CI.
-[`phino`][phino] is the **authoritative, executable** rule spec,
+The paper ([`objectionary/calculus-paper`][paper]) defines the calculus
+  in ordinary mathematical prose.
+Its Fig. 4 rules and Appendix-A example reductions
+  **are generated by `phino`**
+  (`\iexec{phino explain --normalize}` and `phino rewrite`),
+  and its CI checks them.
+[`phino`][phino] is therefore the authoritative, executable definition,
   in `resources/normalize/*.yaml`.
-The retired Minimal/Extended development in this repository's history
-  was reused only as a **technique template**
-  (the Takahashi parallel-reduction skeleton and the `Record` design).
-Because the paper's rules and examples are generated *from phino*,
-  "match the paper" reduces to "match phino", which is executable and testable.
-Two phino bugs surfaced and were fixed during this work,
-  the `alpha`-ordinal asset counting (phino #749)
-  and the duplicate-`ρ` printer (phino #748);
-  our model already matched the paper-faithful side of both.
+The earlier proof in this repository's history
+  served only as a model for the proof technique
+  (the parallel-reduction skeleton and the `Record` design).
+Because the paper's rules and examples come from `phino`,
+  matching the paper means matching `phino`,
+  and running both can test that.
+This work found two `phino` bugs, both since fixed:
+  it counted assets as positions (phino #749),
+  and it printed a duplicate `ρ` (phino #748).
+In both cases the model already did what the paper says.
 
-| Decision | Rationale |
+| Decision | Reason |
 |---|---|
-| **Source of truth = phino + calculus-paper LaTeX source** (never the arXiv PDF) | The PDF is a stale build; the repo source regenerates rules from current phino. Paper-first, phino as its executable interpretation. |
-| **Prove via parallel reduction → diamond → `Relation.church_rosser`** | The system is **non-terminating**, so Newman's lemma is unavailable. The Tait–Martin-Löf/Takahashi method needs no termination. |
-| **Build on mathlib's `Prop`-valued `Relation` API** | Idiomatic, least code; `church_rosser` already proves "diamond ⇒ confluent-closure". |
-| **Named attributes** (`φ, ρ, αᵢ, label`) | Matches the paper and phino; makes contextualization `C` and the `αᵢ` ordinals natural. (De Bruijn would obscure named-attribute semantics.) |
-| **`nf` defined structurally** (like phino's `isNF`), not as "no `Step`" | Avoids an import cycle and the big-step circularity; a *local* property, well-defined regardless of confluence. A single `nf` encodes every rule's redex, including `copy`'s `ξ`-free guard in its void-application case. |
-| **Executable `reduceStep` separate from relational `Step`, linked by `reduce_sound`** | Lets the demo *run* and print traces, while a proof certifies the printed steps are genuine `Step`s — a tighter link than phino has (its Haskell engine is not proven against its YAML). |
-| **`copy` is `ξ`-free and local** (no `scope`/`contextualize`) | Dropping `scope`/`contextualize` is exact, not a weakening, and keeps `copy` inside the de-risked fragment (deviation 7). |
-| **Headline is `WF`-scoped** | `legalKey` is necessary for confluence; `Nodup` is faithfulness. Both re-impose the paper's own grammar (see [Why `WF`-scoped](#why-wf-scoped)). |
+| **Use `phino` and the paper's LaTeX source as the reference**, never the arXiv PDF | The PDF is an old build; the LaTeX source regenerates its rules from current `phino`. |
+| **Prove confluence through parallel reduction** | Some terms rewrite forever, so Newman's lemma cannot be used; the parallel-reduction method (Tait, Martin-Löf, Takahashi) works either way. |
+| **Build on mathlib's `Relation` library** | It already proves that the diamond property implies confluence, so less new code is needed. |
+| **Keep attribute names** (`φ`, `ρ`, `αᵢ`, labels) | They match the paper and `phino` and make contextualization and positions natural; numbering variables instead (de Bruijn indices) would hide what the names mean. |
+| **Define "normal form" directly, like `phino`'s `isNF`**, not as "no step possible" | This avoids a circular dependency between Lean files and the circularity of the old big-step `copy`; it depends only on the term itself, so it makes sense before confluence is known. One definition covers every rule, including `copy`'s `ξ` condition. |
+| **Keep a runnable reducer next to the rules, linked by `reduce_sound`** | The demo can run and print its steps, and a proof guarantees each printed step follows the rules — a closer link than `phino` has, since its Haskell engine is not proven against its YAML rules. |
+| **Leave contextualization out of `copy`** | With no `ξ` in the argument, it changes nothing, and it keeps `copy` in the tested part of the calculus (difference 7). |
+| **State the theorem for well-formed terms only** | `legalKey` is needed for confluence; `Nodup` keeps the model faithful. Both are the paper's own rules (see [Why only well-formed terms][wf]). |
 
 ## Proof strategy
 
-1. Define single-step `Step` (`⟶`):
-     phino's rules + the four congruences, phino-faithful.
-2. Define **parallel reduction** `Par`
-     (contracts any set of redexes at once; congruence built in)
-     and a total **complete development** `devel`.
-3. Prove `Step ⊆ Par ⊆ Step∗`,
-     so `ReflTransGen Step = ReflTransGen Par` (`redMany_eq`).
-4. Prove the **Takahashi triangle** `WF e → Par e u → Par u (devel e)`,
-     giving the diamond.
-5. `Abstract.Diamond.confluent` (via `church_rosser`)
-     turns the diamond into confluence;
-     transport to `Step` (the closures coincide).
-6. Define `≡` as convertibility;
-     confluence makes it an `Equivalence` on `{e // WF e}`.
+The proof goes in six steps.
 
-The hardest parts, all discharged:
-  the **"`C` commutes with reduction"** lemma (`par_contextualize_ctx`),
-  the **non-monotone `nf` guards** threaded through parallel reduction,
-  and the **`ρ`-feedback** of `dot` (the source of non-termination).
+1. Define one rewriting step `⟶` (`Step`):
+     the `phino` rules plus the four rules that let them fire inside a term.
+2. Define *parallel reduction* `Par`,
+     which rewrites any number of redexes in one go,
+     and the *complete development* `devel e`,
+     which rewrites all the redexes `e` has at once.
+3. Prove that one step is a parallel step,
+     and a parallel step is a sequence of ordinary steps,
+     so many steps of either kind reach the same terms (`redMany_eq`).
+4. Prove the *Takahashi triangle*:
+     for a well-formed `e`, if `e` reaches `u` in one parallel step,
+     then `u` reaches `devel e` in one parallel step
+     (`WF e → Par e u → Par u (devel e)`).
+   So any two parallel steps from `e` meet again at `devel e`;
+     this is the *diamond property*.
+5. A general theorem (`Abstract.Diamond.confluent`,
+     through mathlib's `church_rosser`)
+     turns the diamond property into confluence,
+     and step 3 carries it over to `⟶`.
+6. Define equality of terms (`≡`)
+     as "the terms can be rewritten to a common term";
+     confluence makes it a proper equivalence on well-formed terms.
 
-Three structural decisions carry the diamond layer;
-  each load-bearing shape was validated `[propext]`-clean
-  against Lean `v4.30.0` + mathlib.
+The hardest parts were proving that contextualization and rewriting
+  can happen in either order (`par_contextualize_ctx`),
+  handling rules whose permission to fire changes
+  as other parts simplify,
+  and handling `dot`'s `ρ`, which lets terms rewrite forever.
 
-1. **Well-formedness as a `Prop` predicate.**
-   Mutual `WF`/`WFB` (`WellFormed.lean`, importing only `Syntax`)
-     is carried as a *hypothesis* on the diamond and the headline
-     — **not** an indexed `Binding` type
-     (which would force re-deriving `Syntax`/`Step`/`Attributes`).
-   Its preservation engine (`domain_append`/`domain_set`,
-     mirroring `lookup_set_*`) rests on a single fact:
-     reducing a binding's *value* never changes the `domain`,
-     so `WF` survives reduction (`WF.step`/`WF.par`, `Preservation.lean`).
-2. **Parallel reduction `Par`** = mutual `Par`/`ParB`
-     with a **bespoke cons-structured `ParB`**
-     (the `List.Forall₂ ParBind` route is kernel-rejected
-     as a nested inductive carrying `Par`).
-   The append-index lives only on `Step.congForm`,
-     crossed once by `parB_set`.
-   Mutual induction goes through `induction h using Par.rec (motive_2 := …)`
-     with `motive_1` inferred.
-   The cons-lift `redMany_form_cons` is proved
-     by `induction … generalizing` + `form_step_inv`
-     (*not* `ReflTransGen.lift` — unsound, because `stay` turns app→form).
-3. **The Takahashi guard-on-developed-subterm variant**
-     (this, *not* Huet single-step on `Step`).
-   `dot`'s result places the developed formation `⟦bs'⟧`
-     in *both* the `contextualize` receiver and the `ρ`-argument,
-     so reduction is **duplicating**
-     and a `dot`-vs-sibling fork needs more than one step on both sides,
-     breaking Huet.
-   One `Par` step contracts all copies at once,
-     so the triangle needs no non-duplication argument.
-   The parallel-step constructors check `nf` on the *developed* child `e₁'`,
-     not the original `e₁`
-     (e.g. `Par.dot` reads the guard off `develB bs` via `lookup`,
-     keeping `devel` structural)
-     — this restores a total `devel` and the triangle.
+### Three design choices inside the proof
 
-**WF-relativization.**
-`church_rosser` / `Abstract.Diamond.confluent` demand
-  an *unconditional* strip `∀ a b c, r a b → r a c → ∃ d, …`.
-A `WF`-hypothesised strip does not discharge it for the full calculus
-  (off-`WF`, the `alpha`-vs-`over` diamond genuinely fails).
-The fix: relativize to `ParWF a b := WF a ∧ Par a b`,
-  prove `WF.par` (so `ParWF` stays `WF`-rooted),
-  whence the strip for `ParWF` holds *unconditionally*
-  (it is vacuous when `¬WF a`);
-  feed that to the generic diamond to get `Confluent (ReflTransGen ParWF)`,
-  then bridge back to `WF`-rooted `ReflTransGen Step` via `redMany_eq`.
-`Diamond ParWF` needs `WF` of the *source* only,
-  so no new `Abstract` lemma is required (`Diamond.lean`).
+Each of these was checked against Lean `v4.30.0` and mathlib
+  before the full proof was written.
 
-Before investing in the Lean diamond, the central open question
-  — *does the full calculus even have the diamond,
-  given the non-monotone `nf` guards?* —
-  was stressed empirically and by structural analysis.
-The empirical probe was a **fixed corpus of 7 hand-crafted programs
-  plus the paper's Appendix-A examples**,
-  each run under rule-order `--shuffle`
-  and an off-strategy single-rule redex-position check;
-  no divergence was found.
-The analysis concluded confluence holds,
-  for reasons the mechanized proof then made rigorous:
+1. **Well-formedness is a condition, not a type.**
+   `WF` and `WFB` (`WellFormed.lean`, which depends only on `Syntax`)
+     are a condition assumed by the diamond lemma and the main theorem.
+   Building it into the type of bindings instead
+     would force rewriting `Syntax`, `Step`, and `Attributes`.
+   The proof that rewriting keeps terms well-formed
+     (`WF.step` and `WF.par` in `Preservation.lean`)
+     rests on one fact:
+     rewriting a binding's value never changes the attribute names
+     (`domain_append`, `domain_set`).
+2. **Parallel reduction on binding lists is defined by hand.**
+   `Par` and `ParB` are defined together,
+     and `ParB` walks a binding list one element at a time.
+   Lean rejects the shortcut through `List.Forall₂`,
+     because it does not accept that kind of nested definition here.
+   Only `Step.congForm` splits a list into
+     "before, this binding, after",
+     and `parB_set` handles that split once.
+   Induction over both definitions uses `Par.rec` with `motive_2`.
+   The lemma `redMany_form_cons` is proved directly
+     (by `induction … generalizing` and `form_step_inv`),
+     because the general `ReflTransGen.lift` is wrong here:
+     `stay` turns an application into a formation.
+3. **Rule guards are checked on the already-rewritten part.**
+   `dot` places the formation in two spots of its result,
+     so a conflict between `dot` and a rewrite of a neighbouring binding
+     can take more than one step on each side to resolve.
+   That rules out Huet's simpler method,
+     which needs such conflicts to resolve in one step.
+   A parallel step rewrites all copies at once, so it has no such problem.
+   The parallel versions of the guarded rules test "is normal"
+     on the rewritten value `e₁'`, not on the original `e₁`;
+     for example, `Par.dot` reads it from `develB bs` through `lookup`.
+   That keeps `devel` simple and makes the triangle hold.
 
-* **No genuine root critical pairs.**
-  The two LHS-overlap groups are mutually exclusive
-    by guards along root-stable axes
-    — dispatch `⟦B⟧.τ` {dot, null, stop, dd}
-    by slot state (attached/void/absent) × `φ`-membership × subject head;
-    formation application `⟦B⟧(τ↦e)`
-    {copy, alpha, overa, amiss, over, stay, miss, dc}
-    by slot state × name kind
-    (positional `αᵢ` → alpha/overa/amiss by the state at its domain ordinal,
-    named → copy/over/miss, `ρ` → stay) × subject head.
-  The one overlap added since, `dl`, joins at `⊥`
-    because `dot` is guarded (phino #1395).
-  This rests on three facts:
-    duplicate keys are barred (a slot is in exactly one state),
-    `α`-names cannot be formation slots,
-    and `index()` is defined only for `αᵢ` — exactly the `WF` invariants.
-* **All non-root critical pairs join.**
-  The *duplication* diamond
-    (`dot` relocates and contextualizes a redex-bearing sibling
-    into the `ρ`-context
-    — reducing before or after gives the identical normal form)
-    and the *discard* diamond
-    (over/null/stop/miss/dc/dd erase to the absorbing `⊥`
-    regardless of inner activity
-    — which is why they need no `nf` guard,
-    and why Church–Rosser holds *despite* non-termination).
-* **The non-monotone guard is real but benign.**
-  Reducing inside `e₁` can expose a fresh outer `dot`/`copy` redex,
-    so the *naive* maximal development and one-step triangle break.
-  But the non-monotonicity *serializes*
-    (no competing root redex exists while `¬nf(e₁)`)
-    and is monotone in the *destruction* direction
-    (no present guarded redex is destroyed by a sibling contraction)
-    — which is precisely what the guard-on-developed-subterm variant exploits.
+**Limiting the diamond to well-formed terms.**
+The general theorem (`church_rosser`, `Abstract.Diamond.confluent`)
+  needs the diamond property for *all* terms,
+  but it fails for malformed ones,
+  where `alpha` and `over` conflict.
+So the proof uses `ParWF a b := WF a ∧ Par a b`,
+  a parallel step from a well-formed term.
+Since rewriting keeps terms well-formed (`WF.par`),
+  `ParWF` has the diamond property for all terms,
+  trivially so when the start is not well-formed.
+The general theorem then gives confluence of `ParWF`,
+  and `redMany_eq` carries it back to `⟶` on well-formed terms.
+Only the starting term must be well-formed,
+  so no new general lemma was needed (`Diamond.lean`).
 
-Routes considered and rejected:
-  Huet single-step strong confluence (broken by `dot`'s duplication),
-  orthogonality (non-left-linear LHS repeat `τ`),
-  Hindley–Rosen (no mathlib commutation API),
-  decreasing diagrams (no Lean port, unneeded).
+### Why confluence was expected to hold
+
+Before the proof was written, the main risk was that rule guards,
+  which change as a term simplifies,
+  might break the diamond property.
+Two checks addressed it.
+
+The first was a test:
+  seven hand-written programs and the paper's Appendix-A examples,
+  each simplified with the rules tried in shuffled order (`--shuffle`)
+  and with single rules fired at unusual positions.
+No run gave a different result.
+
+The second was an analysis, which the proof later made rigorous:
+
+* **Rules never compete at the top of a term.**
+  On a dispatch `⟦B⟧.τ`, the rules `dot`, `null`, `stop`, and `dd`
+    exclude each other,
+    depending on whether `τ` is attached, void, or missing,
+    whether `B` has `φ`, and what the dispatched term is.
+  On an application `⟦B⟧(τ↦e)`, the rules `copy`, `alpha`, `overa`,
+    `amiss`, `over`, `stay`, `miss`, and `dc` exclude each other,
+    depending on the attribute's state, on the kind of name
+    (positional names go to `alpha`, `overa`, or `amiss`,
+    labels to `copy`, `over`, or `miss`, and `ρ` to `stay`),
+    and on what the applied term is.
+  The later rule `dl` competes with others,
+    but always ends at `⊥`, because `dot` is barred there (phino #1395).
+  This relies on the well-formedness conditions:
+    no attribute name repeats, so each attribute has one state,
+    and positional names never name a formation's attribute.
+* **Conflicts deeper inside a term always resolve.**
+  If `dot` copies a part that still has redexes,
+    rewriting that part before or after the copy
+    gives the same normal form.
+  If `over`, `null`, `stop`, `miss`, `dc`, or `dd`
+    throws a part away and yields `⊥`,
+    whatever happened inside that part no longer matters.
+  That is why these rules need no guard,
+    and why confluence holds even though some terms rewrite forever.
+* **Changing guards cause no harm.**
+  Rewriting inside `e₁` can make it normal
+    and so allow a `dot` or `copy` on the outside,
+    which breaks the most naive version of the triangle.
+  But while `e₁` is not normal, no outer rule competes with it,
+    and rewriting a neighbour never disables a rule that could already fire.
+  The third design choice above relies on exactly this.
+
+Other methods were considered and rejected:
+  Huet's one-step method, because `dot` copies terms;
+  orthogonality, because some rules mention the same `τ` twice;
+  Hindley–Rosen, because mathlib has no support for it;
+  and decreasing diagrams,
+  because Lean has no library for them and they are not needed.
 
 ## Faithfulness
 
-Lean's kernel guarantees **soundness** (the proof establishes the statement).
-It does *not* guarantee **adequacy**
-  (the statement and definitions capture φ-calculus)
-  — that gap is irreducible when one side is an informal paper.
-It is shrunk and cross-checked from several independent directions:
+Lean guarantees the proof is **correct**:
+  the theorem follows from the definitions.
+It cannot guarantee the definitions are **faithful**,
+  meaning they describe the φ-calculus the paper means,
+  because the paper is written in prose.
+Several independent checks narrow that gap:
 
-* **Tiny, human-readable trusted surface.**
-  Only `Syntax`, `Step`, `⟶∗`, and the `confluence` statement
-    must be read and endorsed — a few dozen lines.
-* **Rule transcription vs phino.**
-  The fifteen-rule *display* table (`Rules.lean`) is **generated**
-    from pinned phino before every build, so it cannot drift from phino.
-  The *proof relation* `Step` is hand-written
-    (constructors are needed for case analysis)
-    and pinned to phino **behaviorally** by `difftest`.
-* **Differential testing against phino.**
-  `Difftest.lean` + `.github/difftest.sh` normalize each program
+* **A human needs to read only a little.**
+  To trust the result, you need to read only `Syntax`, `Step`,
+    the definition of `⟶∗`, and the statement of `confluence`,
+    a few dozen lines in total.
+* **The printed rules come from `phino`.**
+  The rule table (`Rules.lean`) is generated from the pinned `phino`
+    before every build, so it cannot drift from `phino`.
+  The rules the proof uses, `Step`, are written by hand,
+    because the proof needs to look at them case by case,
+    and `difftest` checks they behave like `phino`.
+* **The results are compared with `phino`.**
+  `Difftest.lean` and `.github/difftest.sh` simplify each test program
     with both `phino rewrite --normalize` and our reducer
-    and assert equality — **26/26**,
-    exercising every modelled rule
-    (including the positional rules' domain-ordinal skip
-    of `Δ`/`λ` assets and `ρ`)
-    on `⊥`-collapse *and* real formation results.
-  This is the same `phino rewrite` mechanism
-    the paper's Appendix A is generated from,
-    so it doubles as reproducing the paper's examples
-    (the subset that needs no `λ`/`Δ` dataization).
-* **`#print axioms` CI gate.**
-  The headline results (`confluence`, `conv_equivalence`, `reduce_sound`,
-    `par_triangle`, `parWF_diamond`, `nf_iff`)
-    are gated to depend only on `propext`/`Quot.sound`
-    — never `sorryAx`, `Classical.choice`, or `native_decide`.
+    and check the results are equal.
+  All 26 programs match.
+  Together they exercise every modelled rule,
+    including how positions skip `λ`, `Δ`, and `ρ`,
+    on programs that end in `⊥` and on programs that end in real objects.
+  The paper's Appendix A is generated with the same `phino rewrite`,
+    so this also reproduces the paper's examples,
+    except those that need `λ` or `Δ` to run.
+* **CI checks the axioms.**
+  The main results (`confluence`, `conv_equivalence`, `reduce_sound`,
+    `par_triangle`, `parWF_diamond`, and `nf_iff`)
+    may depend only on `propext` and `Quot.sound`,
+    never on `sorryAx`, `Classical.choice`, or `native_decide`.
 
-Every arrow in the faithfulness loop is CI-checked or kernel-proved:
+CI or Lean checks every arrow in this chain:
 
 ```
    paper ──(phino explain/rewrite, calculus-paper CI)──▶ phino rules + example reductions
@@ -537,18 +637,19 @@ Every arrow in the faithfulness loop is CI-checked or kernel-proved:
                                                        confluence theorem
 ```
 
-The trusted computing base is exactly:
-  (a) Lean's kernel;
+To trust the result, you must trust exactly three things:
+  (a) Lean's kernel, the small core that checks proofs;
   (b) the definitions and the theorem statement;
-  (c) for the demo and CI, the term printer/parser bridge and phino.
-The proof adds nothing to (a)–(c).
+  and (c), for the demo and CI only,
+  the code that prints and parses terms, and `phino` itself.
+The proof adds nothing to this list.
 
-A gold-standard, optional improvement would generate the Lean `Step` *relation*
-  (not just the display table) from phino's YAML,
-  so the proof object and the paper's figure share a single source.
-Today `Step` is hand-written and pinned to phino behaviorally by `difftest`;
-  generating it would make the pin structural.
-It does not affect the proof's validity.
+An optional improvement would generate `Step` itself from `phino`'s YAML files,
+  not just the printed table,
+  so the proof and the paper's figure would come from one source.
+Today `Step` is written by hand and checked against `phino` by `difftest`.
+Generating it would make the match structural instead of tested.
+It would not change whether the proof is correct.
 
 ## How it fits together
 
@@ -571,36 +672,46 @@ PhiConfluence/
 Makefile   `make` builds and checks everything CI checks, except difftest
 ```
 
-CI runs single-purpose workflows,
-  each on push to `master` and on pull requests, against pinned phino:
+CI runs separate workflows on every push to `master` and every pull request,
+  all against the pinned `phino`:
 
-* **build** — installs elan and runs `lake exe cache get`, then `make`:
-    the generator unit tests (`.github/test_*.py`);
-    `Rules.lean` and `RuleData.lean` generated from the pinned phino
-    (`.github/regen-rules.sh`);
-    `lake build`;
-    then a `sorry`/`admit`/`axiom` source gate
-    **and** a `#print axioms` gate (`.github/axioms.lean`)
-    on the headline results.
-  `gen-rule-data.py`'s fidelity lock fails the build on rule-structure drift.
-* **difftest** — installs the pinned phino binary
-    (`.phino-version`, verified against `.phino-sha256`),
-    then runs `make difftest`;
-    it fails if our reducer disagrees with phino.
-* **phino-latest** — weekly,
-    fails when `.phino-version` lags behind phino's newest release,
-    so a stale pin is reported instead of silently narrowing `difftest`.
+* **build** installs Lean, downloads mathlib (`lake exe cache get`),
+    and runs `make`.
+  That runs the generators' unit tests (`.github/test_*.py`),
+    generates `Rules.lean` and `RuleData.lean`
+    from the pinned `phino` (`.github/regen-rules.sh`),
+    builds the proof (`lake build`),
+    rejects any `sorry`, `admit`, or `axiom` in the source,
+    and checks the main results' axioms (`.github/axioms.lean`).
+  `gen-rule-data.py` also fails the build
+    if the structure of `phino`'s rules changes.
+* **difftest** installs the pinned `phino` binary
+    (named in `.phino-version` and verified against `.phino-sha256`)
+    and runs `make difftest`,
+    which fails if our reducer and `phino` disagree.
+* **phino-latest** runs weekly
+    and fails when `.phino-version` falls behind the newest `phino` release,
+    so an outdated version is reported
+    instead of quietly limiting `difftest`.
 
-The two Lean workflows share a composite action (`.github/actions/setup-lean`)
-  that caches `~/.elan` and `.lake`
-  so Lean and mathlib are not re-downloaded each run.
-The standard objectionary hygiene checks run alongside.
+The two Lean workflows share one setup action (`.github/actions/setup-lean`)
+  that caches `~/.elan` and `.lake`,
+  so Lean and mathlib are not downloaded on every run.
+The usual objectionary checks for style and licensing run alongside.
 
 ## Stack
 
-Lean 4 (`leanprover/lean4:v4.30.0`) and mathlib4 (pinned in `lakefile.toml`),
-  built with Lake.
-Abstract rewriting is built on mathlib's `Prop`-valued `Relation` API.
+The proof uses Lean 4 (`leanprover/lean4:v4.30.0`)
+  and mathlib4 (pinned in `lakefile.toml`),
+  and it builds with Lake, Lean's build tool.
+The general rewriting theory rests on mathlib's `Relation` library.
 
+[EO]: https://github.com/objectionary/eo
+[Lean 4]: https://leanprover.github.io
+[mathlib]: https://github.com/leanprover-community/mathlib4
 [paper]: https://github.com/objectionary/calculus-paper
 [phino]: https://github.com/objectionary/phino
+[strategy]: #proof-strategy
+[differences]: #differences-from-the-paper
+[parent]: #the-parent-attribute
+[wf]: #why-only-well-formed-terms
