@@ -85,8 +85,8 @@ LOCK = {
                 "⟦𝐵1, 𝜏1 ↦ 𝑛1, 𝐵2⟧ = 𝑒1 and ([λ] ∩ [𝐵1, 𝐵2] = ∅ or [Δ] ∩ [𝐵1, 𝐵2] = ∅)", "𝑒2 := contextualize(𝑛1, ⟦𝐵1, 𝐵2⟧)"),
         shape=".dispatchForm", conds="[.slotAttached, .valNf, .isUniverse, .notLambdaWithDelta]", rhs=".dotGlobal"),
     "miss": dict(
-        expect=("⟦𝐵1⟧(𝜏1 ↦ 𝑒)", "⊥", "¬(𝜏1 ∈ 𝐵1)", ""),
-        shape=".appForm", conds="[.attrNotAlpha, .slotAbsent]", rhs=".bot"),
+        expect=("⟦𝐵1⟧(𝜏1 ↦ 𝑒)", "⊥", "¬(𝜏1 ∈ 𝐵1) and ¬(𝜏1 = ρ)", ""),
+        shape=".appForm", conds="[.attrNotAlpha, .slotAbsent, .attrNeRho]", rhs=".bot"),
     "null": dict(
         expect=("⟦𝐵1, 𝜏1 ↦ ∅, 𝐵2⟧.𝜏1", "⊥", "", ""),
         shape=".dispatchForm", conds="[.slotVoid]", rhs=".bot"),
@@ -96,6 +96,9 @@ LOCK = {
     "overa": dict(
         expect=("⟦𝐵1, 𝜏1 ↦ 𝑒1, 𝐵2⟧(α𝑖1 ↦ 𝑒2)", "⊥", "𝑖1 = domain(𝐵1) and ¬(𝜏1 = ρ)", ""),
         shape=".appForm", conds="[.attrIsAlpha, .ordinalAttached]", rhs=".bot"),
+    "skip": dict(
+        expect=("⟦𝐵1⟧(ρ ↦ 𝑒1)", "⟦𝐵1⟧", "¬(ρ ∈ 𝐵1)", ""),
+        shape=".appForm", conds="[.attrIsRho, .slotAbsent]", rhs=".formSame"),
     "stay": dict(
         expect=("⟦𝐵1, ρ ↦ 𝑒1, 𝐵2⟧(ρ ↦ 𝑒2)", "⟦𝐵1, ρ ↦ 𝑒1, 𝐵2⟧", "", ""),
         shape=".appForm", conds="[.attrIsRho, .slotAttached]", rhs=".formSame"),
@@ -147,7 +150,7 @@ def main():
         "/-!",
         "# Normalization rules as structured data, generated from phino",
         "",
-        "The fifteen rules as `RuleEntry` tags (types in PhiConfluence/RuleSchema.lean), emitted",
+        "The sixteen rules as `RuleEntry` tags (types in PhiConfluence/RuleSchema.lean), emitted",
         "by the fidelity-lock deriver `.github/gen-rule-data.py`. This file is not tracked by",
         "Git: it is regenerated from pinned phino before every build.",
         "-/",

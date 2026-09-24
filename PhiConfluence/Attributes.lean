@@ -84,11 +84,4 @@ def erase : List Binding → Attr → List Binding
   | Binding.delta d :: r, a => Binding.delta d :: erase r a
   | Binding.lambda f :: r, a => Binding.lambda f :: erase r a
 
-/-- Ensure a binding list carries a parent: append `ρ↦∅` at the end iff no `ρ` key is present
-(phino's `withVoidRho`; explicit `ρ` is kept in place, never duplicated). -/
-def ensureRho (bs : List Binding) : List Binding :=
-  match lookup bs .rho with
-  | .absent => bs ++ [.void .rho]
-  | _       => bs
-
 end PhiConfluence

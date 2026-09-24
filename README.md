@@ -76,10 +76,10 @@ It uses no `sorry` (Lean's placeholder for a missing proof)
 
 ## The theorem
 
-The relation `⟶` uses the rules of `phino` version 0.0.138
-  (`dd, dc, dca, null, over, stop, miss, stay, alpha, overa, amiss, dot, copy, dl`),
+The relation `⟶` uses the rules of `phino` version 0.0.139
+  (`dd, dc, dca, null, over, stop, miss, stay, skip, alpha, overa, amiss, dot, copy, dl`),
   applied anywhere inside a term.
-The fifteenth `phino` rule, `dotg`,
+The sixteenth `phino` rule, `dotg`,
   fires only on a whole program,
   which `phino rewrite` never receives,
   so the proof leaves it out.
@@ -182,17 +182,18 @@ In the table below, `C(e⊳ctx)` is *contextualization*:
 
 | `phino` rule | Lean `Step` constructor | Pattern → result | Side condition |
 |---|---|---|---|
-| `dot`   | `Step.dot`   | `⟦B₁,τ↦e₁,B₂⟧.τ → C(e₁⊳⟦B₁,B₂,ρ↦∅⟧)(ρ↦⟦B₁,τ↦e₁,B₂⟧)` | `nf e₁` ∧ not both `λ∈B` and `Δ∈B` (`ρ↦∅` only when `B₁,B₂` lack `ρ`) |
+| `dot`   | `Step.dot`   | `⟦B₁,τ↦e₁,B₂⟧.τ → C(e₁⊳⟦B₁,B₂⟧)(ρ↦⟦B₁,τ↦e₁,B₂⟧)` | `nf e₁` ∧ not both `λ∈B` and `Δ∈B` |
 | `dotg`  | — (difference 10) | same, `(ρ↦Φ)` instead | the formation is the whole program |
 | `copy`  | `Step.copy`  | `⟦B₁,τ↦∅,B₂⟧(τ↦e₁) → ⟦B₁,τ↦e₁,B₂⟧` | `e₁` has no `ξ` ∧ `nf e₁` (difference 7) |
 | `alpha` | `Step.alpha` | `⟦B⟧(αᵢ↦e) → ⟦B⟧(τ↦e)` | `τ = ordinal(B, i)` is void (†) |
 | `overa` | `Step.overa` | `⟦B⟧(αᵢ↦e) → ⊥` | `ordinal(B, i)` is attached |
 | `amiss` | `Step.amiss` | `⟦B⟧(αᵢ↦e) → ⊥` | `B` has no position `i` (†) |
 | `stay`  | `Step.stay`  | `⟦B₁,ρ↦e₁,B₂⟧(ρ↦e₂) → ⟦B₁,ρ↦e₁,B₂⟧` | — |
+| `skip`  | `Step.skip`  | `⟦B⟧(ρ↦e) → ⟦B⟧` | `ρ∉B` |
 | `over`  | `Step.over`  | `⟦B₁,τ↦e₁,B₂⟧(τ↦e₂) → ⊥` | `τ≠ρ` (attached attribute) |
 | `stop`  | `Step.stop`  | `⟦B⟧.τ → ⊥` | `τ∉B` ∧ `φ∉B` ∧ `λ∉B` |
 | `null`  | `Step.null`  | `⟦B₁,τ↦∅,B₂⟧.τ → ⊥` | — (void attribute) |
-| `miss`  | `Step.miss`  | `⟦B⟧(τ↦e) → ⊥` | `τ∉B` ∧ `τ` is not positional |
+| `miss`  | `Step.miss`  | `⟦B⟧(τ↦e) → ⊥` | `τ∉B` ∧ `τ≠ρ` ∧ `τ` is not positional |
 | `dl`    | `Step.dl`    | `⟦B⟧ → ⊥` | `λ∈B` ∧ `Δ∈B` |
 | `dd`    | `Step.dd`    | `⊥.τ → ⊥` | — |
 | `dc`, `dca` | `Step.dc` | `⊥(τ↦e) → ⊥`, `⊥(αᵢ↦e) → ⊥` | — (one Lean rule covers both) |
@@ -228,7 +229,8 @@ At the top of a term, at most one rule applies, with one exception:
     `stay` if it is `ρ` and attached,
     `over` if it is another attached name,
     `copy` if it is void and `e` is normal and has no `ξ`,
-    and `miss` if it is missing.
+    `skip` if it is `ρ` and missing,
+    and `miss` if it is another missing name.
   With a positional `αᵢ`, the rule is `alpha`, `overa`, or `amiss`,
     depending on `ordinal(B, i)`.
   On `⊥(…)`, `dc` applies.
@@ -316,7 +318,7 @@ None of them is a gap against the paper.
    The Lean `Binding` accepts any name, including `Attr.alpha`,
      so it can represent a malformed formation with a positional attribute.
    The `legalKey` part of `WF` rules such formations out.
-9. **Every formation has a parent attribute `ρ`.**
+9. **A formation has a parent attribute `ρ` only when it declares one.**
    This is modelled, not a difference;
      see [The parent attribute][parent].
 10. **The rule `dotg` is not modelled.**
@@ -338,48 +340,30 @@ That is harmless while assets never fire,
 
 ## The parent attribute
 
-The paper (`foundations.tex`, Def. Parent) and `phino`
-  treat **every formation as having a parent attribute `ρ`**,
-  void until something sets it,
+The paper (`foundations.tex`, Def. Parent) gives an object a parent attribute `ρ`,
   much like `this` in other languages.
-The paper's grammar (`syntax.tex`) does not require `ρ`,
-  so `⟦⟧` is a valid formation.
-Instead, `phino` adds `ρ↦∅` at the end of every formation that lacks one,
-  at every depth:
-  `⟦x↦Φ⟧` becomes `⟦x↦Φ, ρ↦∅⟧`.
-An explicit `ρ` stays where it is and is never duplicated.
+A formation has one in `phino` only when it declares it,
+  as `ρ↦∅` among its voids or as an attached `ρ↦e`,
+  the way EO declares `^`.
+Nothing adds a `ρ` behind the program's back,
+  so `⟦x↦Φ⟧` stays `⟦x↦Φ⟧`,
+  and the model follows it with no extra machinery.
 
-Without this, the model would disagree with `phino` and the paper
-  in two ways:
+Two rules treat `ρ` apart from other names:
 
-* A different rule could fire:
-    `phino` rewrites `⟦⟧(ρ↦Φ)` by `copy` to `⟦ρ↦Φ⟧`,
-    but without `ρ` the rule `miss` gives `⊥`.
-* Normal forms would differ,
-    because every formation in a `phino` normal form carries `ρ↦∅`.
+* `skip` drops a `ρ` applied to a formation that declares none:
+    `⟦⟧(ρ↦Φ)` becomes `⟦⟧`, not `⊥`.
+  `miss` spares `ρ` for that reason.
+* `dot` still hands every dispatched body its receiver as `(ρ↦⟦B⟧)`;
+    `copy` fills a declared void `ρ`, `stay` keeps an attached one,
+    and `skip` drops it otherwise.
 
-`Canonical.lean` models the parent attribute:
-
-* `canon` and `canonB` add `ρ↦∅` to every formation without `ρ`,
-    at every depth, exactly as `phino` does.
-* `Canonical` and `CanonicalB` state that every formation has a `ρ`.
-* `canon_canonical` proves that `canon` always produces such a term.
-* `wf_canon` proves that `canon` keeps a term well-formed,
-    because it adds `ρ` only where none exists.
-* `step_canonical` proves that rewriting keeps every formation's `ρ`,
-    so the terms `phino` works with stay that way under `⟶`.
-
-Because such terms are well-formed, the main theorem covers them,
-  so it is a theorem about **the calculus `phino` actually implements**,
-  not a version without `ρ`.
-The added `ρ` never threatened confluence:
-  it is a default value, not a rule,
-  and it only moves `ρ`-applications from `miss` to `copy`,
-  which creates no new conflict between rules.
-It was a question of faithfulness,
-  settled by the three lemmas above
-  and by `difftest`, which matches `phino`
-  on cases such as `⟦⟧(ρ↦Φ)` and plain value formations.
+Neither threatens confluence:
+  `skip` fires only where `miss` used to,
+  and it never competes with `copy` or `stay`,
+  since each of the three needs `ρ` in a different state.
+`difftest` matches `phino` on both sides,
+  on cases such as `⟦⟧(ρ↦Φ)` and `⟦ρ↦∅⟧(ρ↦Φ)`.
 
 ## Design decisions
 
@@ -506,10 +490,10 @@ Three observations, which the proof makes rigorous, show they do not:
     depending on whether `τ` is attached, void, or missing,
     whether `B` has `φ`, and what the dispatched term is.
   On an application `⟦B⟧(τ↦e)`, the rules `copy`, `alpha`, `overa`,
-    `amiss`, `over`, `stay`, `miss`, and `dc` exclude each other,
+    `amiss`, `over`, `stay`, `skip`, `miss`, and `dc` exclude each other,
     depending on the attribute's state, on the kind of name
     (positional names go to `alpha`, `overa`, or `amiss`,
-    labels to `copy`, `over`, or `miss`, and `ρ` to `stay`),
+    labels to `copy`, `over`, or `miss`, and `ρ` to `copy`, `stay`, or `skip`),
     and on what the applied term is.
   The rule `dl` competes with others,
     but always ends at `⊥`, because `dot` is barred there.
@@ -618,7 +602,7 @@ PhiConfluence/
   Syntax · Attributes · WellFormed  Term/Binding/Attr; lookup/fill/ordinal/erase; the WF predicate
   Step                              the relation ⟶ — phino's rules + congruence closure
   Nf · Normal                       structural normal form (the counterpart of phino's isNF)
-  Context · Canonical               contextualization C(e⊳ctx); the implicit-ρ canonicalisation
+  Context                           contextualization C(e⊳ctx)
   Parallel                          Par/ParB, complete development `devel`, the Takahashi triangle
   Preservation · Diamond            WF preserved under reduction; the WF-relativized diamond
   Confluence                        the headline `confluence`

@@ -10,6 +10,3 @@ import PhiConfluence
 #print axioms PhiConfluence.parWF_diamond
 #print axioms PhiConfluence.nf_iff
 #print axioms PhiConfluence.contextualize_eq_self
-#print axioms PhiConfluence.canon_canonical
-#print axioms PhiConfluence.wf_canon
-#print axioms PhiConfluence.step_canonical

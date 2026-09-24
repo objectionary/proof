@@ -31,7 +31,7 @@ on a formation holding both `λ` and `Δ` collapses to `⊥` in one parallel ste
 `dd`/`dc` outside). They let `devel` answer `⊥` for such a redex whichever rule fires first.
 
 Note: the discard constructors carry premises (`ParB bs bs'`, `Par e e'`) that are unused in their
-`⊥` result, and `stay` carries an unused argument-`Par`. This is the standard parallel-reduction
+`⊥` result, and `stay` and `skip` carry an unused argument-`Par`. This is the standard parallel-reduction
 shape — a single `⇒` step may develop subterms even while collapsing.
 -/
 
@@ -54,11 +54,14 @@ inductive Par : Term → Term → Prop where
       ParB bs bs' → lookup bs a = .absent → lookup bs .phi = .absent → hasLambda bs = false →
       Par (.dispatch (.form bs) a) .bot
   | miss {bs bs' : List Binding} {a : Attr} {e e' : Term} :
-      ParB bs bs' → lookup bs a = .absent → a.isAlpha = false → Par e e' →
+      ParB bs bs' → lookup bs a = .absent → a.isAlpha = false → a ≠ .rho → Par e e' →
       Par (.app (.form bs) a e) .bot
   | stay {bs bs' : List Binding} {e₁ e₂ e₂' : Term} :
       ParB bs bs' → lookup bs .rho = .attached e₁ → Par e₂ e₂' →
       Par (.app (.form bs) .rho e₂) (.form bs')
+  | skip {bs bs' : List Binding} {e e' : Term} :
+      ParB bs bs' → lookup bs .rho = .absent → Par e e' →
+      Par (.app (.form bs) .rho e) (.form bs')
   | alpha {bs bs' : List Binding} {i : Nat} {τ1 : Attr} {e e' : Term} :
       ParB bs bs' → ordinal bs i = some τ1 → lookup bs τ1 = .void → Par e e' →
       Par (.app (.form bs) (.alpha i) e) (.app (.form bs') τ1 e')
@@ -72,7 +75,7 @@ inductive Par : Term → Term → Prop where
       ParB bs bs' → lookup bs a = .attached e₀ → lookup bs' a = .attached e₁ → nf e₁ = true →
       (hasLambda bs && hasDelta bs) = false →
       Par (.dispatch (.form bs) a)
-        (.app (contextualize e₁ (.form (ensureRho (erase bs' a)))) .rho (.form bs'))
+        (.app (contextualize e₁ (.form (erase bs' a))) .rho (.form bs'))
   | copy {bs bs' : List Binding} {a : Attr} {arg arg' : Term} :
       ParB bs bs' → lookup bs a = .void → Par arg arg' → xiFree arg' = true → nf arg' = true →
       Par (.app (.form bs) a arg) (.form (fill bs' a arg'))
@@ -253,25 +256,6 @@ theorem parB_lookup_present {bs bs' : List Binding} (h : ParB bs bs') {a : Attr}
   | void => rw [parB_lookup_void h hl]; nofun
   | attached v => obtain ⟨w, hw⟩ := parB_lookup_attached h hl; rw [hw]; nofun
 
-/-- `ParB` lifts through `ensureRho`: both lists agree on whether `ρ` is present, so both get the
-same `ρ↦∅` appended or neither does. -/
-theorem parB_ensureRho {bs bs' : List Binding} (h : ParB bs bs') :
-    ParB (ensureRho bs) (ensureRho bs') := by
-  have happ : ∀ {cs ds : List Binding}, ParB cs ds → ParB (cs ++ [.void .rho]) (ds ++ [.void .rho]) := by
-    intro cs ds hcd
-    induction hcd using ParB.rec (motive_1 := fun _ _ _ => True) with
-    | nil => exact .consVoid .nil
-    | consVoid _ ih => exact .consVoid ih
-    | consAttached hv _ _ ih => exact .consAttached hv ih
-    | consDelta _ ih => exact .consDelta ih
-    | consLambda _ ih => exact .consLambda ih
-    | _ => trivial
-  unfold ensureRho
-  cases hl : lookup bs .rho with
-  | absent => rw [parB_lookup_absent h hl]; exact happ h
-  | void => rw [parB_lookup_void h hl]; exact h
-  | attached v => obtain ⟨w, hw⟩ := parB_lookup_attached h hl; rw [hw]; exact h
-
 /-- `ParB` keeps every domain ordinal on the same key: it never touches keys. -/
 theorem parB_ordinal {bs bs' : List Binding} (h : ParB bs bs') :
     ∀ i, ordinal bs i = ordinal bs' i := by
@@ -345,8 +329,9 @@ theorem step_to_par {e e' : Term} (h : e ↝ e') : Par e e' := by
   | null hv => exact .null (ParB.refl' _) hv
   | «over» hatt hne => exact .over (ParB.refl' _) hatt hne (.refl _)
   | stop habs hphi hlam => exact .stop (ParB.refl' _) habs hphi hlam
-  | miss habs hna => exact .miss (ParB.refl' _) habs hna (.refl _)
+  | miss habs hna hne => exact .miss (ParB.refl' _) habs hna hne (.refl _)
   | stay hs => exact .stay (ParB.refl' _) hs (.refl _)
+  | skip hs => exact .skip (ParB.refl' _) hs (.refl _)
   | alpha hord hv => exact .alpha (ParB.refl' _) hord hv (.refl _)
   | overa hord hat => exact .overa (ParB.refl' _) hord hat (.refl _)
   | amiss hord => exact .amiss (ParB.refl' _) hord (.refl _)
@@ -414,8 +399,9 @@ theorem par_to_red {e e' : Term} (h : Par e e') : e ↝∗ e' := by
   | null hb hl ihb => exact .single (Step.null hl)
   | «over» hb hl hne he ihb ihe => exact .single (Step.over hl hne)
   | stop hb h1 h2 h3 ihb => exact .single (Step.stop h1 h2 h3)
-  | miss hb hl hna he ihb ihe => exact .single (Step.miss hl hna)
+  | miss hb hl hna hne he ihb ihe => exact .single (Step.miss hl hna hne)
   | stay hb hl he ihb ihe => exact .head (Step.stay hl) ihb
+  | skip hb hl he ihb ihe => exact .head (Step.skip hl) ihb
   | alpha hb hord hv he ihb ihe =>
       exact .head (Step.alpha hord hv)
         ((redMany_congAppFn _ _ ihb).trans (redMany_congAppArg _ _ ihe))
@@ -469,7 +455,7 @@ def develDispatch (bs bsd : List Binding) (a : Attr) : Term :=
   | .attached _ =>
       match lookup bsd a with
       | .attached e₁ =>
-          if nf e₁ then .app (contextualize e₁ (.form (ensureRho (erase bsd a)))) .rho (.form bsd)
+          if nf e₁ then .app (contextualize e₁ (.form (erase bsd a))) .rho (.form bsd)
           else .dispatch (.form bsd) a
       | _ => .dispatch (.form bsd) a
   | .absent =>
@@ -490,12 +476,12 @@ def develAlpha (bs bsd : List Binding) (i : Nat) (argd : Term) : Term :=
       | .absent => .app (.form bsd) (.alpha i) argd
 
 /-- The development of an application `⟦bs⟧(a ↦ e)` by a non-positional `a`, given the developed
-bindings `bsd` and argument `argd`: `stay` keeps the formation, `over` and `miss` collapse it,
+bindings `bsd` and argument `argd`: `stay` and `skip` keep the formation, `over` and `miss` collapse it,
 `copy` fills the void slot when the developed argument is `ξ`-free and normal. -/
 def develAttr (bs bsd : List Binding) (a : Attr) (argd : Term) : Term :=
   match lookup bs a with
   | .attached _ => if a = .rho then .form bsd else .bot
-  | .absent => .bot
+  | .absent => if a = .rho then .form bsd else .bot
   | .void => if xiFree argd && nf argd then .form (fill bsd a argd) else .app (.form bsd) a argd
 
 mutual
@@ -629,7 +615,10 @@ theorem par_devel_attr {bs : List Binding} {a : Attr} (hna : a.isAlpha = false) 
         by_cases hr : a = .rho
         · subst hr; simp only [if_true]; exact .stay hb h he
         · simp only [hr, if_false]; exact .over hb h hr he
-    | .absent => exact .miss hb h hna he
+    | .absent =>
+        by_cases hr : a = .rho
+        · subst hr; simp only [if_true]; exact .skip hb h he
+        · simp only [hr, if_false]; exact .miss hb h hna hr he
     | .void =>
         by_cases hcp : xiFree (devel e₂) && nf (devel e₂)
         · obtain ⟨hxi, hnf⟩ := Bool.and_eq_true_iff.mp hcp
@@ -833,7 +822,7 @@ theorem tri_dispatch {s s' : Term} {a : Attr}
             | .attached _ => exact .congDispatch ihs
 
 /-- Triangle, `congApp` case on a formation subject by a non-positional attribute: the redex
-(`stay`/`over`/`miss`/`copy`) fires via `parB_preserves`. -/
+(`stay`/`over`/`skip`/`miss`/`copy`) fires via `parB_preserves`. -/
 theorem tri_app_attr {bs cs : List Binding} {a : Attr} {arg arg' : Term} (hna : a.isAlpha = false)
     (hbc : ParB bs cs) (hcd : ParB cs (develB bs)) (iharg : Par arg' (devel arg)) :
     Par (.app (.form cs) a arg') (develAttr bs (develB bs) a (devel arg)) := by
@@ -844,7 +833,10 @@ theorem tri_app_attr {bs cs : List Binding} {a : Attr} {arg arg' : Term} (hna : 
       by_cases hr : a = .rho
       · subst hr; simp only [if_true]; exact .stay hcd hw iharg
       · simp only [hr, if_false]; exact .over hcd hw hr iharg
-  | .absent => exact .miss hcd (parB_lookup_absent hbc hb) hna iharg
+  | .absent =>
+      by_cases hr : a = .rho
+      · subst hr; simp only [if_true]; exact .skip hcd (parB_lookup_absent hbc hb) iharg
+      · simp only [hr, if_false]; exact .miss hcd (parB_lookup_absent hbc hb) hna hr iharg
   | .void =>
       by_cases hcp : xiFree (devel arg) && nf (devel arg)
       · obtain ⟨hxi, hnf⟩ := Bool.and_eq_true_iff.mp hcp
@@ -924,8 +916,8 @@ theorem appNF_attached {bs : List Binding} {a : Attr} {e₁ : Term} (h : lookup 
   | alpha i => rfl
   | _ => simp [appNF, h]
 
-/-- An application on a formation by an absent slot has a root redex (`miss`, or a positional
-rule). -/
+/-- An application on a formation by an absent slot has a root redex (`skip`, `miss`, or a
+positional rule). -/
 theorem appNF_absent {bs : List Binding} {a : Attr} (h : lookup bs a = .absent) (arg : Term) :
     appNF (.form bs) a arg = false := by
   cases a with
@@ -959,8 +951,9 @@ theorem nf_par_eq {e e' : Term} (hnf : nf e = true) (h : Par e e') : e' = e := b
   | null hb hl ihb => intro hnf; simp [nf, dispatchNF, hl] at hnf
   | «over» hb hl hne he ihb ihe => intro hnf; simp [nf, appNF_attached hl] at hnf
   | stop hb h1 h2 h3 ihb => intro hnf; simp [nf, dispatchNF, h1, h2, h3] at hnf
-  | miss hb hl hna he ihb ihe => intro hnf; simp [nf, appNF_absent hl] at hnf
+  | miss hb hl hna hne he ihb ihe => intro hnf; simp [nf, appNF_absent hl] at hnf
   | stay hb hl he ihb ihe => intro hnf; simp [nf, appNF_attached hl] at hnf
+  | skip hb hl he ihb ihe => intro hnf; simp [nf, appNF_absent hl] at hnf
   | alpha hb hord hv he ihb ihe => intro hnf; simp [nf, appNF] at hnf
   | overa hb hord hat he ihb ihe => intro hnf; simp [nf, appNF] at hnf
   | amiss hb hord he ihb ihe => intro hnf; simp [nf, appNF] at hnf
@@ -1181,13 +1174,23 @@ theorem par_triangle {e u : Term} (hwf : WF e) (h : Par e u) : Par u (devel e) :
       rw [devel_dispatch]
       simp only [develDispatch, h1, h2, h3, Bool.false_and, Bool.false_eq_true, if_false]
       exact .refl _
-  | miss hb hl hna he ihb ihe =>
+  | miss hb hl hna hne he ihb ihe =>
       intro _
       rw [devel_attr _ hna]
-      simp only [develAttr, hl, ite_self]
+      simp only [develAttr, hl, hne, if_false, ite_self]
       exact .refl _
   | stay hb hl he ihb ihe =>
       rename_i bs bs' e₁ e₂ e₂'
+      intro hwfa
+      rw [devel_attr bs rfl]
+      by_cases hld : (hasLambda bs && hasDelta bs) = true
+      · obtain ⟨hl', hd⟩ := Bool.and_eq_true_iff.mp hld
+        rw [if_pos hld]; exact par_dl hb hl' hd
+      · rw [if_neg hld]
+        simp only [develAttr, hl, if_true]
+        exact .congForm (ihb (wf_app_form hwfa).2.1)
+  | skip hb hl he ihb ihe =>
+      rename_i bs bs' e₂ e₂'
       intro hwfa
       rw [devel_attr bs rfl]
       by_cases hld : (hasLambda bs && hasDelta bs) = true
@@ -1226,7 +1229,7 @@ theorem par_triangle {e u : Term} (hwf : WF e) (h : Par e u) : Par u (devel e) :
       subst hwe
       rw [devel_dispatch]
       simp only [hld, Bool.false_eq_true, if_false, develDispatch, hl0, hlw, hnfe, if_true]
-      exact .congApp (par_contextualize_ctx (.congForm (parB_ensureRho (parB_erase hbd a))) w)
+      exact .congApp (par_contextualize_ctx (.congForm (parB_erase hbd a)) w)
         (.congForm hbd)
   | copy hb hl harg hxi hnfe ihb ihe =>
       rename_i bs bs' a arg arg'
@@ -1327,8 +1330,9 @@ theorem step_nf_false {e e' : Term} (h : e ↝ e') : nf e = false := by
   | null hv => simp [nf, dispatchNF, hv]
   | «over» hatt hne => simp [nf, appNF_attached hatt]
   | stop habs hphi hlam => simp [nf, dispatchNF, habs, hphi, hlam]
-  | miss habs hna => simp [nf, appNF_absent habs]
+  | miss habs hna hne => simp [nf, appNF_absent habs]
   | stay hs => simp [nf, appNF_attached hs]
+  | skip hs => simp [nf, appNF_absent hs]
   | alpha hord hv => simp [nf, appNF]
   | overa hord hat => simp [nf, appNF]
   | amiss hord => simp [nf, appNF]
@@ -1391,8 +1395,8 @@ theorem lookup_attached_nf {bs : List Binding} {a : Attr} {v : Term}
           simp only [lookup] at hl; simp only [nfB] at hnf; exact ih hnf hl
 
 /-- An application on a formation by a non-positional attribute with a root redex reduces at the
-root, given a normal argument (`stay`/`over` on an attached slot, `copy` on a void one, `miss` on an
-absent one). -/
+root, given a normal argument (`stay`/`over` on an attached slot, `copy` on a void one, `skip`/`miss`
+on an absent one). -/
 theorem reducible_app_attr {bs : List Binding} {a : Attr} {arg : Term} (hna : a.isAlpha = false)
     (h : appNF (.form bs) a arg = false) (hnarg : nf arg = true) :
     Reducible (.app (.form bs) a arg) := by
@@ -1408,7 +1412,10 @@ theorem reducible_app_attr {bs : List Binding} {a : Attr} {arg : Term} (hna : a.
         | _ => simp [appNF, hl]
       rw [happ] at h
       exact ⟨_, Step.copy hl (by simpa using h) hnarg⟩
-  | absent => exact ⟨_, Step.miss hl hna⟩
+  | absent =>
+      by_cases hrho : a = .rho
+      · subst hrho; exact ⟨_, Step.skip hl⟩
+      · exact ⟨_, Step.miss hl hna hrho⟩
 
 /-- **Backward: a non-`nf` well-formed term is reducible.** By the `Term` recursor (`motive₃`
 collects the binding-list split + the value's reduction). On a formation, reduce a binding value

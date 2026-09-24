@@ -9,8 +9,8 @@ import PhiConfluence.Diamond
 
 **`confluence : WF e → e ↝∗ e₁ → e ↝∗ e₂ → ∃ e₃, e₁ ↝∗ e₃ ∧ e₂ ↝∗ e₃`** — the **headline**, the
 `WF`-scoped Church-Rosser property and the README's theorem statement, covering every rule
-`phino rewrite` applies, all fifteen but the universe-only `dotg` (the `⊥`-collapse rules
-`dd/dc/dca/null/over/stop/miss/overa/amiss/dl` + `stay` + `alpha` + `dot` + `copy`, with the full
+`phino rewrite` applies, all sixteen but the universe-only `dotg` (the `⊥`-collapse rules
+`dd/dc/dca/null/over/stop/miss/overa/amiss/dl` + `stay` + `skip` + `alpha` + `dot` + `copy`, with the full
 congruence closure; `dc` and `dca` are one `Step` rule).
 
 Proved through the **WF-relativized bridge** (the unconditional `church_rosser` cannot apply
@@ -61,7 +61,7 @@ theorem parWF_to_par {a b : Term} (h : Relation.ReflTransGen ParWF a b) :
 `redMany_eq` turns `↝∗` into `Par∗`, `redMany_par_to_parWF` lifts the well-formed forks to
 `ParWF∗`, `parWF_confluent` joins them, and `parWF_to_par`+`redMany_eq` carry the join back to `↝∗`.
 
-It governs every rule `phino rewrite` applies (the `⊥`-collapse rules + `stay` + `alpha` + `dot` + `copy`). It is proved through the relativized bridge — *not*
+It governs every rule `phino rewrite` applies (the `⊥`-collapse rules + `stay` + `skip` + `alpha` + `dot` + `copy`). It is proved through the relativized bridge — *not*
 via an unconditional `Confluent Step`, which is false with `alpha` present. The `WF e` hypothesis's
 **`αᵢ`-not-a-formation-key clause is necessary** (dev. #8 — the `alpha`-vs-`over` counterexample);
 its **unique-key clause is faithfulness** (Def. Binding + `lookup` agreement), carried but unused by

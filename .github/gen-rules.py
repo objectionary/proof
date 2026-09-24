@@ -43,7 +43,7 @@ def main():
         "/-!",
         "# Normalization rules, as data, generated from phino",
         "",
-        "The fifteen rules rendered from phino's `resources/normalize/*.yaml`, the source",
+        "The sixteen rules rendered from phino's `resources/normalize/*.yaml`, the source",
         "the paper's reduction figure is drawn from. The proof relation `Step` is hand-written.",
         "-/",
         "",

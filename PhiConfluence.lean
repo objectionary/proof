@@ -20,4 +20,3 @@ import PhiConfluence.Preservation
 import PhiConfluence.Diamond
 import PhiConfluence.Confluence
 import PhiConfluence.Equivalence
-import PhiConfluence.Canonical

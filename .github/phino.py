@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 Objectionary.com
 # SPDX-License-Identifier: MIT
 """
-A directory of phino normalization rules, as phino 0.0.138 ships them in resources/normalize/*.yaml,
+A directory of phino normalization rules, as phino 0.0.139 ships them in resources/normalize/*.yaml,
 which a test can change rule by rule before writing it to disk for a generator to read.
 """
 import os
@@ -51,7 +51,12 @@ ORIGINAL = {
         "result": "𝑒2(ρ ↦ Φ)",
         "where": [{"meta": "𝑒2", "function": "contextualize", "args": ["𝑛1", "⟦𝐵1, 𝐵2⟧"]}],
     },
-    "miss": {"name": "miss", "pattern": "⟦𝐵1⟧(𝜏1 ↦ 𝑒)", "result": "⊥", "when": {"not": {"in": ["𝜏1", "𝐵1"]}}},
+    "miss": {
+        "name": "miss",
+        "pattern": "⟦𝐵1⟧(𝜏1 ↦ 𝑒)",
+        "result": "⊥",
+        "when": {"and": [{"not": {"in": ["𝜏1", "𝐵1"]}}, {"not": {"eq": ["𝜏1", "ρ"]}}]},
+    },
     "null": {"name": "null", "pattern": "⟦𝐵1, 𝜏1 ↦ ∅, 𝐵2⟧.𝜏1", "result": "⊥"},
     "over": {
         "name": "over",
@@ -65,6 +70,7 @@ ORIGINAL = {
         "result": "⊥",
         "when": {"and": [{"eq": ["𝑖1", {"domain": "𝐵1"}]}, {"not": {"eq": ["𝜏1", "ρ"]}}]},
     },
+    "skip": {"name": "skip", "pattern": "⟦𝐵1⟧(ρ ↦ 𝑒1)", "result": "⟦𝐵1⟧", "when": {"not": {"in": ["ρ", "𝐵1"]}}},
     "stay": {"name": "stay", "pattern": "⟦𝐵1, ρ ↦ 𝑒1, 𝐵2⟧(ρ ↦ 𝑒2)", "result": "⟦𝐵1, ρ ↦ 𝑒1, 𝐵2⟧"},
     "stop": {
         "name": "stop",

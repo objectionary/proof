@@ -201,52 +201,16 @@ theorem wfb_erase {a : Attr} : ∀ {bs : List Binding}, WFB bs → WFB (erase bs
   | .delta _ :: _, h => by cases h with | consDelta hr => simp only [erase]; exact .consDelta (wfb_erase hr)
   | .lambda _ :: _, h => by cases h with | consLambda hr => simp only [erase]; exact .consLambda (wfb_erase hr)
 
-/-- Appending a void binding preserves `WFB`. -/
-theorem wfb_append_void {a : Attr} : ∀ {bs : List Binding}, WFB bs → WFB (bs ++ [.void a])
-  | [], _ => .consVoid .nil
-  | _ :: _, h => by
-      cases h with
-      | consVoid hr => exact .consVoid (wfb_append_void hr)
-      | consAttached hv hr => exact .consAttached hv (wfb_append_void hr)
-      | consDelta hr => exact .consDelta (wfb_append_void hr)
-      | consLambda hr => exact .consLambda (wfb_append_void hr)
-
-/-- `WF (.form (ensureRho cs))` from the `WF` ingredients of `cs`: appending `ρ↦∅` (only when `ρ`
-is absent) keeps the domain duplicate-free (`ρ` was not present) and `ρ` is a legal key. -/
-theorem wf_form_ensureRho {cs : List Binding}
-    (hnd : (domain cs).Nodup) (hlk : ∀ a ∈ domain cs, a.legalKey = true) (hbb : WFB cs) :
-    WF (.form (ensureRho cs)) := by
-  cases hl : lookup cs .rho with
-  | absent =>
-      simp only [ensureRho, hl]
-      have hrho : domain [Binding.void Attr.rho] = [Attr.rho] := rfl
-      refine .form ?_ ?_ (wfb_append_void hbb)
-      · rw [domain_append, hrho]
-        refine List.nodup_append.mpr ⟨hnd, by simp, ?_⟩
-        intro x hx b hb
-        rw [List.mem_singleton] at hb
-        subst hb
-        intro he
-        exact lookup_absent_not_mem hl (he ▸ hx)
-      · intro x hx
-        rw [domain_append, hrho, List.mem_append, List.mem_singleton] at hx
-        rcases hx with hx | hx
-        · exact hlk x hx
-        · subst hx; rfl
-  | void => simp only [ensureRho, hl]; exact .form hnd hlk hbb
-  | attached v => simp only [ensureRho, hl]; exact .form hnd hlk hbb
-
-/-- The context `dot` builds, `⟦B₁, B₂⟧` with a `ρ` ensured, is well-formed when the dispatched
-formation is. -/
+/-- The context `dot` builds, `⟦B₁, B₂⟧`, is well-formed when the dispatched formation is. -/
 theorem wf_dot_context {bs : List Binding} (h : WF (.form bs)) (a : Attr) :
-    WF (.form (ensureRho (erase bs a))) := by
+    WF (.form (erase bs a)) := by
   cases h with
   | form hnd hlk hbb =>
-      exact wf_form_ensureRho ((domain_erase bs a).nodup hnd)
+      exact .form ((domain_erase bs a).nodup hnd)
         (fun x hx => hlk x ((domain_erase bs a).subset hx)) (wfb_erase hbb)
 
 /-- Preservation of well-formedness under one single step (`↝`), by ordinary structural
-induction on the `Step` derivation. The discard rules land in `WF.bot`; `stay` returns the
+induction on the `Step` derivation. The discard rules land in `WF.bot`; `stay` and `skip` return the
 (already well-formed) subject formation; `dot` embeds its value into the narrowed context `wf_dot_context`; `congForm` re-derives the value via `wfb_attached_wf`, the inductive hypothesis,
 and `wfb_set`, transporting `Nodup`/`legalKey` across the unchanged domain by `domain_set`. -/
 theorem WF.step {e e' : Term} (hwf : WF e) (h : e ↝ e') : WF e' := by
@@ -256,8 +220,9 @@ theorem WF.step {e e' : Term} (hwf : WF e) (h : e ↝ e') : WF e' := by
   | null hv => exact .bot
   | «over» hatt hne => exact .bot
   | stop habs hphi hlam => exact .bot
-  | miss habs hna => exact .bot
+  | miss habs hna hne => exact .bot
   | stay hs => cases hwf with | app hf _ => exact hf
+  | skip hs => cases hwf with | app hf _ => exact hf
   | alpha hord hv =>
       cases hwf with | app hf ha => exact .app hf ha
   | overa hord hat => exact .bot
@@ -291,7 +256,7 @@ theorem WF.step {e e' : Term} (hwf : WF e) (h : e ↝ e') : WF e' := by
 
 /-- Preservation of well-formedness under one parallel step (`Par`), proved via the
 two-motive `Par.rec` recursor whose binding-list leg (`motive₂`) is exactly the
-`WFB xs → WFB ys` implication. Discard rules land in `WF.bot`; `stay`/`congForm`
+`WFB xs → WFB ys` implication. Discard rules land in `WF.bot`; `stay`/`skip`/`congForm`
 rebuild the target formation through the `parB_domain`+`motive₂` bridge `wf_form_of_parB`;
 the congruences thread the inductive hypotheses through the subterms. -/
 theorem WF.par {e e' : Term} (hwf : WF e) (h : Par e e') : WF e' := by
@@ -304,8 +269,14 @@ theorem WF.par {e e' : Term} (hwf : WF e) (h : Par e e') : WF e' := by
   | null hb hl ihb => exact fun _ => .bot
   | «over» hb hl hne he ihb ihe => exact fun _ => .bot
   | stop hb h1 h2 h3 ihb => exact fun _ => .bot
-  | miss hb hl hna he ihb ihe => exact fun _ => .bot
+  | miss hb hl hna hne he ihb ihe => exact fun _ => .bot
   | stay hb hl he ihb ihe =>
+      intro hw
+      cases hw with
+      | app hf _ =>
+          cases hf with
+          | form hnd hlk hbb => exact wf_form_of_parB hnd hlk (parB_domain hb) (ihb hbb)
+  | skip hb hl he ihb ihe =>
       intro hw
       cases hw with
       | app hf _ =>

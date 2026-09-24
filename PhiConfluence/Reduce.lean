@@ -8,7 +8,7 @@ import PhiConfluence.Step
 
 The relation `Step` is declarative (it allows *any* legal reduction). To actually run programs and
 print traces, we add an executable, deterministic `reduceStep`. It first tries every rule at the
-root (`rootStep`: `dd, dc, null, over, stop, miss, stay, alpha, overa, amiss, dot, copy, dl`); when
+root (`rootStep`: `dd, dc, null, over, stop, miss, stay, skip, alpha, overa, amiss, dot, copy, dl`); when
 none fires or its guard is blocked (e.g. `dot` needs `nf e₁`), it recurses **into the subterms** —
 the subject first, then the argument, and a formation's bindings in list order (`reduceForm`, the
 executable counterpart of `congForm`) — so a redex buried inside a formation is found, not missed.
@@ -25,11 +25,11 @@ prints — is a genuine `Step`, governed by the confluence theorem. It is **soun
 namespace PhiConfluence
 
 /-- The root contraction of an application `⟦bs⟧(a ↦ arg)` by a non-positional `a`: `stay`,
-`over`, `miss`, or `copy` when the argument is `ξ`-free and normal. -/
+`over`, `skip`, `miss`, or `copy` when the argument is `ξ`-free and normal. -/
 def rootAttr (bs : List Binding) (a : Attr) (arg : Term) : Option Term :=
   match lookup bs a with
   | .attached _ => if a = .rho then some (.form bs) else some .bot
-  | .absent => some .bot
+  | .absent => if a = .rho then some (.form bs) else some .bot
   | .void => if xiFree arg && nf arg then some (.form (fill bs a arg)) else none
 
 /-- The contraction of a redex at the root of the term, or `none` if no rule fires there. -/
@@ -41,7 +41,7 @@ def rootStep : Term → Option Term
       | .void => some .bot
       | .attached e₁ =>
           if nf e₁ && !(hasLambda bs && hasDelta bs) then
-            some (.app (contextualize e₁ (.form (ensureRho (erase bs a)))) .rho (.form bs))
+            some (.app (contextualize e₁ (.form (erase bs a))) .rho (.form bs))
           else none
       | .absent =>
           match lookup bs .phi with
@@ -113,8 +113,12 @@ theorem rootAttr_sound {bs : List Binding} {a : Attr} {arg e' : Term} (hna : a.i
       · simp only [rootAttr, hl, hr, if_false, Option.some.injEq] at h
         subst h; exact Step.over hl hr
   | absent =>
-      simp only [rootAttr, hl, Option.some.injEq] at h
-      subst h; exact Step.miss hl hna
+      by_cases hr : a = .rho
+      · subst hr
+        simp only [rootAttr, hl, if_true, Option.some.injEq] at h
+        subst h; exact Step.skip hl
+      · simp only [rootAttr, hl, hr, if_false, Option.some.injEq] at h
+        subst h; exact Step.miss hl hna hr
   | void =>
       by_cases hg : (xiFree arg && nf arg) = true
       · simp only [rootAttr, hl, hg, if_true, Option.some.injEq] at h
