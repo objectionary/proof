@@ -350,15 +350,11 @@ Instead, `phino` adds `ρ↦∅` at the end of every formation that lacks one,
 An explicit `ρ` stays where it is and is never duplicated.
 
 Without this, the model would disagree with `phino` and the paper
-  in three ways:
+  in two ways:
 
 * A different rule could fire:
     `phino` rewrites `⟦⟧(ρ↦Φ)` by `copy` to `⟦ρ↦Φ⟧`,
     but without `ρ` the rule `miss` gives `⊥`.
-* Positional arguments would land elsewhere,
-    because the added `ρ` counts as a position for `alpha`:
-    `⟦x↦∅⟧(~1↦Φ) ⟶ ⟦x↦∅, ρ↦Φ⟧`,
-    where `~1` is `phino`'s spelling of `α₁`.
 * Normal forms would differ,
     because every formation in a `phino` normal form carries `ρ↦∅`.
 
