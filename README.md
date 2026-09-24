@@ -670,9 +670,33 @@ The proof uses Lean 4 (`leanprover/lean4:v4.30.0`)
   and it builds with [Lake], Lean's build tool.
 The general rewriting theory rests on mathlib's `Relation` library.
 
+## How to Contribute
+
+Fork the repository, make your changes,
+  and send us a [pull request][guidelines].
+We review it and merge it into `master`
+  if it meets our quality standards.
+To avoid frustration, run the full build before you send it:
+
+```bash
+make
+```
+
+If you have `phino` installed, also compare our reducer with it:
+
+```bash
+make difftest
+```
+
+You need [elan], which installs Lean,
+  Python 3 with the packages from `.github/requirements.txt`,
+  and [GNU Make][make] 4.3 or newer.
+
 [EO]: https://github.com/objectionary/eo
 [GitHub Actions]: https://docs.github.com/en/actions
 [Huet]: https://doi.org/10.1145/322217.322230
+[elan]: https://github.com/leanprover/elan
+[guidelines]: https://www.yegor256.com/2014/04/15/github-guidelines.html
 [Lake]: https://github.com/leanprover/lean4/tree/master/src/lake
 [Newman's lemma]: https://en.wikipedia.org/wiki/Newman%27s_lemma
 [Normal form]: https://en.wikipedia.org/wiki/Normal_form_(abstract_rewriting)
