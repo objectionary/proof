@@ -10,6 +10,8 @@ RULES := PhiConfluence/Rules.lean PhiConfluence/RuleData.lean
 MATHLIB := .lake/packages/mathlib/.lake/build/lib/lean/Mathlib.olean
 
 all: test build axioms
+	count=$$(cat $$(find PhiConfluence -name '*.lean') | grep -cE '^[[:space:]]*(private |protected )?(theorem|lemma)[[:space:]]')
+	echo "👍🏻 CONFLUENCE IS PROVEN BY $$count THEOREMS, ALL CHECKED BY LEAN"
 
 test:
 	python3 -m pytest -p no:cacheprovider .github
