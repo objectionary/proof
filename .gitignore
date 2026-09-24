@@ -1,7 +1,11 @@
-.lake/
-build/
+# SPDX-FileCopyrightText: Copyright (c) 2026 Objectionary.com
+# SPDX-License-Identifier: MIT
+
 *.olean
+.claude/
 .DS_Store
+.lake/
 __pycache__/
-PhiConfluence/Rules.lean
+build/
 PhiConfluence/RuleData.lean
+PhiConfluence/Rules.lean
