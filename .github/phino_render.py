@@ -5,6 +5,7 @@ The one rendering of phino's rule YAML into display strings, shared by gen-rules
 (the display table) and gen-rule-data.py (the fidelity lock), so the lock asserts
 against exactly the strings the display table shows.
 """
+
 import glob
 import os
 
@@ -77,11 +78,13 @@ def rules(res_dir):
         absent = [k for k in ("name", "pattern", "result") if not isinstance(d, dict) or k not in d]
         if absent:
             raise SystemExit(f"phino rule file {path} lacks the keys {absent}")
-        out.append({
-            "name": str(d["name"]),
-            "pattern": str(d["pattern"]),
-            "result": str(d["result"]),
-            "cond": rcond(d.get("when")),
-            "wher": rwhere(d.get("where")),
-        })
+        out.append(
+            {
+                "name": str(d["name"]),
+                "pattern": str(d["pattern"]),
+                "result": str(d["result"]),
+                "cond": rcond(d.get("when")),
+                "wher": rwhere(d.get("where")),
+            }
+        )
     return out

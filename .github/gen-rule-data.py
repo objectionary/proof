@@ -27,6 +27,7 @@ uses, so the asserted condition strings are exactly the display table's.
 Usage:
     gen-rule-data.py <phino-resources-dir> <output-RuleData.lean>
 """
+
 import re
 import sys
 
@@ -51,60 +52,79 @@ def norm(s):
 
 LOCK = {
     "alpha": dict(
-        expect=("⟦𝐵1, 𝜏1 ↦ ∅, 𝐵2⟧(α𝑖1 ↦ 𝑒1)", "⟦𝐵1, 𝜏1 ↦ ∅, 𝐵2⟧(𝜏1 ↦ 𝑒1)",
-                "𝑖1 = domain(𝐵1) and ¬(𝜏1 = ρ)", ""),
-        shape=".appForm", conds="[.attrIsAlpha, .ordinalVoid]", rhs=".alphaRename"),
+        expect=("⟦𝐵1, 𝜏1 ↦ ∅, 𝐵2⟧(α𝑖1 ↦ 𝑒1)", "⟦𝐵1, 𝜏1 ↦ ∅, 𝐵2⟧(𝜏1 ↦ 𝑒1)", "𝑖1 = domain(𝐵1) and ¬(𝜏1 = ρ)", ""),
+        shape=".appForm",
+        conds="[.attrIsAlpha, .ordinalVoid]",
+        rhs=".alphaRename",
+    ),
     "amiss": dict(
-        expect=("⟦𝐵1⟧(α𝑖1 ↦ 𝑒)", "⊥", "¬(domain(𝐵1) > 𝑖1)", ""),
-        shape=".appForm", conds="[.attrIsAlpha, .ordinalAbsent]", rhs=".bot"),
+        expect=("⟦𝐵1⟧(α𝑖1 ↦ 𝑒)", "⊥", "¬(domain(𝐵1) > 𝑖1)", ""), shape=".appForm", conds="[.attrIsAlpha, .ordinalAbsent]", rhs=".bot"
+    ),
     # NOTE — copy's guards live in phino's `𝑘` sigil (ξ-free and normal), not in `when`.
     "copy": dict(
         expect=("⟦ 𝐵1, 𝜏1 ↦ ∅, 𝐵2 ⟧(𝜏1 ↦ 𝑘1)", "⟦ 𝐵1, 𝜏1 ↦ 𝑘1, 𝐵2 ⟧", "", ""),
-        shape=".appForm", conds="[.attrNotAlpha, .slotVoid, .argXiFree, .argNf]", rhs=".copyFill"),
-    "dc": dict(
-        expect=("⊥(𝜏 ↦ 𝑒)", "⊥", "", ""),
-        shape=".appBot", conds="[.attrNotAlpha]", rhs=".bot"),
-    "dca": dict(
-        expect=("⊥(α𝑖 ↦ 𝑒)", "⊥", "", ""),
-        shape=".appBot", conds="[.attrIsAlpha]", rhs=".bot"),
-    "dd": dict(
-        expect=("⊥.𝜏", "⊥", "", ""),
-        shape=".dispatchBot", conds="[]", rhs=".bot"),
-    "dl": dict(
-        expect=("⟦𝐵1, λ ⤍ 𝑓, 𝐵2⟧", "⊥", "Δ ∈ 𝐵1 or Δ ∈ 𝐵2", ""),
-        shape=".form", conds="[.lambdaPresent, .deltaPresent]", rhs=".bot"),
+        shape=".appForm",
+        conds="[.attrNotAlpha, .slotVoid, .argXiFree, .argNf]",
+        rhs=".copyFill",
+    ),
+    "dc": dict(expect=("⊥(𝜏 ↦ 𝑒)", "⊥", "", ""), shape=".appBot", conds="[.attrNotAlpha]", rhs=".bot"),
+    "dca": dict(expect=("⊥(α𝑖 ↦ 𝑒)", "⊥", "", ""), shape=".appBot", conds="[.attrIsAlpha]", rhs=".bot"),
+    "dd": dict(expect=("⊥.𝜏", "⊥", "", ""), shape=".dispatchBot", conds="[]", rhs=".bot"),
+    "dl": dict(expect=("⟦𝐵1, λ ⤍ 𝑓, 𝐵2⟧", "⊥", "Δ ∈ 𝐵1 or Δ ∈ 𝐵2", ""), shape=".form", conds="[.lambdaPresent, .deltaPresent]", rhs=".bot"),
     # NOTE — dot's normal-form guard lives in phino's `𝑛` sigil, not in `when`.
     "dot": dict(
-        expect=("⟦𝐵1, 𝜏1 ↦ 𝑛1, 𝐵2⟧.𝜏1", "𝑒2(ρ ↦ ⟦𝐵1, 𝜏1 ↦ 𝑛1, 𝐵2⟧)",
-                "¬(⟦𝐵1, 𝜏1 ↦ 𝑛1, 𝐵2⟧ = 𝑒1) and ([λ] ∩ [𝐵1, 𝐵2] = ∅ or [Δ] ∩ [𝐵1, 𝐵2] = ∅)", "𝑒2 := contextualize(𝑛1, ⟦𝐵1, 𝐵2⟧)"),
-        shape=".dispatchForm", conds="[.slotAttached, .valNf, .notUniverse, .notLambdaWithDelta]", rhs=".dotFeedback"),
+        expect=(
+            "⟦𝐵1, 𝜏1 ↦ 𝑛1, 𝐵2⟧.𝜏1",
+            "𝑒2(ρ ↦ ⟦𝐵1, 𝜏1 ↦ 𝑛1, 𝐵2⟧)",
+            "¬(⟦𝐵1, 𝜏1 ↦ 𝑛1, 𝐵2⟧ = 𝑒1) and ([λ] ∩ [𝐵1, 𝐵2] = ∅ or [Δ] ∩ [𝐵1, 𝐵2] = ∅)",
+            "𝑒2 := contextualize(𝑛1, ⟦𝐵1, 𝐵2⟧)",
+        ),
+        shape=".dispatchForm",
+        conds="[.slotAttached, .valNf, .notUniverse, .notLambdaWithDelta]",
+        rhs=".dotFeedback",
+    ),
     # NOTE — dotg fires only on the whole program, which `phino rewrite` never knows,
     # so `Step` leaves it out and `dot` answers every dispatch.
     "dotg": dict(
-        expect=("⟦𝐵1, 𝜏1 ↦ 𝑛1, 𝐵2⟧.𝜏1", "𝑒2(ρ ↦ Φ)",
-                "⟦𝐵1, 𝜏1 ↦ 𝑛1, 𝐵2⟧ = 𝑒1 and ([λ] ∩ [𝐵1, 𝐵2] = ∅ or [Δ] ∩ [𝐵1, 𝐵2] = ∅)", "𝑒2 := contextualize(𝑛1, ⟦𝐵1, 𝐵2⟧)"),
-        shape=".dispatchForm", conds="[.slotAttached, .valNf, .isUniverse, .notLambdaWithDelta]", rhs=".dotGlobal"),
+        expect=(
+            "⟦𝐵1, 𝜏1 ↦ 𝑛1, 𝐵2⟧.𝜏1",
+            "𝑒2(ρ ↦ Φ)",
+            "⟦𝐵1, 𝜏1 ↦ 𝑛1, 𝐵2⟧ = 𝑒1 and ([λ] ∩ [𝐵1, 𝐵2] = ∅ or [Δ] ∩ [𝐵1, 𝐵2] = ∅)",
+            "𝑒2 := contextualize(𝑛1, ⟦𝐵1, 𝐵2⟧)",
+        ),
+        shape=".dispatchForm",
+        conds="[.slotAttached, .valNf, .isUniverse, .notLambdaWithDelta]",
+        rhs=".dotGlobal",
+    ),
     "miss": dict(
         expect=("⟦𝐵1⟧(𝜏1 ↦ 𝑒)", "⊥", "¬(𝜏1 ∈ 𝐵1) and ¬(𝜏1 = ρ)", ""),
-        shape=".appForm", conds="[.attrNotAlpha, .slotAbsent, .attrNeRho]", rhs=".bot"),
-    "null": dict(
-        expect=("⟦𝐵1, 𝜏1 ↦ ∅, 𝐵2⟧.𝜏1", "⊥", "", ""),
-        shape=".dispatchForm", conds="[.slotVoid]", rhs=".bot"),
+        shape=".appForm",
+        conds="[.attrNotAlpha, .slotAbsent, .attrNeRho]",
+        rhs=".bot",
+    ),
+    "null": dict(expect=("⟦𝐵1, 𝜏1 ↦ ∅, 𝐵2⟧.𝜏1", "⊥", "", ""), shape=".dispatchForm", conds="[.slotVoid]", rhs=".bot"),
     "over": dict(
-        expect=("⟦𝐵1, 𝜏1 ↦ 𝑒1, 𝐵2⟧(𝜏1 ↦ 𝑒2)", "⊥", "¬(𝜏1 = ρ)", ""),
-        shape=".appForm", conds="[.slotAttached, .attrNeRho]", rhs=".bot"),
+        expect=("⟦𝐵1, 𝜏1 ↦ 𝑒1, 𝐵2⟧(𝜏1 ↦ 𝑒2)", "⊥", "¬(𝜏1 = ρ)", ""), shape=".appForm", conds="[.slotAttached, .attrNeRho]", rhs=".bot"
+    ),
     "overa": dict(
         expect=("⟦𝐵1, 𝜏1 ↦ 𝑒1, 𝐵2⟧(α𝑖1 ↦ 𝑒2)", "⊥", "𝑖1 = domain(𝐵1) and ¬(𝜏1 = ρ)", ""),
-        shape=".appForm", conds="[.attrIsAlpha, .ordinalAttached]", rhs=".bot"),
-    "skip": dict(
-        expect=("⟦𝐵1⟧(ρ ↦ 𝑒1)", "⟦𝐵1⟧", "¬(ρ ∈ 𝐵1)", ""),
-        shape=".appForm", conds="[.attrIsRho, .slotAbsent]", rhs=".formSame"),
+        shape=".appForm",
+        conds="[.attrIsAlpha, .ordinalAttached]",
+        rhs=".bot",
+    ),
+    "skip": dict(expect=("⟦𝐵1⟧(ρ ↦ 𝑒1)", "⟦𝐵1⟧", "¬(ρ ∈ 𝐵1)", ""), shape=".appForm", conds="[.attrIsRho, .slotAbsent]", rhs=".formSame"),
     "stay": dict(
         expect=("⟦𝐵1, ρ ↦ 𝑒1, 𝐵2⟧(ρ ↦ 𝑒2)", "⟦𝐵1, ρ ↦ 𝑒1, 𝐵2⟧", "", ""),
-        shape=".appForm", conds="[.attrIsRho, .slotAttached]", rhs=".formSame"),
+        shape=".appForm",
+        conds="[.attrIsRho, .slotAttached]",
+        rhs=".formSame",
+    ),
     "stop": dict(
         expect=("⟦𝐵1⟧.𝜏1", "⊥", "¬(𝜏1 ∈ 𝐵1) and ¬(φ ∈ 𝐵1) and ¬(λ ∈ 𝐵1)", ""),
-        shape=".dispatchForm", conds="[.slotAbsent, .phiAbsent, .noLambda]", rhs=".bot"),
+        shape=".dispatchForm",
+        conds="[.slotAbsent, .phiAbsent, .noLambda]",
+        rhs=".bot",
+    ),
 }
 
 
@@ -117,7 +137,8 @@ def check(name, got, want):
             f"locked interpretation in gen-rule-data.py.\n  phino : {g}\n  locked: {w}\n"
             f"Re-read the phino rule, update LOCK['{name}'] and its tags, and check by hand "
             f"that `Step` in PhiConfluence/Step.lean still matches, since no conformance "
-            f"theorem ties the tags to `Step` yet")
+            f"theorem ties the tags to `Step` yet"
+        )
 
 
 def main():
@@ -163,9 +184,7 @@ def main():
     entries = []
     for name in sorted(found):
         e = found[name]
-        entries.append(
-            '  { name := "%s", shape := %s, conds := %s, rhs := %s }'
-            % (name, e["shape"], e["conds"], e["rhs"]))
+        entries.append('  { name := "%s", shape := %s, conds := %s, rhs := %s }' % (name, e["shape"], e["conds"], e["rhs"]))
     lines.append("  [ " + "\n  , ".join(x.strip() for x in entries) + " ]")
     lines.append("")
     lines.append("end PhiConfluence")

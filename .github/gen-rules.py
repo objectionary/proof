@@ -15,6 +15,7 @@ conditions stay short. `.github/regen-rules.sh` runs this before every build.
 Usage:
     gen-rules.py <phino-resources-dir> <output-Rules.lean>
 """
+
 import sys
 
 from phino_render import rules as rendered
@@ -55,7 +56,7 @@ def main():
     entries = []
     for r in rules:
         entries.append(
-            "  { name := \"%s\", pattern := \"%s\", result := \"%s\", cond := \"%s\", wher := \"%s\" }"
+            '  { name := "%s", pattern := "%s", result := "%s", cond := "%s", wher := "%s" }'
             % (esc(r["name"]), esc(r["pattern"]), esc(r["result"]), esc(r["cond"]), esc(r["wher"]))
         )
     lines.append("  [ " + "\n  , ".join(e.strip() for e in entries) + " ]")

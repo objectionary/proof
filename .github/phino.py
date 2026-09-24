@@ -4,6 +4,7 @@
 A directory of phino normalization rules, as phino 0.0.139 ships them in resources/normalize/*.yaml,
 which a test can change rule by rule before writing it to disk for a generator to read.
 """
+
 import os
 import subprocess
 import sys

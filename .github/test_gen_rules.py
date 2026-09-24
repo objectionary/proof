@@ -46,4 +46,3 @@ def test_aborts_when_the_directory_holds_no_rules(tmp_path):
         equal_to(1),
         "Did not fail on a directory without rules",
     )
-
