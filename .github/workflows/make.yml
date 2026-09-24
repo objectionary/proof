@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Objectionary.com
+# SPDX-License-Identifier: MIT
+
+name: make
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+concurrency:
+  group: make-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  make:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install elan, as the README says
+        run: |
+          curl -sSf https://elan.lean-lang.org/elan-init.sh | sh -s -- -y
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Install the Python dependencies, as the README says
+        run: pip install -r .github/requirements.txt
+      - name: Run make, as the README says
+        run: make

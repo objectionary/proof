@@ -5,7 +5,7 @@ SPDX-License-Identifier: MIT
 
 # Confluence of φ-Calculus Normalization (Lean 4)
 
-[![build](https://github.com/objectionary/proof/actions/workflows/build.yml/badge.svg)](https://github.com/objectionary/proof/actions/workflows/build.yml)
+[![make](https://github.com/objectionary/proof/actions/workflows/make.yml/badge.svg)](https://github.com/objectionary/proof/actions/workflows/make.yml)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](https://github.com/objectionary/proof/blob/master/LICENSE.txt)
 
 This repository holds a computer-checked proof
