@@ -8,7 +8,7 @@ import PhiConfluence.Diamond
 # Confluence of φ-calculus normalization
 
 **`confluence : WF e → e ↝∗ e₁ → e ↝∗ e₂ → ∃ e₃, e₁ ↝∗ e₃ ∧ e₂ ↝∗ e₃`** — the **headline**, the
-`WF`-scoped Church-Rosser property and M0-spec's frozen theorem statement, covering every rule
+`WF`-scoped Church-Rosser property and the README's theorem statement, covering every rule
 `phino rewrite` applies, all fifteen but the universe-only `dotg` (the `⊥`-collapse rules
 `dd/dc/dca/null/over/stop/miss/overa/amiss/dl` + `stay` + `alpha` + `dot` + `copy`, with the full
 congruence closure; `dc` and `dca` are one `Step` rule).
@@ -22,7 +22,7 @@ re-imposes the paper's own *grammar* our looser `Binding` drops. Of its two clau
 a-formation-key is *necessary*** for confluence (the `alpha`-vs-`over` counterexample is that
 violation; the diamond proof consumes exactly it — dev. #8); the **unique-key `Nodup` clause is
 *faithfulness*** (Def. Binding + `lookup`-vs-matcher agreement), carried but unused by the diamond.
-See `M0-spec.md` "Why `WF`-scoped". (The paper itself proves no confluence theorem; it *presupposes*
+See README "Why `WF`-scoped". (The paper itself proves no confluence theorem; it *presupposes*
 it when defining `≡` as "normal forms are syntactically identical" — we prove it.)
 
 The statement does NOT change as `Step` grows — adding `dot`/`copy` (M4.3/4.4) only re-establishes

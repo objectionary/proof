@@ -8,9 +8,9 @@ import PhiConfluence.Syntax
 
 The confluence theorem is stated for **well-formed** terms. A formation is well-formed
 when its attribute `domain` (the keys, with `Δ`/`λ` assets excluded — paper Def. Domain,
-`foundations.tex`) has **no duplicates** (Def. Binding "all keys are unique", M0-spec
+`foundations.tex`) has **no duplicates** (Def. Binding "all keys are unique", README
 deviation #6) and **every key is legal** — i.e. not a positional `αᵢ` (the paper grammar
-puts `αᵢ` solely in application-argument pairs, M0-spec deviation #8). Both invariants
+puts `αᵢ` solely in application-argument pairs, README deviation #8). Both invariants
 are load-bearing now that `alpha`/`dot`/`copy` are in `Step`: without deviation #8,
 `alpha` vs `over` is a non-joinable critical pair.
 

@@ -12,7 +12,7 @@ import PhiConfluence.Context
 Parallel reduction contracts any set of redexes in one step, including inside
 subterms and formation bindings — congruence is built in. It is the relation whose
 **diamond** (Takahashi complete development, guard-on-developed-subterm) gives confluence
-via `Relation.church_rosser`; see `docs/DESIGN.md` §6 (proof architecture).
+via `Relation.church_rosser`; see README "Proof strategy".
 
 `Par` and `ParB` are **mutually inductive** (`ParB` reduces a binding list pointwise),
 with a *bespoke cons-structured* `ParB` — the `List.Forall₂ ParBind` alternative is
@@ -1107,7 +1107,7 @@ formations and `⊥` are fixed; dispatch/app recurse into spine positions), so a
 `ξ` is untouched. This is the **fidelity bridge for `copy`**: the paper's `copy` places
 `C(e₁ ⊳ scope)` in the filled slot whereas `Step.copy` places `e₁` directly — and under
 `Step.copy`'s `xiFree e₁` guard these coincide for *any* `scope`, so dropping `scope`/`contextualize`
-from `copy` is exact, not a weakening (M0-spec dev. #7). Structural induction on `e`; the `ξ` case is
+from `copy` is exact, not a weakening (README deviation #7). Structural induction on `e`; the `ξ` case is
 excluded by the hypothesis. -/
 theorem contextualize_eq_self : ∀ {e : Term}, xiFree e = true → ∀ ctx, contextualize e ctx = e
   | .glob,        _, _   => rfl

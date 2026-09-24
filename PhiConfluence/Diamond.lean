@@ -24,7 +24,7 @@ but `church_rosser` demands an unconditional strong-confluence premise. The fix:
 `Confluence.lean` bridges to the `WF`-scoped headline `confluence`. As `dot`/`copy` land
 (M4.3/4.4), only `par_triangle`/`devel`/`Step`/`Par` change, not this plumbing. (De-risked: no
 root critical pairs, no divergence over a fixed corpus of 7 hand-crafted probe programs + the
-paper's Appendix-A examples — `docs/DESIGN.md` §7; a fixed corpus, not random fuzzing.) There is
+paper's Appendix-A examples — README "Proof strategy"; a fixed corpus, not random fuzzing.) There is
 deliberately no unconditional `par_diamond`/`step_confluent` now — they would be false.
 -/
 
@@ -32,7 +32,7 @@ namespace PhiConfluence
 
 open PhiConfluence.Abstract
 
-/-- The **WF-relativized** parallel reduction (`docs/DESIGN.md` §6's `Par'`): a `Par` step whose
+/-- The **WF-relativized** parallel reduction (README "Proof strategy"): a `Par` step whose
 *source* is well-formed. `abbrev` (not `def`) so the underlying `WF a ∧ Par a b` stays
 transparent to `⟨·,·⟩`/`rcases`. -/
 abbrev ParWF (a b : Term) : Prop := WF a ∧ Par a b
