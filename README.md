@@ -14,17 +14,19 @@ This repository holds a computer-checked proof
 
 The φ-calculus is the small formal language behind [EO].
 A program in it is a *term*,
-  and a fixed set of *rules* rewrites a term, one step at a time,
+  and a fixed set of *rules* [rewrites][rewriting] a term,
+  one step at a time,
   into a simpler one.
 Often several rules apply at once, or one rule applies in several places,
   so you have a choice of what to rewrite next.
-The property proved here, called **confluence** (or **Church–Rosser**),
+The property proved here, called **[confluence]**
+  (or **[Church–Rosser][church-rosser]**),
   says that the choice never matters:
   any two ways of rewriting the same term
   can always be continued until they meet at the same term.
 
 The proof is written in [Lean 4],
-  a programming language that is also a *proof assistant*:
+  a programming language that is also a *[proof assistant]*:
   a program that checks every step of a mathematical proof.
 If Lean accepts the proof,
   you do not need to trust the reasoning,
@@ -40,9 +42,9 @@ The proof replaces an earlier one, still in this repository's history,
 
 Lean reports that the main theorem, `PhiConfluence.confluence`,
   depends only on the axioms `propext` and `Quot.sound`,
-  two standard parts of Lean's logic.
+  two [standard parts of Lean's logic][lean-axioms].
 It uses no `sorry` (Lean's placeholder for a missing proof)
-  and no `Classical.choice` (the axiom of choice).
+  and no `Classical.choice` (the [axiom of choice]).
 
 ## Key terms
 
@@ -68,7 +70,7 @@ It uses no `sorry` (Lean's placeholder for a missing proof)
     anywhere inside it.
   `e ⟶∗ e'` means zero or more steps.
 * **Redex** — a place inside a term where a rule can fire.
-* **Normal form** — a term with no redex, so no rule can fire.
+* **[Normal form]** — a term with no redex, so no rule can fire.
   `nf e` means "`e` is in normal form".
 * **Well-formed** — a term with no repeated attribute names in any formation
     and no positional name used as a formation's attribute.
@@ -90,7 +92,7 @@ The theorem, `PhiConfluence.confluence`, says:
 > then some term `e₃` exists with `e₁ ⟶∗ e₃` and `e₂ ⟶∗ e₃`.
 
 Some terms rewrite forever: `⟦x↦y,y↦x⟧.x` never reaches a normal form.
-So the usual shortcut, Newman's lemma,
+So the usual shortcut, [Newman's lemma],
   which derives confluence only for systems where rewriting always stops,
   does not apply.
 The proof uses *parallel reduction* instead,
@@ -150,7 +152,7 @@ lake exe demo               # the rules + example reductions, by the project's o
 make difftest               # our reducer vs `phino rewrite --normalize` (needs phino on PATH)
 ```
 
-`make` needs GNU Make 4.3 or newer.
+`make` needs [GNU Make][make] 4.3 or newer.
 It downloads prebuilt parts of [mathlib], Lean's standard mathematics library.
 It generates the rule files from the pinned version of `phino`,
   and regenerates them only when `.phino-version` or a generator changes.
@@ -263,7 +265,7 @@ None of them is a gap against the current paper.
      so a careless reading would let `over` fire on a void attribute too.
    There it would compete with `copy`,
      and their results, an object and `⊥`, could never meet.
-   The published arXiv v9 PDF, built with an older `phino`,
+   The published [arXiv v9] PDF, built with an older `phino`,
      printed exactly that looser form.
    We follow the current form, where the two rules never compete.
 2. **`dot` and `copy` wait for normal forms.**
@@ -432,9 +434,9 @@ In both cases the model already did what the paper says.
 | Decision | Reason |
 |---|---|
 | **Use `phino` and the paper's LaTeX source as the reference**, never the arXiv PDF | The PDF is an old build; the LaTeX source regenerates its rules from current `phino`. |
-| **Prove confluence through parallel reduction** | Some terms rewrite forever, so Newman's lemma cannot be used; the parallel-reduction method (Tait, Martin-Löf, Takahashi) works either way. |
+| **Prove confluence through parallel reduction** | Some terms rewrite forever, so Newman's lemma cannot be used; the parallel-reduction method ([Tait, Martin-Löf][church-rosser], [Takahashi]) works either way. |
 | **Build on mathlib's `Relation` library** | It already proves that the diamond property implies confluence, so less new code is needed. |
-| **Keep attribute names** (`φ`, `ρ`, `αᵢ`, labels) | They match the paper and `phino` and make contextualization and positions natural; numbering variables instead (de Bruijn indices) would hide what the names mean. |
+| **Keep attribute names** (`φ`, `ρ`, `αᵢ`, labels) | They match the paper and `phino` and make contextualization and positions natural; numbering variables instead ([de Bruijn indices][de-bruijn]) would hide what the names mean. |
 | **Define "normal form" directly, like `phino`'s `isNF`**, not as "no step possible" | This avoids a circular dependency between Lean files and the circularity of the old big-step `copy`; it depends only on the term itself, so it makes sense before confluence is known. One definition covers every rule, including `copy`'s `ξ` condition. |
 | **Keep a runnable reducer next to the rules, linked by `reduce_sound`** | The demo can run and print its steps, and a proof guarantees each printed step follows the rules — a closer link than `phino` has, since its Haskell engine is not proven against its YAML rules. |
 | **Leave contextualization out of `copy`** | With no `ξ` in the argument, it changes nothing, and it keeps `copy` in the tested part of the calculus (difference 7). |
@@ -465,7 +467,8 @@ The proof goes in six steps.
      and step 3 carries it over to `⟶`.
 6. Define equality of terms (`≡`)
      as "the terms can be rewritten to a common term";
-     confluence makes it a proper equivalence on well-formed terms.
+     confluence makes it a proper [equivalence][equivalence]
+     on well-formed terms.
 
 The hardest parts were proving that contextualization and rewriting
   can happen in either order (`par_contextualize_ctx`),
@@ -505,7 +508,7 @@ Each of these was checked against Lean `v4.30.0` and mathlib
    `dot` places the formation in two spots of its result,
      so a conflict between `dot` and a rewrite of a neighbouring binding
      can take more than one step on each side to resolve.
-   That rules out Huet's simpler method,
+   That rules out [Huet]'s simpler method,
      which needs such conflicts to resolve in one step.
    A parallel step rewrites all copies at once, so it has no such problem.
    The parallel versions of the guarded rules test "is normal"
@@ -544,6 +547,7 @@ No run gave a different result.
 The second was an analysis, which the proof later made rigorous:
 
 * **Rules never compete at the top of a term.**
+  In rewriting jargon, there are no [critical pairs][critical-pair] at the top.
   On a dispatch `⟦B⟧.τ`, the rules `dot`, `null`, `stop`, and `dd`
     exclude each other,
     depending on whether `τ` is attached, void, or missing,
@@ -578,9 +582,9 @@ The second was an analysis, which the proof later made rigorous:
 
 Other methods were considered and rejected:
   Huet's one-step method, because `dot` copies terms;
-  orthogonality, because some rules mention the same `τ` twice;
+  [orthogonality], because some rules mention the same `τ` twice;
   Hindley–Rosen, because mathlib has no support for it;
-  and decreasing diagrams,
+  and [decreasing diagrams],
   because Lean has no library for them and they are not needed.
 
 ## Faithfulness
@@ -602,7 +606,8 @@ Several independent checks narrow that gap:
   The rules the proof uses, `Step`, are written by hand,
     because the proof needs to look at them case by case,
     and `difftest` checks they behave like `phino`.
-* **The results are compared with `phino`.**
+* **The results are compared with `phino`**,
+    a technique called [differential testing].
   `Difftest.lean` and `.github/difftest.sh` simplify each test program
     with both `phino rewrite --normalize` and our reducer
     and check the results are equal.
@@ -637,7 +642,8 @@ CI or Lean checks every arrow in this chain:
                                                        confluence theorem
 ```
 
-To trust the result, you must trust exactly three things:
+To trust the result, you must trust exactly three things,
+  its [trusted computing base]:
   (a) Lean's kernel, the small core that checks proofs;
   (b) the definitions and the theorem statement;
   and (c), for the demo and CI only,
@@ -672,7 +678,8 @@ PhiConfluence/
 Makefile   `make` builds and checks everything CI checks, except difftest
 ```
 
-CI runs separate workflows on every push to `master` and every pull request,
+CI runs separate [GitHub Actions] workflows
+  on every push to `master` and every pull request,
   all against the pinned `phino`:
 
 * **build** installs Lean, downloads mathlib (`lake exe cache get`),
@@ -703,10 +710,31 @@ The usual objectionary checks for style and licensing run alongside.
 
 The proof uses Lean 4 (`leanprover/lean4:v4.30.0`)
   and mathlib4 (pinned in `lakefile.toml`),
-  and it builds with Lake, Lean's build tool.
+  and it builds with [Lake], Lean's build tool.
 The general rewriting theory rests on mathlib's `Relation` library.
 
 [EO]: https://github.com/objectionary/eo
+[GitHub Actions]: https://docs.github.com/en/actions
+[Huet]: https://doi.org/10.1145/322217.322230
+[Lake]: https://github.com/leanprover/lean4/tree/master/src/lake
+[Newman's lemma]: https://en.wikipedia.org/wiki/Newman%27s_lemma
+[Normal form]: https://en.wikipedia.org/wiki/Normal_form_(abstract_rewriting)
+[Takahashi]: https://doi.org/10.1006/inco.1995.1057
+[arXiv v9]: https://arxiv.org/abs/2111.13384v9
+[axiom of choice]: https://en.wikipedia.org/wiki/Axiom_of_choice
+[church-rosser]: https://en.wikipedia.org/wiki/Church%E2%80%93Rosser_theorem
+[confluence]: https://en.wikipedia.org/wiki/Confluence_(abstract_rewriting)
+[critical-pair]: https://en.wikipedia.org/wiki/Critical_pair_(term_rewriting)
+[de-bruijn]: https://en.wikipedia.org/wiki/De_Bruijn_index
+[decreasing diagrams]: https://doi.org/10.1016/0304-3975(92)00023-K
+[differential testing]: https://en.wikipedia.org/wiki/Differential_testing
+[equivalence]: https://en.wikipedia.org/wiki/Equivalence_relation
+[lean-axioms]: https://lean-lang.org/theorem_proving_in_lean4/Axioms-and-Computation/
+[make]: https://www.gnu.org/software/make/
+[orthogonality]: https://en.wikipedia.org/wiki/Orthogonality_(term_rewriting)
+[proof assistant]: https://en.wikipedia.org/wiki/Proof_assistant
+[rewriting]: https://en.wikipedia.org/wiki/Rewriting
+[trusted computing base]: https://en.wikipedia.org/wiki/Trusted_computing_base
 [Lean 4]: https://leanprover.github.io
 [mathlib]: https://github.com/leanprover-community/mathlib4
 [paper]: https://github.com/objectionary/calculus-paper
