@@ -53,14 +53,16 @@ theorem redMany_congForm {bs₁ bs₂ : List Binding} {a : Attr} {e e' : Term}
   | refl => exact .refl
   | tail _ step ih => exact ih.tail (Step.congForm step)
 
-/-- Inversion: the only way a formation steps is `congForm` (reducing one attached
-binding's value). Stated with the list as a variable so `cases` can eliminate it — the
-caller then gets the decomposition as data, sidestepping dependent elimination on an
-append index. -/
+/-- Inversion: a formation steps either by `congForm` (reducing one attached binding's value) or
+by `dl` (collapsing to `⊥` because it holds both `λ` and `Δ`). Stated with the list as a variable
+so `cases` can eliminate it — the caller then gets the decomposition as data, sidestepping
+dependent elimination on an append index. -/
 theorem form_step_inv {L : List Binding} {b : Term} (h : Step (.form L) b) :
-    ∃ (cs₁ : List Binding) (c : Attr) (f f' : Term) (cs₂ : List Binding),
-      L = cs₁ ++ .attached c f :: cs₂ ∧ b = .form (cs₁ ++ .attached c f' :: cs₂) ∧ f ↝ f' := by
+    (∃ (cs₁ : List Binding) (c : Attr) (f f' : Term) (cs₂ : List Binding),
+      L = cs₁ ++ .attached c f :: cs₂ ∧ b = .form (cs₁ ++ .attached c f' :: cs₂) ∧ f ↝ f')
+      ∨ (b = .bot ∧ hasLambda L = true ∧ hasDelta L = true) := by
   cases h with
-  | congForm st => exact ⟨_, _, _, _, _, rfl, rfl, st⟩
+  | congForm st => exact .inl ⟨_, _, _, _, _, rfl, rfl, st⟩
+  | dl hl hd => exact .inr ⟨rfl, hl, hd⟩
 
 end PhiConfluence

@@ -12,35 +12,33 @@ import Mathlib.Logic.Relation
 
 The reduction relation, encoded as an inductive relation: each constructor is one
 way a term may reduce in a single step. A value of type `Step e e'` is *evidence*
-that `e` reduces to `e'`.
+that `e` reduces to `e'`. The constructors transcribe phino 0.0.138's
+`resources/normalize/*.yaml`:
 
-This is grown incrementally across M1. Implemented now (the `⊥`-collapse fragment,
-which needs no contextualization or formation rebuilding):
+* `dd`    `⊥.τ ↝ ⊥`
+* `dc`    `⊥(τ↦e) ↝ ⊥`, for any attribute, so it also covers phino's positional `dca`
+* `null`  `⟦…τ↦∅…⟧.τ ↝ ⊥`
+* `over`  `⟦…τ↦e₁…⟧(τ↦e₂) ↝ ⊥`, guard `τ ≠ ρ`
+* `stop`  `⟦B⟧.τ ↝ ⊥`, guards `τ ∉ B`, `φ ∉ B`, `λ ∉ B`
+* `miss`  `⟦B⟧(τ↦e) ↝ ⊥`, guard `τ ∉ B`; in phino `τ` never matches a positional `αᵢ`,
+  which `a.isAlpha = false` spells out here
+* `stay`  `⟦…ρ↦e₁…⟧(ρ↦e₂) ↝ ⟦…ρ↦e₁…⟧`
+* `alpha` `⟦B⟧(αᵢ↦e) ↝ ⟦B⟧(τ↦e)` when the binding at domain ordinal `i` is the void `τ`
+  (`ordinal` skips `Δ`/`λ` assets and `ρ`, as phino's `domain` does)
+* `overa` `⟦B⟧(αᵢ↦e) ↝ ⊥` when the binding at domain ordinal `i` is attached
+* `amiss` `⟦B⟧(αᵢ↦e) ↝ ⊥` when the domain has no ordinal `i`
+* `dot`   `⟦B₁,τ↦e₁,B₂⟧.τ ↝ (C(e₁ ⊳ ⟦B₁,B₂⟧))(ρ↦⟦B₁,τ↦e₁,B₂⟧)`, guards `nf e₁` and
+  "not both `λ` and `Δ`"; the context drops the dispatched binding (`erase`) and, as
+  phino's builder does, gains a `ρ↦∅` when that binding was `ρ` (`ensureRho`)
+* `copy`  `⟦B₁,τ↦∅,B₂⟧(τ↦e₁) ↝ ⟦B₁,τ↦e₁,B₂⟧`, guards `ξFree e₁` and `nf e₁` (phino's `𝑘`)
+* `dl`    `⟦B⟧ ↝ ⊥` when `B` holds both a `λ` and a `Δ` asset
 
-* `dd`   `⊥.τ ↝ ⊥`
-* `dc`   `⊥(τ↦e) ↝ ⊥`
-* `null` `⟦…τ↦∅…⟧.τ ↝ ⊥`           (dispatch on a void attribute)
-* `over` `⟦…τ↦e₁…⟧(τ↦e₂) ↝ ⊥`      (apply to an already-attached `τ≠ρ`)
-* `stop` `⟦B⟧.τ ↝ ⊥`               (dispatch a missing `τ`, no `φ`/`λ` to delegate to)
-* `miss` `⟦B⟧(τ↦e) ↝ ⊥`            (apply a missing non-positional `τ`)
-* `stay` `⟦…ρ↦e₁…⟧(ρ↦e₂) ↝ ⟦…ρ↦e₁…⟧`   (applying `ρ` to a formation that already has `ρ`)
-* `phi`  `⟦B⟧.τ ↝ ⟦B⟧.φ.τ`         (dispatch a missing `τ` through the decoration `φ`)
-* `alpha` `⟦B₁,τ₁↦∅,B₂⟧(αᵢ↦e) ↝ ⟦B₁,τ₁↦∅,B₂⟧(τ₁↦e)`  (rename a positional `αᵢ` to the key `τ₁`
-  of the binding at **domain ordinal** `i` — the `i`-th *non-asset* binding — when it is void, via
-  `voidAtOrdinal bs i`; `Δ`/`λ` assets are skipped, matching the paper's Def. Ordinal and phino #749)
-* `dot`  `⟦B₁,τ↦e₁,B₂⟧.τ ↝ (C(e₁ ⊳ ⟦…⟧))(ρ↦⟦…⟧)`, guard `nf e₁`  (dispatch on an *attached*
-  slot whose value is normal: contextualize it against the formation, then re-decorate with
-  `ρ`↦the formation — the `ρ`-feedback that makes the system non-terminating)
-* `copy` `⟦B₁,τ↦∅,B₂⟧(τ↦e₁) ↝ ⟦B₁,τ↦e₁,B₂⟧`, guards `ξFree e₁` then `nf e₁`  (apply to a *void*
-  slot a `ξ`-free normal argument: drop it into the slot. Under `ξFree`, the paper's
-  `contextualize(e₁, scope)` is provably the identity, so there is no `scope`/contextualization —
-  a local slot-fill, matching the corrected paper + phino)
-
-plus the congruence constructors that let a step happen *inside* a dispatch, an
-application, or a formation binding (`congForm`, paper `B₁,τ↦e,B₂` splitting — reduction
-may occur anywhere). **All eleven rules are now present.** With `alpha`/`dot`/`copy`, confluence is
-**`WF`-scoped** (the `alpha`-vs-`over` fork on a malformed `αᵢ`-keyed formation is non-joinable; `WF`
-bars it) and proved via the parallel diamond (non-termination ⇒ no Newman).
+plus the congruence constructors that let a step happen inside a dispatch, an
+application, or a formation binding. phino's `dotg` is absent on purpose: it fires only
+when the dispatched formation is the whole program, a universe that `phino rewrite`
+never knows, so there `dot` answers every dispatch, and so does `Step`.
+Confluence is `WF`-scoped (a positional `αᵢ` used as a key makes `alpha` and `copy`
+disagree; `WF` bars it) and proved via the parallel diamond (non-termination ⇒ no Newman).
 -/
 
 namespace PhiConfluence
@@ -62,18 +60,23 @@ inductive Step : Term → Term → Prop where
       lookup bs a = .absent → a.isAlpha = false → Step (.app (.form bs) a e) .bot
   | stay {bs : List Binding} {e₁ e₂ : Term} :
       lookup bs .rho = .attached e₁ → Step (.app (.form bs) .rho e₂) (.form bs)
-  | phi {bs : List Binding} {a : Attr} :
-      lookup bs .phi ≠ .absent → lookup bs a = .absent →
-      Step (.dispatch (.form bs) a) (.dispatch (.dispatch (.form bs) .phi) a)
   | alpha {bs : List Binding} {i : Nat} {τ₁ : Attr} {e : Term} :
-      voidAtOrdinal bs i = some τ₁ →
+      ordinal bs i = some τ₁ → lookup bs τ₁ = .void →
       Step (.app (.form bs) (.alpha i) e) (.app (.form bs) τ₁ e)
+  | overa {bs : List Binding} {i : Nat} {τ₁ : Attr} {e₁ e : Term} :
+      ordinal bs i = some τ₁ → lookup bs τ₁ = .attached e₁ →
+      Step (.app (.form bs) (.alpha i) e) .bot
+  | amiss {bs : List Binding} {i : Nat} {e : Term} :
+      ordinal bs i = none → Step (.app (.form bs) (.alpha i) e) .bot
   | dot {bs : List Binding} {a : Attr} {e₁ : Term} :
-      lookup bs a = .attached e₁ → nf e₁ = true →
-      Step (.dispatch (.form bs) a) (.app (contextualize e₁ (.form bs)) .rho (.form bs))
+      lookup bs a = .attached e₁ → nf e₁ = true → (hasLambda bs && hasDelta bs) = false →
+      Step (.dispatch (.form bs) a)
+        (.app (contextualize e₁ (.form (ensureRho (erase bs a)))) .rho (.form bs))
   | copy {bs : List Binding} {a : Attr} {e₁ : Term} :
       lookup bs a = .void → xiFree e₁ = true → nf e₁ = true →
       Step (.app (.form bs) a e₁) (.form (fill bs a e₁))
+  | dl {bs : List Binding} :
+      hasLambda bs = true → hasDelta bs = true → Step (.form bs) .bot
   | congDispatch {e e' : Term} {a : Attr} :
       Step e e' → Step (.dispatch e a) (.dispatch e' a)
   | congAppFn {e e' : Term} {a : Attr} {arg : Term} :

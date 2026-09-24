@@ -8,9 +8,10 @@ import PhiConfluence.Diamond
 # Confluence of φ-calculus normalization
 
 **`confluence : WF e → e ↝∗ e₁ → e ↝∗ e₂ → ∃ e₃, e₁ ↝∗ e₃ ∧ e₂ ↝∗ e₃`** — the **headline**, the
-`WF`-scoped Church-Rosser property and M0-spec's frozen theorem statement, covering **all eleven
-rules** in `Step` (the `⊥`-collapse six `dd/dc/null/over/stop/miss` + `stay` + `phi` + `alpha` +
-`dot` + `copy`, with the full congruence closure).
+`WF`-scoped Church-Rosser property and M0-spec's frozen theorem statement, covering every rule
+`phino rewrite` applies, all fifteen but the universe-only `dotg` (the `⊥`-collapse rules
+`dd/dc/dca/null/over/stop/miss/overa/amiss/dl` + `stay` + `alpha` + `dot` + `copy`, with the full
+congruence closure; `dc` and `dca` are one `Step` rule).
 
 Proved through the **WF-relativized bridge** (the unconditional `church_rosser` cannot apply
 directly, since with `alpha` the unconditional diamond is false — dev. #8): `redMany_eq` turns
@@ -62,8 +63,8 @@ theorem parWF_to_par {a b : Term} (h : Relation.ReflTransGen ParWF a b) :
 `ParWF∗`, `parWF_confluent` joins them, and `parWF_to_par`+`redMany_eq` carry the join back to `↝∗`.
 
 This is the headline's frozen *statement* — it did not change as `Step` grew; adding `dot`/`copy`
-(M4.3/4.4) only re-established `par_triangle`/`devel`. It governs all eleven rules (the `⊥`-six +
-`stay` + `phi` + `alpha` + `dot` + `copy`). It is proved through the relativized bridge — *not*
+(M4.3/4.4) only re-established `par_triangle`/`devel`. It governs every rule `phino rewrite`
+applies (the `⊥`-collapse rules + `stay` + `alpha` + `dot` + `copy`). It is proved through the relativized bridge — *not*
 via an unconditional `Confluent Step`, which is false with `alpha` present. The `WF e` hypothesis's
 **`αᵢ`-not-a-formation-key clause is necessary** (dev. #8 — the `alpha`-vs-`over` counterexample);
 its **unique-key clause is faithfulness** (Def. Binding + `lookup` agreement), carried but unused by

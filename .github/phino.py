@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 Objectionary.com
 # SPDX-License-Identifier: MIT
 """
-A directory of phino normalization rules, as phino 0.0.74 ships them in resources/*.yaml,
+A directory of phino normalization rules, as phino 0.0.138 ships them in resources/normalize/*.yaml,
 which a test can change rule by rule before writing it to disk for a generator to read.
 """
 import os
@@ -10,59 +10,71 @@ import sys
 
 import yaml
 
+ASSETLESS = {"or": [{"disjoint": [["λ"], ["𝐵1", "𝐵2"]]}, {"disjoint": [["Δ"], ["𝐵1", "𝐵2"]]}]}
+
 ORIGINAL = {
     "alpha": {
         "name": "alpha",
-        "pattern": "⟦𝐵1, 𝜏1 ↦ ∅, 𝐵2⟧(𝜏2 ↦ 𝑒)",
-        "result": "⟦𝐵1, 𝜏1 ↦ ∅, 𝐵2⟧(𝜏1 ↦ 𝑒)",
-        "when": {"eq": [{"index": "𝜏2"}, {"domain": "𝐵1"}]},
+        "pattern": "⟦𝐵1, 𝜏1 ↦ ∅, 𝐵2⟧(α𝑖1 ↦ 𝑒1)",
+        "result": "⟦𝐵1, 𝜏1 ↦ ∅, 𝐵2⟧(𝜏1 ↦ 𝑒1)",
+        "when": {"and": [{"eq": ["𝑖1", {"domain": "𝐵1"}]}, {"not": {"eq": ["𝜏1", "ρ"]}}]},
     },
-    "copy": {
-        "name": "copy",
-        "pattern": "⟦ 𝐵1, 𝜏 ↦ ∅, 𝐵2 ⟧(𝜏 ↦ 𝑒)",
-        "result": "⟦ 𝐵1, 𝜏 ↦ 𝑒, 𝐵2 ⟧",
-        "when": {"and": [{"xi-free": "𝑒"}, {"nf": "𝑒"}]},
+    "amiss": {
+        "name": "amiss",
+        "pattern": "⟦𝐵1⟧(α𝑖1 ↦ 𝑒)",
+        "result": "⊥",
+        "when": {"not": {"gt": [{"domain": "𝐵1"}, "𝑖1"]}},
     },
+    "copy": {"name": "copy", "pattern": "⟦ 𝐵1, 𝜏1 ↦ ∅, 𝐵2 ⟧(𝜏1 ↦ 𝑘1)", "result": "⟦ 𝐵1, 𝜏1 ↦ 𝑘1, 𝐵2 ⟧"},
     "dc": {"name": "dc", "pattern": "⊥(𝜏 ↦ 𝑒)", "result": "⊥"},
+    "dca": {"name": "dca", "pattern": "⊥(α𝑖 ↦ 𝑒)", "result": "⊥"},
     "dd": {"name": "dd", "pattern": "⊥.𝜏", "result": "⊥"},
+    "dl": {
+        "name": "dl",
+        "pattern": "⟦𝐵1, λ ⤍ 𝑓, 𝐵2⟧",
+        "result": "⊥",
+        "when": {"or": [{"in": ["Δ", "𝐵1"]}, {"in": ["Δ", "𝐵2"]}]},
+    },
     "dot": {
         "name": "dot",
-        "pattern": "⟦𝐵1, 𝜏 ↦ 𝑒1, 𝐵2⟧.𝜏",
-        "result": "𝑒2(ρ ↦ ⟦𝐵1, 𝜏 ↦ 𝑒1, 𝐵2⟧)",
-        "when": {"nf": "𝑒1"},
-        "where": [
-            {"meta": "𝑒2", "function": "contextualize", "args": ["𝑒1", "⟦𝐵1, 𝜏 ↦ 𝑒1, 𝐵2⟧"]},
-        ],
+        "pattern": "⟦𝐵1, 𝜏1 ↦ 𝑛1, 𝐵2⟧.𝜏1",
+        "e-match": "𝑒1",
+        "when": {"and": [{"not": {"eq": ["⟦𝐵1, 𝜏1 ↦ 𝑛1, 𝐵2⟧", "𝑒1"]}}, ASSETLESS]},
+        "result": "𝑒2(ρ ↦ ⟦𝐵1, 𝜏1 ↦ 𝑛1, 𝐵2⟧)",
+        "where": [{"meta": "𝑒2", "function": "contextualize", "args": ["𝑛1", "⟦𝐵1, 𝐵2⟧"]}],
     },
-    "miss": {
-        "name": "miss",
-        "pattern": "⟦𝐵⟧(𝜏 ↦ 𝑒)",
-        "result": "⊥",
-        "when": {"and": [{"not": {"in": ["𝜏", "𝐵"]}}, {"not": {"alpha": "𝜏"}}]},
+    "dotg": {
+        "name": "dotg",
+        "pattern": "⟦𝐵1, 𝜏1 ↦ 𝑛1, 𝐵2⟧.𝜏1",
+        "e-match": "𝑒1",
+        "when": {"and": [{"eq": ["⟦𝐵1, 𝜏1 ↦ 𝑛1, 𝐵2⟧", "𝑒1"]}, ASSETLESS]},
+        "result": "𝑒2(ρ ↦ Φ)",
+        "where": [{"meta": "𝑒2", "function": "contextualize", "args": ["𝑛1", "⟦𝐵1, 𝐵2⟧"]}],
     },
-    "null": {"name": "null", "pattern": "⟦𝐵1, 𝜏 ↦ ∅, 𝐵2⟧.𝜏", "result": "⊥"},
+    "miss": {"name": "miss", "pattern": "⟦𝐵1⟧(𝜏1 ↦ 𝑒)", "result": "⊥", "when": {"not": {"in": ["𝜏1", "𝐵1"]}}},
+    "null": {"name": "null", "pattern": "⟦𝐵1, 𝜏1 ↦ ∅, 𝐵2⟧.𝜏1", "result": "⊥"},
     "over": {
         "name": "over",
-        "pattern": "⟦𝐵1, 𝜏 ↦ 𝑒1, 𝐵2⟧(𝜏 ↦ 𝑒2)",
+        "pattern": "⟦𝐵1, 𝜏1 ↦ 𝑒1, 𝐵2⟧(𝜏1 ↦ 𝑒2)",
         "result": "⊥",
-        "when": {"not": {"eq": ["𝜏", "ρ"]}},
+        "when": {"not": {"eq": ["𝜏1", "ρ"]}},
     },
-    "phi": {
-        "name": "phi",
-        "pattern": "⟦𝐵⟧.𝜏",
-        "result": "⟦𝐵⟧.φ.𝜏",
-        "when": {"and": [{"in": ["φ", "𝐵"]}, {"not": {"in": ["𝜏", "𝐵"]}}]},
+    "overa": {
+        "name": "overa",
+        "pattern": "⟦𝐵1, 𝜏1 ↦ 𝑒1, 𝐵2⟧(α𝑖1 ↦ 𝑒2)",
+        "result": "⊥",
+        "when": {"and": [{"eq": ["𝑖1", {"domain": "𝐵1"}]}, {"not": {"eq": ["𝜏1", "ρ"]}}]},
     },
     "stay": {"name": "stay", "pattern": "⟦𝐵1, ρ ↦ 𝑒1, 𝐵2⟧(ρ ↦ 𝑒2)", "result": "⟦𝐵1, ρ ↦ 𝑒1, 𝐵2⟧"},
     "stop": {
         "name": "stop",
-        "pattern": "⟦𝐵⟧.𝜏",
+        "pattern": "⟦𝐵1⟧.𝜏1",
         "result": "⊥",
         "when": {
             "and": [
-                {"not": {"in": ["𝜏", "𝐵"]}},
-                {"not": {"in": ["φ", "𝐵"]}},
-                {"not": {"in": ["λ", "𝐵"]}},
+                {"not": {"in": ["𝜏1", "𝐵1"]}},
+                {"not": {"in": ["φ", "𝐵1"]}},
+                {"not": {"in": ["λ", "𝐵1"]}},
             ],
         },
     },

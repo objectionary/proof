@@ -35,7 +35,7 @@ def rcond(w):
     k = next(iter(w))
     v = w[k]
     if k == "and":
-        return " and ".join(p for p in (rcond(x) for x in v) if p)
+        return " and ".join(f"({p})" if isinstance(x, dict) and "or" in x else p for x, p in ((x, rcond(x)) for x in v) if p)
     if k == "or":
         return " or ".join(p for p in (rcond(x) for x in v) if p)
     if k == "not":
@@ -48,6 +48,10 @@ def rcond(w):
         return f"α-attr({rterm(v)})"
     if k == "eq":
         return f"{rcmp(v[0])} = {rcmp(v[1])}"
+    if k == "disjoint":
+        return f"[{', '.join(map(rterm, v[0]))}] ∩ [{', '.join(map(rterm, v[1]))}] = ∅"
+    if k == "gt":
+        return f"{rcmp(v[0])} > {rcmp(v[1])}"
     return f"{k}({rterm(v)})"
 
 
