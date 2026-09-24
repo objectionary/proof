@@ -5,6 +5,7 @@ SHELL := bash
 .SHELLFLAGS := -e -o pipefail -c
 .ONESHELL:
 .PHONY: all test build axioms difftest clean
+.SILENT:
 
 RULES := PhiConfluence/Rules.lean PhiConfluence/RuleData.lean
 MATHLIB := .lake/packages/mathlib/.lake/build/lib/lean/Mathlib.olean
