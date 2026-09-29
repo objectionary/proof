@@ -10,8 +10,8 @@ Emits, for each example, a tab-separated line `<input>\t<our normal form>`, wher
 input is the bare expression, as `phino rewrite` reads it.
 `.github/difftest.sh` feeds the input to `phino rewrite --normalize` and checks
 phino's normal form matches ours — the behavioral pin between our reducer and phino.
-Corpus exercises every rule `phino rewrite` applies (all sixteen but `dotg`, which needs the
-whole-program universe; `alpha` included — phino parses our printed `α0`).
+Corpus exercises every rule `phino rewrite` applies (all fifteen; `alpha` included — phino
+parses our printed `α0`).
 
 A formation has a parent `ρ` only when it declares one, as phino does: nothing injects a `ρ↦∅`.
 The corpus includes non-`⊥` formation results that match phino exactly, such as `⟦⟧(ρ↦Φ)`

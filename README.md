@@ -76,13 +76,9 @@ It uses no `sorry` (Lean's placeholder for a missing proof)
 
 ## The theorem
 
-The relation `⟶` uses the rules of `phino` version 0.0.139
+The relation `⟶` uses the rules of `phino` version 0.0.142
   (`dd, dc, dca, null, over, stop, miss, stay, skip, alpha, overa, amiss, dot, copy, dl`),
   applied anywhere inside a term.
-The sixteenth `phino` rule, `dotg`,
-  fires only on a whole program,
-  which `phino rewrite` never receives,
-  so the proof leaves it out.
 
 The theorem, `PhiConfluence.confluence`, says:
 
@@ -182,8 +178,7 @@ In the table below, `C(e⊳ctx)` is *contextualization*:
 
 | `phino` rule | Lean `Step` constructor | Pattern → result | Side condition |
 |---|---|---|---|
-| `dot`   | `Step.dot`   | `⟦B₁,τ↦e₁,B₂⟧.τ → C(e₁⊳⟦B₁,B₂⟧)(ρ↦⟦B₁,τ↦e₁,B₂⟧)` | `nf e₁` ∧ not both `λ∈B` and `Δ∈B` |
-| `dotg`  | — (difference 10) | same, `(ρ↦Φ)` instead | the formation is the whole program |
+| `dot`   | `Step.dot`   | `⟦B₁,τ↦e₁,B₂⟧.τ → C(e₁⊳⟦B₁,B₂⟧)(ρ↦⟦B₁,τ↦e₁,B₂⟧)` | `nf e₁` ∧ not both `λ∈B` and `Δ∈B` (difference 10) |
 | `copy`  | `Step.copy`  | `⟦B₁,τ↦∅,B₂⟧(τ↦e₁) → ⟦B₁,τ↦e₁,B₂⟧` | `e₁` has no `ξ` ∧ `nf e₁` (difference 7) |
 | `alpha` | `Step.alpha` | `⟦B⟧(αᵢ↦e) → ⟦B⟧(τ↦e)` | `τ = ordinal(B, i)` is void (†) |
 | `overa` | `Step.overa` | `⟦B⟧(αᵢ↦e) → ⊥` | `ordinal(B, i)` is attached |
@@ -321,13 +316,14 @@ None of them is a gap against the paper.
 9. **A formation has a parent attribute `ρ` only when it declares one.**
    This is modelled, not a difference;
      see [The parent attribute][parent].
-10. **The rule `dotg` is not modelled.**
-    `phino` uses `dotg` instead of `dot`
-      when the dispatched formation is the whole program,
-      and it puts `Φ` into the result's `ρ`.
+10. **The `ρ` that `dot` writes is the formation itself.**
+    `phino` writes `named(⟦B⟧)` into the result's `ρ`:
+      the name the formation goes by in the world,
+      such as `Φ` for the whole program.
     The model follows `phino rewrite` on a single expression,
-      which is never the whole program,
-      so `dot` always fires and `dotg` never does.
+      which knows no world,
+      so `named` answers with the formation itself,
+      and `Step.dot` writes that.
 
 Two more loose spots in the model are intentional.
 `Step.alpha` and `Step.copy` do not themselves require well-formedness;

@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 Objectionary.com
 # SPDX-License-Identifier: MIT
 """
-A directory of phino normalization rules, as phino 0.0.139 ships them in resources/normalize/*.yaml,
+A directory of phino normalization rules, as phino 0.0.142 ships them in resources/normalize/*.yaml,
 which a test can change rule by rule before writing it to disk for a generator to read.
 """
 
@@ -10,8 +10,6 @@ import subprocess
 import sys
 
 import yaml
-
-ASSETLESS = {"or": [{"disjoint": [["λ"], ["𝐵1", "𝐵2"]]}, {"disjoint": [["Δ"], ["𝐵1", "𝐵2"]]}]}
 
 ORIGINAL = {
     "alpha": {
@@ -34,23 +32,17 @@ ORIGINAL = {
         "name": "dl",
         "pattern": "⟦𝐵1, λ ⤍ 𝑓, 𝐵2⟧",
         "result": "⊥",
-        "when": {"or": [{"in": ["Δ", "𝐵1"]}, {"in": ["Δ", "𝐵2"]}]},
+        "when": {"in": ["Δ", ["𝐵1", "𝐵2"]]},
     },
     "dot": {
         "name": "dot",
         "pattern": "⟦𝐵1, 𝜏1 ↦ 𝑛1, 𝐵2⟧.𝜏1",
-        "e-match": "𝑒1",
-        "when": {"and": [{"not": {"eq": ["⟦𝐵1, 𝜏1 ↦ 𝑛1, 𝐵2⟧", "𝑒1"]}}, ASSETLESS]},
-        "result": "𝑒2(ρ ↦ ⟦𝐵1, 𝜏1 ↦ 𝑛1, 𝐵2⟧)",
-        "where": [{"meta": "𝑒2", "function": "contextualize", "args": ["𝑛1", "⟦𝐵1, 𝐵2⟧"]}],
-    },
-    "dotg": {
-        "name": "dotg",
-        "pattern": "⟦𝐵1, 𝜏1 ↦ 𝑛1, 𝐵2⟧.𝜏1",
-        "e-match": "𝑒1",
-        "when": {"and": [{"eq": ["⟦𝐵1, 𝜏1 ↦ 𝑛1, 𝐵2⟧", "𝑒1"]}, ASSETLESS]},
-        "result": "𝑒2(ρ ↦ Φ)",
-        "where": [{"meta": "𝑒2", "function": "contextualize", "args": ["𝑛1", "⟦𝐵1, 𝐵2⟧"]}],
+        "when": {"not": {"in": [["Δ", "λ"], ["𝐵1", "𝐵2"]]}},
+        "result": "𝑒1(ρ ↦ 𝑒2)",
+        "where": [
+            {"meta": "𝑒1", "function": "contextualize", "args": ["𝑛1", "⟦𝐵1, 𝐵2⟧"]},
+            {"meta": "𝑒2", "function": "named", "args": ["⟦𝐵1, 𝜏1 ↦ 𝑛1, 𝐵2⟧"]},
+        ],
     },
     "miss": {
         "name": "miss",
@@ -77,13 +69,7 @@ ORIGINAL = {
         "name": "stop",
         "pattern": "⟦𝐵1⟧.𝜏1",
         "result": "⊥",
-        "when": {
-            "and": [
-                {"not": {"in": ["𝜏1", "𝐵1"]}},
-                {"not": {"in": ["φ", "𝐵1"]}},
-                {"not": {"in": ["λ", "𝐵1"]}},
-            ],
-        },
+        "when": {"disjoint": [["𝜏1", "φ", "λ"], ["𝐵1"]]},
     },
 }
 

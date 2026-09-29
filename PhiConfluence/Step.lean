@@ -12,7 +12,7 @@ import Mathlib.Logic.Relation
 
 The reduction relation, encoded as an inductive relation: each constructor is one
 way a term may reduce in a single step. A value of type `Step e e'` is *evidence*
-that `e` reduces to `e'`. The constructors transcribe phino 0.0.139's
+that `e` reduces to `e'`. The constructors transcribe phino 0.0.142's
 `resources/normalize/*.yaml`:
 
 * `dd`    `⊥.τ ↝ ⊥`
@@ -29,14 +29,14 @@ that `e` reduces to `e'`. The constructors transcribe phino 0.0.139's
 * `overa` `⟦B⟧(αᵢ↦e) ↝ ⊥` when the binding at domain ordinal `i` is attached
 * `amiss` `⟦B⟧(αᵢ↦e) ↝ ⊥` when the domain has no ordinal `i`
 * `dot`   `⟦B₁,τ↦e₁,B₂⟧.τ ↝ (C(e₁ ⊳ ⟦B₁,B₂⟧))(ρ↦⟦B₁,τ↦e₁,B₂⟧)`, guards `nf e₁` and
-  "not both `λ` and `Δ`"; the context drops the dispatched binding (`erase`)
+  "not both `λ` and `Δ`"; the context drops the dispatched binding (`erase`), and the `ρ`
+  holds the formation itself, which is what phino's `named` answers where no world is
+  known, as in `phino rewrite`
 * `copy`  `⟦B₁,τ↦∅,B₂⟧(τ↦e₁) ↝ ⟦B₁,τ↦e₁,B₂⟧`, guards `ξFree e₁` and `nf e₁` (phino's `𝑘`)
 * `dl`    `⟦B⟧ ↝ ⊥` when `B` holds both a `λ` and a `Δ` asset
 
 plus the congruence constructors that let a step happen inside a dispatch, an
-application, or a formation binding. phino's `dotg` is absent on purpose: it fires only
-when the dispatched formation is the whole program, a universe that `phino rewrite`
-never knows, so there `dot` answers every dispatch, and so does `Step`.
+application, or a formation binding.
 Confluence is `WF`-scoped (a positional `αᵢ` used as a key makes `alpha` and `copy`
 disagree; `WF` bars it) and proved via the parallel diamond (non-termination ⇒ no Newman).
 -/

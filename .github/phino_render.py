@@ -16,6 +16,10 @@ def rterm(x):
     return str(x)
 
 
+def rset(x):
+    return f"[{', '.join(map(rterm, x))}]" if isinstance(x, list) else rterm(x)
+
+
 def rcmp(x):
     if isinstance(x, dict):
         k = next(iter(x))
@@ -42,7 +46,7 @@ def rcond(w):
     if k == "not":
         return "¬(" + rcond(v) + ")"
     if k == "in":
-        return f"{rterm(v[0])} ∈ {rterm(v[1])}"
+        return f"{rset(v[0])} {'⊆' if isinstance(v[0], list) else '∈'} {rset(v[1])}"
     if k == "nf":
         return f"nf({rterm(v)})"
     if k == "alpha":
@@ -50,7 +54,7 @@ def rcond(w):
     if k == "eq":
         return f"{rcmp(v[0])} = {rcmp(v[1])}"
     if k == "disjoint":
-        return f"[{', '.join(map(rterm, v[0]))}] ∩ [{', '.join(map(rterm, v[1]))}] = ∅"
+        return f"{rset(v[0])} ∩ {rset(v[1])} = ∅"
     if k == "gt":
         return f"{rcmp(v[0])} > {rcmp(v[1])}"
     return f"{k}({rterm(v)})"

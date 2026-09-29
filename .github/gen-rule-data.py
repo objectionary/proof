@@ -70,31 +70,19 @@ LOCK = {
     "dc": dict(expect=("⊥(𝜏 ↦ 𝑒)", "⊥", "", ""), shape=".appBot", conds="[.attrNotAlpha]", rhs=".bot"),
     "dca": dict(expect=("⊥(α𝑖 ↦ 𝑒)", "⊥", "", ""), shape=".appBot", conds="[.attrIsAlpha]", rhs=".bot"),
     "dd": dict(expect=("⊥.𝜏", "⊥", "", ""), shape=".dispatchBot", conds="[]", rhs=".bot"),
-    "dl": dict(expect=("⟦𝐵1, λ ⤍ 𝑓, 𝐵2⟧", "⊥", "Δ ∈ 𝐵1 or Δ ∈ 𝐵2", ""), shape=".form", conds="[.lambdaPresent, .deltaPresent]", rhs=".bot"),
-    # NOTE — dot's normal-form guard lives in phino's `𝑛` sigil, not in `when`.
+    "dl": dict(expect=("⟦𝐵1, λ ⤍ 𝑓, 𝐵2⟧", "⊥", "Δ ∈ [𝐵1, 𝐵2]", ""), shape=".form", conds="[.lambdaPresent, .deltaPresent]", rhs=".bot"),
+    # NOTE — dot's normal-form guard lives in phino's `𝑛` sigil, not in `when`, and `named`
+    # answers with the formation itself where no world is known, as in `phino rewrite`.
     "dot": dict(
         expect=(
             "⟦𝐵1, 𝜏1 ↦ 𝑛1, 𝐵2⟧.𝜏1",
-            "𝑒2(ρ ↦ ⟦𝐵1, 𝜏1 ↦ 𝑛1, 𝐵2⟧)",
-            "¬(⟦𝐵1, 𝜏1 ↦ 𝑛1, 𝐵2⟧ = 𝑒1) and ([λ] ∩ [𝐵1, 𝐵2] = ∅ or [Δ] ∩ [𝐵1, 𝐵2] = ∅)",
-            "𝑒2 := contextualize(𝑛1, ⟦𝐵1, 𝐵2⟧)",
+            "𝑒1(ρ ↦ 𝑒2)",
+            "¬([Δ, λ] ⊆ [𝐵1, 𝐵2])",
+            "𝑒1 := contextualize(𝑛1, ⟦𝐵1, 𝐵2⟧) and 𝑒2 := named(⟦𝐵1, 𝜏1 ↦ 𝑛1, 𝐵2⟧)",
         ),
         shape=".dispatchForm",
-        conds="[.slotAttached, .valNf, .notUniverse, .notLambdaWithDelta]",
+        conds="[.slotAttached, .valNf, .notLambdaWithDelta]",
         rhs=".dotFeedback",
-    ),
-    # NOTE — dotg fires only on the whole program, which `phino rewrite` never knows,
-    # so `Step` leaves it out and `dot` answers every dispatch.
-    "dotg": dict(
-        expect=(
-            "⟦𝐵1, 𝜏1 ↦ 𝑛1, 𝐵2⟧.𝜏1",
-            "𝑒2(ρ ↦ Φ)",
-            "⟦𝐵1, 𝜏1 ↦ 𝑛1, 𝐵2⟧ = 𝑒1 and ([λ] ∩ [𝐵1, 𝐵2] = ∅ or [Δ] ∩ [𝐵1, 𝐵2] = ∅)",
-            "𝑒2 := contextualize(𝑛1, ⟦𝐵1, 𝐵2⟧)",
-        ),
-        shape=".dispatchForm",
-        conds="[.slotAttached, .valNf, .isUniverse, .notLambdaWithDelta]",
-        rhs=".dotGlobal",
     ),
     "miss": dict(
         expect=("⟦𝐵1⟧(𝜏1 ↦ 𝑒)", "⊥", "¬(𝜏1 ∈ 𝐵1) and ¬(𝜏1 = ρ)", ""),
@@ -120,7 +108,7 @@ LOCK = {
         rhs=".formSame",
     ),
     "stop": dict(
-        expect=("⟦𝐵1⟧.𝜏1", "⊥", "¬(𝜏1 ∈ 𝐵1) and ¬(φ ∈ 𝐵1) and ¬(λ ∈ 𝐵1)", ""),
+        expect=("⟦𝐵1⟧.𝜏1", "⊥", "[𝜏1, φ, λ] ∩ [𝐵1] = ∅", ""),
         shape=".dispatchForm",
         conds="[.slotAbsent, .phiAbsent, .noLambda]",
         rhs=".bot",
@@ -171,7 +159,7 @@ def main():
         "/-!",
         "# Normalization rules as structured data, generated from phino",
         "",
-        "The sixteen rules as `RuleEntry` tags (types in PhiConfluence/RuleSchema.lean), emitted",
+        "The fifteen rules as `RuleEntry` tags (types in PhiConfluence/RuleSchema.lean), emitted",
         "by the fidelity-lock deriver `.github/gen-rule-data.py`. This file is not tracked by",
         "Git: it is regenerated from pinned phino before every build.",
         "-/",

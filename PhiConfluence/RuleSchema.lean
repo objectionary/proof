@@ -7,7 +7,7 @@
 The typed vocabulary that `PhiConfluence/RuleData.lean` (generated from phino by
 `.github/gen-rule-data.py`) is written in: each normalization rule is a `RuleEntry` of
 tags — the redex it fires on, its side-conditions, and its contractum. These are *data*
-describing the sixteen `phino` rules; the proof relation `Step` (`Step.lean`) is the
+describing the fifteen `phino` rules; the proof relation `Step` (`Step.lean`) is the
 authoritative hand-written object. `RuleData.lean` is not tracked by Git:
 `.github/regen-rules.sh` generates it from the pinned phino before every build.
 -/
@@ -26,12 +26,11 @@ inductive Cond where
   | phiAbsent | noLambda | lambdaPresent | deltaPresent | notLambdaWithDelta
   | valNf | argXiFree | argNf
   | ordinalVoid | ordinalAttached | ordinalAbsent
-  | notUniverse | isUniverse
   deriving Repr, DecidableEq
 
 /-- The contractum a rule rewrites its redex to. -/
 inductive Contractum where
-  | bot | formSame | dotFeedback | dotGlobal | copyFill | alphaRename
+  | bot | formSame | dotFeedback | copyFill | alphaRename
   deriving Repr, DecidableEq
 
 /-- One normalization rule as structured data. (Named `RuleEntry`, not `RuleSpec`,
