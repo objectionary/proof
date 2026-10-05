@@ -9,6 +9,9 @@ name: ruff
   pull_request:
     branches:
       - master
+concurrency:
+  group: ruff-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   ruff:
     timeout-minutes: 15
