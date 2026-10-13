@@ -90,6 +90,7 @@ LOCK = {
         conds="[.attrNotAlpha, .slotAbsent, .attrNeRho]",
         rhs=".bot",
     ),
+    "norho": dict(expect=("⟦𝐵1⟧.ρ", "⊥", "¬(ρ ∈ 𝐵1)", ""), shape=".dispatchForm", conds="[.attrIsRho, .slotAbsent]", rhs=".bot"),
     "null": dict(expect=("⟦𝐵1, 𝜏1 ↦ ∅, 𝐵2⟧.𝜏1", "⊥", "", ""), shape=".dispatchForm", conds="[.slotVoid]", rhs=".bot"),
     "over": dict(
         expect=("⟦𝐵1, 𝜏1 ↦ 𝑒1, 𝐵2⟧(𝜏1 ↦ 𝑒2)", "⊥", "¬(𝜏1 = ρ)", ""), shape=".appForm", conds="[.slotAttached, .attrNeRho]", rhs=".bot"
@@ -159,7 +160,7 @@ def main():
         "/-!",
         "# Normalization rules as structured data, generated from phino",
         "",
-        "The fifteen rules as `RuleEntry` tags (types in PhiConfluence/RuleSchema.lean), emitted",
+        "The sixteen rules as `RuleEntry` tags (types in PhiConfluence/RuleSchema.lean), emitted",
         "by the fidelity-lock deriver `.github/gen-rule-data.py`. This file is not tracked by",
         "Git: it is regenerated from pinned phino before every build.",
         "-/",

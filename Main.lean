@@ -34,7 +34,7 @@ def main : IO Unit := do
   IO.println "  + congruence: a step may occur inside any subterm"
   IO.println ""
   IO.println " (The reducer below implements every rule `phino rewrite` applies — dd, dc/dca,"
-  IO.println "  null, over, stop, miss, stay, skip, alpha, overa, amiss, dot, copy, dl — and"
+  IO.println "  null, over, stop, norho, miss, stay, skip, alpha, overa, amiss, dot, copy, dl — and"
   IO.println "  `reduce_sound` proves every step it takes is a genuine `Step`.)"
   IO.println ""
   IO.println "═══════════════════════════════════════════════════════════════"

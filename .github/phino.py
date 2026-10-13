@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 Objectionary.com
 # SPDX-License-Identifier: MIT
 """
-A directory of phino normalization rules, as phino 0.0.142 ships them in resources/normalize/*.yaml,
+A directory of phino normalization rules, as phino 0.0.152 ships them in resources/normalize/*.yaml,
 which a test can change rule by rule before writing it to disk for a generator to read.
 """
 
@@ -63,6 +63,7 @@ ORIGINAL = {
         "result": "⊥",
         "when": {"and": [{"eq": ["𝑖1", {"domain": "𝐵1"}]}, {"not": {"eq": ["𝜏1", "ρ"]}}]},
     },
+    "norho": {"name": "norho", "pattern": "⟦𝐵1⟧.ρ", "result": "⊥", "when": {"not": {"in": ["ρ", "𝐵1"]}}},
     "skip": {"name": "skip", "pattern": "⟦𝐵1⟧(ρ ↦ 𝑒1)", "result": "⟦𝐵1⟧", "when": {"not": {"in": ["ρ", "𝐵1"]}}},
     "stay": {"name": "stay", "pattern": "⟦𝐵1, ρ ↦ 𝑒1, 𝐵2⟧(ρ ↦ 𝑒2)", "result": "⟦𝐵1, ρ ↦ 𝑒1, 𝐵2⟧"},
     "stop": {

@@ -10,7 +10,7 @@ Emits, for each example, a tab-separated line `<input>\t<our normal form>`, wher
 input is the bare expression, as `phino rewrite` reads it.
 `.github/difftest.sh` feeds the input to `phino rewrite --normalize` and checks
 phino's normal form matches ours — the behavioral pin between our reducer and phino.
-Corpus exercises every rule `phino rewrite` applies (all fifteen; `alpha` included — phino
+Corpus exercises every rule `phino rewrite` applies (all sixteen; `alpha` included — phino
 parses our printed `α0`).
 
 A formation has a parent `ρ` only when it declares one, as phino does: nothing injects a `ρ↦∅`.
@@ -31,6 +31,7 @@ def cases : List Term :=
     app (form [attached (label "y") glob]) (label "x") glob,            -- Rmiss → ⊥
     dispatch (form [void (label "x")]) (label "y"),                     -- Rstop → ⊥
     dispatch (app (form [attached rho glob]) rho glob) (label "x"),     -- Rstay then Rstop → ⊥
+    dispatch (form [void phi]) rho,                                     -- Rnorho: ρ undeclared, even with φ → ⊥
     dispatch (form [void phi]) (label "y"),                             -- φ present, no rule fires: normal
     dispatch (app (form [void (label "x")]) (label "x") glob) (label "y"),  -- Rcopy then Rstop → ⊥
     dispatch (form [attached (label "x") bot]) (label "x"),             -- Rdot then Rdc → ⊥

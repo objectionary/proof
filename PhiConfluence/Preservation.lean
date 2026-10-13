@@ -220,6 +220,7 @@ theorem WF.step {e e' : Term} (hwf : WF e) (h : e ↝ e') : WF e' := by
   | null hv => exact .bot
   | «over» hatt hne => exact .bot
   | stop habs hphi hlam => exact .bot
+  | norho habs => exact .bot
   | miss habs hna hne => exact .bot
   | stay hs => cases hwf with | app hf _ => exact hf
   | skip hs => cases hwf with | app hf _ => exact hf
@@ -269,6 +270,7 @@ theorem WF.par {e e' : Term} (hwf : WF e) (h : Par e e') : WF e' := by
   | null hb hl ihb => exact fun _ => .bot
   | «over» hb hl hne he ihb ihe => exact fun _ => .bot
   | stop hb h1 h2 h3 ihb => exact fun _ => .bot
+  | norho hb hl ihb => exact fun _ => .bot
   | miss hb hl hna hne he ihb ihe => exact fun _ => .bot
   | stay hb hl he ihb ihe =>
       intro hw

@@ -19,8 +19,8 @@ and `nf` of a formation also rejects the `dl` redex, a formation holding both `�
 
 namespace PhiConfluence
 
-/-- A dispatch `e.a` has no root redex (`dd`/`null`/`dot`/`stop` do not fire at the top).
-A missing `a` on a formation with `φ` is normal: phino has no rule for it. -/
+/-- A dispatch `e.a` has no root redex (`dd`/`null`/`dot`/`stop`/`norho` do not fire at the top).
+A missing `a` on a formation with `φ` is normal: phino has no rule for it, unless `a` is `ρ`. -/
 def dispatchNF : Term → Attr → Bool
   | .bot, _ => false
   | .form bs, a =>
@@ -28,6 +28,7 @@ def dispatchNF : Term → Attr → Bool
       | .attached _ => false
       | .void => false
       | .absent =>
+          if a = .rho then false else
           match lookup bs .phi with
           | .absent => hasLambda bs
           | _ => true

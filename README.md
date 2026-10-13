@@ -76,8 +76,8 @@ It uses no `sorry` (Lean's placeholder for a missing proof)
 
 ## The theorem
 
-The relation `⟶` uses the rules of `phino` version 0.0.142
-  (`dd, dc, dca, null, over, stop, miss, stay, skip, alpha, overa, amiss, dot, copy, dl`),
+The relation `⟶` uses the rules of `phino` version 0.0.152
+  (`dd, dc, dca, null, over, stop, norho, miss, stay, skip, alpha, overa, amiss, dot, copy, dl`),
   applied anywhere inside a term.
 
 The theorem, `PhiConfluence.confluence`, says:
@@ -187,6 +187,7 @@ In the table below, `C(e⊳ctx)` is *contextualization*:
 | `skip`  | `Step.skip`  | `⟦B⟧(ρ↦e) → ⟦B⟧` | `ρ∉B` |
 | `over`  | `Step.over`  | `⟦B₁,τ↦e₁,B₂⟧(τ↦e₂) → ⊥` | `τ≠ρ` (attached attribute) |
 | `stop`  | `Step.stop`  | `⟦B⟧.τ → ⊥` | `τ∉B` ∧ `φ∉B` ∧ `λ∉B` |
+| `norho` | `Step.norho` | `⟦B⟧.ρ → ⊥` | `ρ∉B` |
 | `null`  | `Step.null`  | `⟦B₁,τ↦∅,B₂⟧.τ → ⊥` | — (void attribute) |
 | `miss`  | `Step.miss`  | `⟦B⟧(τ↦e) → ⊥` | `τ∉B` ∧ `τ≠ρ` ∧ `τ` is not positional |
 | `dl`    | `Step.dl`    | `⟦B⟧ → ⊥` | `λ∈B` ∧ `Δ∈B` |
@@ -214,9 +215,10 @@ At the top of a term, at most one rule applies, with one exception:
 
 * On a dispatch `⟦B⟧.τ`, the rule depends on attribute `τ`:
     `dot` if it is attached, `null` if it is void,
-    and `stop` if it is missing and `B` holds neither `φ` nor `λ`.
+    `norho` if it is a missing `ρ`,
+    and `stop` if it is another missing name and `B` holds neither `φ` nor `λ`.
   On `⊥.τ`, `dd` applies.
-  A dispatch of a missing attribute on a formation holding `φ` or `λ`
+  A dispatch of a missing name other than `ρ` on a formation holding `φ` or `λ`
     is already normal, because no rule covers it,
     and so are terms like `Φ.τ` and `ξ.τ`.
 * On an application `⟦B⟧(τ↦e)` with a named `τ`,
@@ -481,7 +483,7 @@ Three observations, which the proof makes rigorous, show they do not:
 
 * **Rules never compete at the top of a term.**
   In rewriting jargon, there are no [critical pairs][critical-pair] at the top.
-  On a dispatch `⟦B⟧.τ`, the rules `dot`, `null`, `stop`, and `dd`
+  On a dispatch `⟦B⟧.τ`, the rules `dot`, `null`, `stop`, `norho`, and `dd`
     exclude each other,
     depending on whether `τ` is attached, void, or missing,
     whether `B` has `φ`, and what the dispatched term is.
@@ -500,7 +502,7 @@ Three observations, which the proof makes rigorous, show they do not:
   If `dot` copies a part that still has redexes,
     rewriting that part before or after the copy
     gives the same normal form.
-  If `over`, `null`, `stop`, `miss`, `dc`, or `dd`
+  If `over`, `null`, `stop`, `norho`, `miss`, `dc`, or `dd`
     throws a part away and yields `⊥`,
     whatever happened inside that part no longer matters.
   That is why these rules need no guard,
@@ -626,7 +628,7 @@ CI runs separate [GitHub Actions] workflows
   `gen-rule-data.py` also fails the build
     if the structure of `phino`'s rules changes.
 * **difftest** installs the pinned `phino` binary
-    (named in `.phino-version` and verified against `.phino-sha256`)
+    (named in `.phino-version`)
     and runs `make difftest`,
     which fails if our reducer and `phino` disagree.
 * **phino-latest** runs weekly
