@@ -12,7 +12,7 @@ import Mathlib.Logic.Relation
 
 The reduction relation, encoded as an inductive relation: each constructor is one
 way a term may reduce in a single step. A value of type `Step e e'` is *evidence*
-that `e` reduces to `e'`. The constructors transcribe phino 0.0.142's
+that `e` reduces to `e'`. The constructors transcribe phino 0.0.152's
 `resources/normalize/*.yaml`:
 
 * `dd`    `⊥.τ ↝ ⊥`
@@ -20,6 +20,8 @@ that `e` reduces to `e'`. The constructors transcribe phino 0.0.142's
 * `null`  `⟦…τ↦∅…⟧.τ ↝ ⊥`
 * `over`  `⟦…τ↦e₁…⟧(τ↦e₂) ↝ ⊥`, guard `τ ≠ ρ`
 * `stop`  `⟦B⟧.τ ↝ ⊥`, guards `τ ∉ B`, `φ ∉ B`, `λ ∉ B`
+* `norho` `⟦B⟧.ρ ↝ ⊥`, guard `ρ ∉ B`: a formation declares a receiver only when it lists `ρ`, so
+  this fires even where `φ` or `λ` keeps `stop` from firing
 * `miss`  `⟦B⟧(τ↦e) ↝ ⊥`, guards `τ ∉ B` and `τ ≠ ρ`; in phino `τ` never matches a positional
   `αᵢ`, which `a.isAlpha = false` spells out here
 * `stay`  `⟦…ρ↦e₁…⟧(ρ↦e₂) ↝ ⟦…ρ↦e₁…⟧`
@@ -56,6 +58,8 @@ inductive Step : Term → Term → Prop where
   | stop {bs : List Binding} {a : Attr} :
       lookup bs a = .absent → lookup bs .phi = .absent → hasLambda bs = false →
       Step (.dispatch (.form bs) a) .bot
+  | norho {bs : List Binding} :
+      lookup bs .rho = .absent → Step (.dispatch (.form bs) .rho) .bot
   | miss {bs : List Binding} {a : Attr} {e : Term} :
       lookup bs a = .absent → a.isAlpha = false → a ≠ .rho → Step (.app (.form bs) a e) .bot
   | stay {bs : List Binding} {e₁ e₂ : Term} :

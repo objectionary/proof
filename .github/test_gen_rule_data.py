@@ -20,6 +20,15 @@ def test_writes_every_locked_rule_when_phino_matches_the_lock(tmp_path):
     )
 
 
+def test_writes_the_locked_tags_of_the_norho_rule(tmp_path):
+    Rules().run("gen-rule-data.py", tmp_path)
+    assert_that(
+        (tmp_path / "Out.lean").read_text(encoding="utf-8"),
+        contains_string('{ name := "norho", shape := .dispatchForm, conds := [.attrIsRho, .slotAbsent], rhs := .bot }'),
+        "Did not emit the locked tags of the norho rule",
+    )
+
+
 def test_aborts_when_a_rule_result_drifts(tmp_path):
     assert_that(
         Rules().changed("stay", "result", noise()).run("gen-rule-data.py", tmp_path).stderr,

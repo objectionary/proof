@@ -53,6 +53,8 @@ inductive Par : Term → Term → Prop where
   | stop {bs bs' : List Binding} {a : Attr} :
       ParB bs bs' → lookup bs a = .absent → lookup bs .phi = .absent → hasLambda bs = false →
       Par (.dispatch (.form bs) a) .bot
+  | norho {bs bs' : List Binding} :
+      ParB bs bs' → lookup bs .rho = .absent → Par (.dispatch (.form bs) .rho) .bot
   | miss {bs bs' : List Binding} {a : Attr} {e e' : Term} :
       ParB bs bs' → lookup bs a = .absent → a.isAlpha = false → a ≠ .rho → Par e e' →
       Par (.app (.form bs) a e) .bot
@@ -329,6 +331,7 @@ theorem step_to_par {e e' : Term} (h : e ↝ e') : Par e e' := by
   | null hv => exact .null (ParB.refl' _) hv
   | «over» hatt hne => exact .over (ParB.refl' _) hatt hne (.refl _)
   | stop habs hphi hlam => exact .stop (ParB.refl' _) habs hphi hlam
+  | norho habs => exact .norho (ParB.refl' _) habs
   | miss habs hna hne => exact .miss (ParB.refl' _) habs hna hne (.refl _)
   | stay hs => exact .stay (ParB.refl' _) hs (.refl _)
   | skip hs => exact .skip (ParB.refl' _) hs (.refl _)
@@ -399,6 +402,7 @@ theorem par_to_red {e e' : Term} (h : Par e e') : e ↝∗ e' := by
   | null hb hl ihb => exact .single (Step.null hl)
   | «over» hb hl hne he ihb ihe => exact .single (Step.over hl hne)
   | stop hb h1 h2 h3 ihb => exact .single (Step.stop h1 h2 h3)
+  | norho hb hl ihb => exact .single (Step.norho hl)
   | miss hb hl hna hne he ihb ihe => exact .single (Step.miss hl hna hne)
   | stay hb hl he ihb ihe => exact .head (Step.stay hl) ihb
   | skip hb hl he ihb ihe => exact .head (Step.skip hl) ihb
@@ -446,7 +450,7 @@ theorem redMany_eq : RedMany = Relation.ReflTransGen Par := by
     | tail _ pt ih => exact ih.trans (par_to_red pt)
 
 /-- The development of a dispatch `⟦bs⟧.a` on a formation without both `λ` and `Δ`, given the
-developed bindings `bsd`: `null` and `stop` collapse it, `dot` fires when the developed value is
+developed bindings `bsd`: `null`, `stop` and `norho` collapse it, `dot` fires when the developed value is
 normal (contextualized against the developed formation without `a`), anything else develops
 inside. -/
 def develDispatch (bs bsd : List Binding) (a : Attr) : Term :=
@@ -459,6 +463,7 @@ def develDispatch (bs bsd : List Binding) (a : Attr) : Term :=
           else .dispatch (.form bsd) a
       | _ => .dispatch (.form bsd) a
   | .absent =>
+      if a = .rho then .bot else
       match lookup bs .phi with
       | .absent => if hasLambda bs then .dispatch (.form bsd) a else .bot
       | _ => .dispatch (.form bsd) a
@@ -661,6 +666,9 @@ theorem par_devel : ∀ (e : Term), Par e (devel e)
             · simp only [hnf, Bool.false_eq_true, if_false]
               exact .congDispatch (.congForm (parB_develB bs))
         | .absent =>
+            by_cases hr : a = .rho
+            · subst hr; simp only [if_true]; exact .norho (parB_develB bs) h
+            simp only [hr, if_false]
             match hphi : lookup bs .phi with
             | .absent =>
                 by_cases hl : hasLambda bs = true
@@ -810,6 +818,9 @@ theorem tri_dispatch {s s' : Term} {a : Attr}
             · simp only [hnf, Bool.false_eq_true, if_false]
               exact .congDispatch ihs
         | .absent =>
+            by_cases hr : a = .rho
+            · subst hr; simp only [if_true]; exact .norho hcd (parB_lookup_absent hbc hb)
+            simp only [hr, if_false]
             match hphi : lookup bs .phi with
             | .absent =>
                 by_cases hl : hasLambda bs = true
@@ -951,6 +962,7 @@ theorem nf_par_eq {e e' : Term} (hnf : nf e = true) (h : Par e e') : e' = e := b
   | null hb hl ihb => intro hnf; simp [nf, dispatchNF, hl] at hnf
   | «over» hb hl hne he ihb ihe => intro hnf; simp [nf, appNF_attached hl] at hnf
   | stop hb h1 h2 h3 ihb => intro hnf; simp [nf, dispatchNF, h1, h2, h3] at hnf
+  | norho hb hl ihb => intro hnf; simp [nf, dispatchNF, hl] at hnf
   | miss hb hl hna hne he ihb ihe => intro hnf; simp [nf, appNF_absent hl] at hnf
   | stay hb hl he ihb ihe => intro hnf; simp [nf, appNF_attached hl] at hnf
   | skip hb hl he ihb ihe => intro hnf; simp [nf, appNF_absent hl] at hnf
@@ -1039,9 +1051,12 @@ theorem nf_devel {e : Term} (hnf : nf e = true) : devel e = e := by
           | void => simp [dispatchNF, hl] at hdisp
           | attached v => simp [dispatchNF, hl] at hdisp
           | absent =>
+              by_cases hr : a = .rho
+              · subst hr; simp [dispatchNF, hl] at hdisp
+              simp only [hr, if_false]
               cases hphi : lookup bs .phi with
               | absent =>
-                  simp only [dispatchNF, hl, hphi] at hdisp
+                  simp only [dispatchNF, hl, hphi, hr, if_false] at hdisp
                   simp only [hdisp, hb, if_true]
               | void => simp only [hb]
               | attached v => simp only [hb]
@@ -1172,7 +1187,12 @@ theorem par_triangle {e u : Term} (hwf : WF e) (h : Par e u) : Par u (devel e) :
   | stop hb h1 h2 h3 ihb =>
       intro _
       rw [devel_dispatch]
-      simp only [develDispatch, h1, h2, h3, Bool.false_and, Bool.false_eq_true, if_false]
+      simp only [develDispatch, h1, h2, h3, Bool.false_and, Bool.false_eq_true, if_false, ite_self]
+      exact .refl _
+  | norho hb hl ihb =>
+      intro _
+      rw [devel_dispatch]
+      simp [develDispatch, hl]
       exact .refl _
   | miss hb hl hna hne he ihb ihe =>
       intro _
@@ -1330,6 +1350,7 @@ theorem step_nf_false {e e' : Term} (h : e ↝ e') : nf e = false := by
   | null hv => simp [nf, dispatchNF, hv]
   | «over» hatt hne => simp [nf, appNF_attached hatt]
   | stop habs hphi hlam => simp [nf, dispatchNF, habs, hphi, hlam]
+  | norho habs => simp [nf, dispatchNF, habs]
   | miss habs hna hne => simp [nf, appNF_absent habs]
   | stay hs => simp [nf, appNF_attached hs]
   | skip hs => simp [nf, appNF_absent hs]
@@ -1457,7 +1478,9 @@ theorem nf_false_reducible {e : Term} (hwf : WF e) (h : nf e = false) : Reducibl
             | void => exact ⟨_, Step.null hl⟩
             | attached v => exact ⟨_, Step.dot hl (lookup_attached_nf hnb hl) hld⟩
             | absent =>
-                simp only [dispatchNF, hl] at h
+                by_cases hr : a = .rho
+                · subst hr; exact ⟨_, Step.norho hl⟩
+                simp only [dispatchNF, hl, hr, if_false] at h
                 cases hphi : lookup bs .phi with
                 | absent =>
                     simp only [hphi] at h

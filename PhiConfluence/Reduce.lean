@@ -8,7 +8,7 @@ import PhiConfluence.Step
 
 The relation `Step` is declarative (it allows *any* legal reduction). To actually run programs and
 print traces, we add an executable, deterministic `reduceStep`. It first tries every rule at the
-root (`rootStep`: `dd, dc, null, over, stop, miss, stay, skip, alpha, overa, amiss, dot, copy, dl`); when
+root (`rootStep`: `dd, dc, null, over, stop, norho, miss, stay, skip, alpha, overa, amiss, dot, copy, dl`); when
 none fires or its guard is blocked (e.g. `dot` needs `nf e₁`), it recurses **into the subterms** —
 the subject first, then the argument, and a formation's bindings in list order (`reduceForm`, the
 executable counterpart of `congForm`) — so a redex buried inside a formation is found, not missed.
@@ -44,6 +44,7 @@ def rootStep : Term → Option Term
             some (.app (contextualize e₁ (.form (erase bs a))) .rho (.form bs))
           else none
       | .absent =>
+          if a = .rho then some .bot else
           match lookup bs .phi with
           | .absent => if hasLambda bs then none else some .bot
           | _ => none
@@ -149,6 +150,11 @@ theorem rootStep_sound : ∀ {e e' : Term}, rootStep e = some e' → e ↝ e'
             exact Step.dot hl hg.1 hg.2
           · simp only [rootStep, hl, hg, if_false, reduceCtorEq] at h
       | absent =>
+          by_cases hr : a = .rho
+          · subst hr
+            simp only [rootStep, hl, if_true, Option.some.injEq] at h
+            subst h; exact Step.norho hl
+          simp only [rootStep, hl, hr, if_false] at h
           cases hphi : lookup bs .phi with
           | absent =>
               cases hlam : hasLambda bs with

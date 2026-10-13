@@ -9,8 +9,8 @@ import PhiConfluence.Diamond
 
 **`confluence : WF e → e ↝∗ e₁ → e ↝∗ e₂ → ∃ e₃, e₁ ↝∗ e₃ ∧ e₂ ↝∗ e₃`** — the **headline**, the
 `WF`-scoped Church-Rosser property and the README's theorem statement, covering every rule
-`phino rewrite` applies, all fifteen (the `⊥`-collapse rules
-`dd/dc/dca/null/over/stop/miss/overa/amiss/dl` + `stay` + `skip` + `alpha` + `dot` + `copy`, with the full
+`phino rewrite` applies, all sixteen (the `⊥`-collapse rules
+`dd/dc/dca/null/over/stop/norho/miss/overa/amiss/dl` + `stay` + `skip` + `alpha` + `dot` + `copy`, with the full
 congruence closure; `dc` and `dca` are one `Step` rule).
 
 Proved through the **WF-relativized bridge** (the unconditional `church_rosser` cannot apply
