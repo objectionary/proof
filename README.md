@@ -76,7 +76,7 @@ It uses no `sorry` (Lean's placeholder for a missing proof)
 
 ## The theorem
 
-The relation `⟶` uses the rules of `phino` version 0.0.158
+The relation `⟶` uses the rules of `phino` version 0.0.159
   (`dd, dc, dca, null, over, stop, norho, miss, stay, skip, alpha, overa, amiss, dot, copy, dl`),
   applied anywhere inside a term.
 
