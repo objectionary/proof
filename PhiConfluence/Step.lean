@@ -12,7 +12,7 @@ import Mathlib.Logic.Relation
 
 The reduction relation, encoded as an inductive relation: each constructor is one
 way a term may reduce in a single step. A value of type `Step e e'` is *evidence*
-that `e` reduces to `e'`. The constructors transcribe phino 0.0.159's
+that `e` reduces to `e'`. The constructors transcribe phino 0.0.160's
 `resources/normalize/*.yaml`:
 
 * `dd`    `⊥.τ ↝ ⊥`
