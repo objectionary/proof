@@ -11,12 +11,12 @@ runs:
   using: composite
   steps:
     - name: Cache elan + Lean toolchain
-      uses: actions/cache@v4
+      uses: actions/cache@v6.1.0
       with:
         path: ~/.elan
         key: elan-${{ runner.os }}-${{ hashFiles('lean-toolchain') }}
     - name: Cache Lake deps + mathlib oleans
-      uses: actions/cache@v4
+      uses: actions/cache@v6.1.0
       with:
         path: .lake
         key: lake-${{ runner.os }}-${{ hashFiles('lake-manifest.json', 'lean-toolchain') }}
