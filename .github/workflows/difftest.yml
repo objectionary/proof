@@ -15,12 +15,12 @@ jobs:
   difftest:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7.0.1
       - uses: objectionary/phino@9f7992914b2aff1ec7d0b28d37066e43b9dfeeba  # master
         with:
           version-file: .phino-version
       - uses: ./.github/actions/setup-lean
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7.1.0
         with:
           python-version: '3.12'
       - name: Differential test — our reducer vs phino
