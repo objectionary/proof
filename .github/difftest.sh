@@ -21,6 +21,14 @@ fi
 
 lake build difftest >/dev/null 2>&1 || { echo "failed to build difftest" >&2; exit 1; }
 
+corpus="$(mktemp)" || { echo "FATAL: cannot create a temporary corpus file" >&2; exit 1; }
+trap 'rm -f "$corpus"' EXIT
+
+if ! lake exe difftest > "$corpus"; then
+  echo "FATAL: failed to generate the differential corpus" >&2
+  exit 1
+fi
+
 fail=0
 count=0
 while IFS=$'\t' read -r input expected; do
@@ -35,7 +43,12 @@ while IFS=$'\t' read -r input expected; do
     echo "FAIL  $input    phino=[$out]  ours=[$expected]"
     fail=1
   fi
-done < <(lake exe difftest 2>/dev/null)
+done < "$corpus"
+
+if [ "$count" -eq 0 ]; then
+  echo "FATAL: the differential corpus is empty, no checks were produced" >&2
+  exit 1
+fi
 
 echo "----"
 if [ "$fail" -eq 0 ]; then
