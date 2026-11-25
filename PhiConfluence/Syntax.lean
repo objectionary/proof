@@ -17,11 +17,10 @@ looks at them.
 
 namespace PhiConfluence
 
-/-- An attribute: `φ`, `ρ`, a positional `αᵢ`, or an ordinary label. -/
+/-- An attribute: `φ`, `ρ`, or an ordinary label. -/
 inductive Attr where
   | phi
   | rho
-  | alpha (idx : Nat)
   | label (name : String)
 deriving DecidableEq, Repr
 

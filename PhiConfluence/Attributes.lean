@@ -41,11 +41,6 @@ def hasLambda : List Binding → Bool
   | Binding.lambda _ :: _ => true
   | _ :: rest => hasLambda rest
 
-/-- Is the attribute a positional `αᵢ`? -/
-def Attr.isAlpha : Attr → Bool
-  | .alpha _ => true
-  | _ => false
-
 /-- Replace the first binding keyed on `a` (void or attached) by `a ↦ e` — the local `copy`
 slot-fill (structural, first-match like `lookup`). `copy` fires on a `void` slot, turning that
 `void a` into `attached a e`. -/
@@ -61,19 +56,6 @@ def hasDelta : List Binding → Bool
   | [] => false
   | Binding.delta _ :: _ => true
   | _ :: rest => hasDelta rest
-
-/-- The key of the binding at **domain ordinal** `i`, counting only the bindings phino's
-`domain` counts: `Δ`/`λ` assets and `ρ` are skipped. This is the positional index that
-`alpha`, `overa` and `amiss` read, **not** the raw list position; `none` when the domain
-is shorter than `i + 1`. -/
-def ordinal : List Binding → Nat → Option Attr
-  | [], _ => none
-  | Binding.delta _ :: r, i => ordinal r i
-  | Binding.lambda _ :: r, i => ordinal r i
-  | Binding.void a :: r, i =>
-      if a = .rho then ordinal r i else match i with | 0 => some a | j + 1 => ordinal r j
-  | Binding.attached a _ :: r, i =>
-      if a = .rho then ordinal r i else match i with | 0 => some a | j + 1 => ordinal r j
 
 /-- Drop the first binding keyed on `a` (void or attached) — the `⟦B₁, B₂⟧` that `dot`
 contextualizes against, the formation without the dispatched binding. -/

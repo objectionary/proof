@@ -13,21 +13,12 @@ def test_renders_the_condition_of_every_rule(tmp_path):
     )
 
 
-def test_renders_the_domain_of_a_binding(tmp_path):
-    Rules().run("gen-rules.py", tmp_path)
-    assert_that(
-        (tmp_path / "Out.lean").read_text(encoding="utf-8"),
-        contains_string('cond := "𝑖1 = domain(𝐵1) and ¬(𝜏1 = ρ)"'),
-        "Did not render the domain in the condition of the alpha rule",
-    )
-
-
 def test_renders_an_ordering_of_numbers(tmp_path):
-    Rules().run("gen-rules.py", tmp_path)
+    Rules().changed("dc", "when", {"not": {"gt": [{"length": "𝐵1"}, 0]}}).run("gen-rules.py", tmp_path)
     assert_that(
         (tmp_path / "Out.lean").read_text(encoding="utf-8"),
-        contains_string('cond := "¬(domain(𝐵1) > 𝑖1)"'),
-        "Did not render the ordering in the condition of the amiss rule",
+        contains_string('cond := "¬(|𝐵1| > 0)"'),
+        "Did not render the ordering of numbers in a condition",
     )
 
 

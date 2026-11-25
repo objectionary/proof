@@ -9,24 +9,20 @@ import PhiConfluence.Diamond
 
 **`confluence : WF e → e ↝∗ e₁ → e ↝∗ e₂ → ∃ e₃, e₁ ↝∗ e₃ ∧ e₂ ↝∗ e₃`** — the **headline**, the
 `WF`-scoped Church-Rosser property and the README's theorem statement, covering every rule
-`phino rewrite` applies, all sixteen (the `⊥`-collapse rules
-`dd/dc/dca/null/over/stop/norho/miss/overa/amiss/dl` + `stay` + `skip` + `alpha` + `dot` + `copy`, with the full
-congruence closure; `dc` and `dca` are one `Step` rule).
+`phino rewrite` applies, all twelve (the `⊥`-collapse rules
+`dd/dc/null/over/stop/norho/miss/dl` + `stay` + `skip` + `dot` + `copy`, with the full
+congruence closure).
 
-Proved through the **WF-relativized bridge** (the unconditional `church_rosser` cannot apply
-directly, since with `alpha` the unconditional diamond is false — dev. #8): `redMany_eq` turns
+Proved through the **WF-relativized bridge**: `redMany_eq` turns
 `↝∗` into `Par∗`, `redMany_par_to_parWF` lifts the well-formed forks to `ParWF∗` (`ParWF` from
 `Diamond.lean`), `parWF_confluent` joins them (the generic `Abstract.Diamond.confluent` =
 `church_rosser`), and `parWF_to_par` + `redMany_eq` carry the join back. The `WF e` hypothesis
-re-imposes the paper's own *grammar* our looser `Binding` drops. Of its two clauses only **`αᵢ`-not-
-a-formation-key is *necessary*** for confluence (the `alpha`-vs-`over` counterexample is that
-violation; the diamond proof consumes exactly it — dev. #8); the **unique-key `Nodup` clause is
-*faithfulness*** (Def. Binding + `lookup`-vs-matcher agreement), carried but unused by the diamond.
+re-imposes the paper's own unique-key rule our looser `Binding` drops: it is *faithfulness*
+(Def. Binding + `lookup`-vs-matcher agreement), carried but unused by the diamond.
 See README "Why only well-formed terms". (The paper itself proves no confluence theorem; it *presupposes*
 it when defining `≡` as "normal forms are syntactically identical" — we prove it.)
 
-There is deliberately no unconditional `step_confluent`: it would be false with `alpha`. The
-paper's `λ`/`Δ` semantics (its *separate*, stateful Morphing/Dataization partial functions,
+The paper's `λ`/`Δ` semantics (its *separate*, stateful Morphing/Dataization partial functions,
 `fig:morphing`/`fig:dataization`) are outside the normalization relation `⟶` — hence outside this
 theorem by construction, not pending work.
 -/
@@ -61,11 +57,9 @@ theorem parWF_to_par {a b : Term} (h : Relation.ReflTransGen ParWF a b) :
 `redMany_eq` turns `↝∗` into `Par∗`, `redMany_par_to_parWF` lifts the well-formed forks to
 `ParWF∗`, `parWF_confluent` joins them, and `parWF_to_par`+`redMany_eq` carry the join back to `↝∗`.
 
-It governs every rule `phino rewrite` applies (the `⊥`-collapse rules + `stay` + `skip` + `alpha` + `dot` + `copy`). It is proved through the relativized bridge — *not*
-via an unconditional `Confluent Step`, which is false with `alpha` present. The `WF e` hypothesis's
-**`αᵢ`-not-a-formation-key clause is necessary** (dev. #8 — the `alpha`-vs-`over` counterexample);
-its **unique-key clause is faithfulness** (Def. Binding + `lookup` agreement), carried but unused by
-the diamond. The paper presupposes confluence (in its `≡`) but never proves it; we do. -/
+It governs every rule `phino rewrite` applies (the `⊥`-collapse rules + `stay` + `skip` + `dot` +
+`copy`). The `WF e` hypothesis is faithfulness (Def. Binding + `lookup` agreement), carried but
+unused by the diamond. The paper presupposes confluence (in its `≡`) but never proves it; we do. -/
 theorem confluence {e e₁ e₂ : Term} (hwf : WF e)
     (h₁ : e ↝∗ e₁) (h₂ : e ↝∗ e₂) : ∃ e₃, e₁ ↝∗ e₃ ∧ e₂ ↝∗ e₃ := by
   rw [redMany_eq] at h₁ h₂

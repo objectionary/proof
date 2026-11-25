@@ -36,16 +36,16 @@ def reservedSpelling (s : String) : Bool :=
     (s.startsWith "α" && !(s.drop 1).isEmpty && (s.drop 1).all Char.isDigit)
 
 /-- Render an attribute. An ordinary label that spells a reserved attribute is quoted, so it
-never prints like `φ`, `ρ`, or `αᵢ`, which reduce differently. -/
+never prints like `φ` or `ρ`, which reduce differently, or like a positional `αᵢ`, which phino
+refuses. -/
 def ppAttr : Attr → String
   | .phi => "φ"
   | .rho => "ρ"
-  | .alpha i => "α" ++ toString i
   | .label s => if reservedSpelling s then "\"" ++ s ++ "\"" else s
 
 #guard ppAttr (.label "ρ") != ppAttr .rho
 #guard ppAttr (.label "φ") != ppAttr .phi
-#guard ppAttr (.label "α0") != ppAttr (.alpha 0)
+#guard ppAttr (.label "α0") == "\"α0\""
 #guard ppAttr (.label "x") == "x"
 
 /-- Render one byte as two upper-case hex digits. -/
