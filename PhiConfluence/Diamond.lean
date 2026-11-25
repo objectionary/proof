@@ -13,8 +13,7 @@ Two halves connect `Step` to confluence: (1) `step ⊆ ⇒ ⊆ step*`, so `ReflT
 `par_triangle : WF e → Par e u → Par u (devel e)` (also in `Parallel.lean`), which collapses the
 diamond to a single apex `devel e`.
 
-**The WF-relativized diamond — the permanent headline path.** With `alpha` present the
-*unconditional* diamond is FALSE (`alpha`-vs-`over` on malformed `αᵢ`-keyed formations, dev. #8),
+**The WF-relativized diamond — the headline path.** The headline is stated for well-formed terms,
 but `church_rosser` demands an unconditional strong-confluence premise. The fix: relativize to
 `ParWF a b := WF a ∧ Par a b` and prove `Diamond ParWF` — with `d := devel a`, any fork
 `ParWF a b`, `ParWF a c` rejoins because the WF-scoped triangle sends both `b` and `c` to
@@ -22,8 +21,7 @@ but `church_rosser` demands an unconditional strong-confluence premise. The fix:
 *source* `a` only (not of `devel a`), so it discharges the unconditional premise for the relation
 `ParWF`. The SAME generic `Abstract.Diamond.confluent` then gives `Confluent ParWF`, which
 `Confluence.lean` bridges to the `WF`-scoped headline `confluence`. (Why no root critical pairs
-exist: README "Why confluence holds".) There is deliberately no unconditional
-`par_diamond`/`step_confluent` — they would be false.
+exist: README "Why confluence holds".)
 -/
 
 namespace PhiConfluence
@@ -35,10 +33,8 @@ open PhiConfluence.Abstract
 transparent to `⟨·,·⟩`/`rcases`. -/
 abbrev ParWF (a b : Term) : Prop := WF a ∧ Par a b
 
-/-- The Takahashi triangle, **WF-scoped** (`WF e → Par e u → Par u (devel e)`); a thin alias of
-`par_triangle` (itself WF-scoped, since `alpha` makes the unconditional triangle false).
-(There is deliberately no *unconditional* `par_diamond`/`par_confluent`/`step_confluent` — those
-would be false; see `Confluence.lean`.) -/
+/-- The Takahashi triangle for well-formed terms (`WF e → Par e u → Par u (devel e)`); a thin
+alias of `par_triangle`. -/
 theorem wf_par_triangle {e u : Term} (hwf : WF e) (h : Par e u) : Par u (devel e) :=
   par_triangle hwf h
 

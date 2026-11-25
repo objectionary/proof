@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 Objectionary.com
 # SPDX-License-Identifier: MIT
 """
-A directory of phino normalization rules, as phino 0.0.166 ships them in resources/normalize/*.yaml,
+A directory of phino normalization rules, as phino 0.0.169 ships them in resources/normalize/*.yaml,
 which a test can change rule by rule before writing it to disk for a generator to read.
 """
 
@@ -12,21 +12,8 @@ import sys
 import yaml
 
 ORIGINAL = {
-    "alpha": {
-        "name": "alpha",
-        "pattern": "⟦𝐵1, 𝜏1 ↦ ∅, 𝐵2⟧(α𝑖1 ↦ 𝑒1)",
-        "result": "⟦𝐵1, 𝜏1 ↦ ∅, 𝐵2⟧(𝜏1 ↦ 𝑒1)",
-        "when": {"and": [{"eq": ["𝑖1", {"domain": "𝐵1"}]}, {"not": {"eq": ["𝜏1", "ρ"]}}]},
-    },
-    "amiss": {
-        "name": "amiss",
-        "pattern": "⟦𝐵1⟧(α𝑖1 ↦ 𝑒)",
-        "result": "⊥",
-        "when": {"not": {"gt": [{"domain": "𝐵1"}, "𝑖1"]}},
-    },
     "copy": {"name": "copy", "pattern": "⟦ 𝐵1, 𝜏1 ↦ ∅, 𝐵2 ⟧(𝜏1 ↦ 𝑘1)", "result": "⟦ 𝐵1, 𝜏1 ↦ 𝑘1, 𝐵2 ⟧"},
     "dc": {"name": "dc", "pattern": "⊥(𝜏 ↦ 𝑒)", "result": "⊥"},
-    "dca": {"name": "dca", "pattern": "⊥(α𝑖 ↦ 𝑒)", "result": "⊥"},
     "dd": {"name": "dd", "pattern": "⊥.𝜏", "result": "⊥"},
     "dl": {
         "name": "dl",
@@ -56,12 +43,6 @@ ORIGINAL = {
         "pattern": "⟦𝐵1, 𝜏1 ↦ 𝑒1, 𝐵2⟧(𝜏1 ↦ 𝑒2)",
         "result": "⊥",
         "when": {"not": {"eq": ["𝜏1", "ρ"]}},
-    },
-    "overa": {
-        "name": "overa",
-        "pattern": "⟦𝐵1, 𝜏1 ↦ 𝑒1, 𝐵2⟧(α𝑖1 ↦ 𝑒2)",
-        "result": "⊥",
-        "when": {"and": [{"eq": ["𝑖1", {"domain": "𝐵1"}]}, {"not": {"eq": ["𝜏1", "ρ"]}}]},
     },
     "norho": {"name": "norho", "pattern": "⟦𝐵1⟧.ρ", "result": "⊥", "when": {"not": {"in": ["ρ", "𝐵1"]}}},
     "skip": {"name": "skip", "pattern": "⟦𝐵1⟧(ρ ↦ 𝑒1)", "result": "⟦𝐵1⟧", "when": {"not": {"in": ["ρ", "𝐵1"]}}},

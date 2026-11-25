@@ -12,7 +12,7 @@ it, so the proof always builds against phino-derived rules and a phino change th
 compilation (or trips the fidelity lock below) fails the build.
 
 DESIGN — a *fidelity lock*, not a general translator.
-  phino's rule semantics live in its Haskell (`contextualize`, `isNF`, ordinals …),
+  phino's rule semantics live in its Haskell (`contextualize`, `isNF` …),
   not in the YAML, so the YAML cannot be mechanically translated into a Lean relation.
   Instead this script carries one *locked interpretation*
   per rule (the structured tags below) and ASSERTS that phino's current YAML still
@@ -51,24 +51,14 @@ def norm(s):
 # exists so far. Adding/removing a phino rule trips the name-set assertion in `main`.
 
 LOCK = {
-    "alpha": dict(
-        expect=("⟦𝐵1, 𝜏1 ↦ ∅, 𝐵2⟧(α𝑖1 ↦ 𝑒1)", "⟦𝐵1, 𝜏1 ↦ ∅, 𝐵2⟧(𝜏1 ↦ 𝑒1)", "𝑖1 = domain(𝐵1) and ¬(𝜏1 = ρ)", ""),
-        shape=".appForm",
-        conds="[.attrIsAlpha, .ordinalVoid]",
-        rhs=".alphaRename",
-    ),
-    "amiss": dict(
-        expect=("⟦𝐵1⟧(α𝑖1 ↦ 𝑒)", "⊥", "¬(domain(𝐵1) > 𝑖1)", ""), shape=".appForm", conds="[.attrIsAlpha, .ordinalAbsent]", rhs=".bot"
-    ),
     # NOTE — copy's guards live in phino's `𝑘` sigil (ξ-free and normal), not in `when`.
     "copy": dict(
         expect=("⟦ 𝐵1, 𝜏1 ↦ ∅, 𝐵2 ⟧(𝜏1 ↦ 𝑘1)", "⟦ 𝐵1, 𝜏1 ↦ 𝑘1, 𝐵2 ⟧", "", ""),
         shape=".appForm",
-        conds="[.attrNotAlpha, .slotVoid, .argXiFree, .argNf]",
+        conds="[.slotVoid, .argXiFree, .argNf]",
         rhs=".copyFill",
     ),
-    "dc": dict(expect=("⊥(𝜏 ↦ 𝑒)", "⊥", "", ""), shape=".appBot", conds="[.attrNotAlpha]", rhs=".bot"),
-    "dca": dict(expect=("⊥(α𝑖 ↦ 𝑒)", "⊥", "", ""), shape=".appBot", conds="[.attrIsAlpha]", rhs=".bot"),
+    "dc": dict(expect=("⊥(𝜏 ↦ 𝑒)", "⊥", "", ""), shape=".appBot", conds="[]", rhs=".bot"),
     "dd": dict(expect=("⊥.𝜏", "⊥", "", ""), shape=".dispatchBot", conds="[]", rhs=".bot"),
     "dl": dict(expect=("⟦𝐵1, λ ⤍ 𝑓, 𝐵2⟧", "⊥", "Δ ∈ [𝐵1, 𝐵2]", ""), shape=".form", conds="[.lambdaPresent, .deltaPresent]", rhs=".bot"),
     # NOTE — dot's normal-form guard lives in phino's `𝑛` sigil, not in `when`, and `named`
@@ -87,19 +77,13 @@ LOCK = {
     "miss": dict(
         expect=("⟦𝐵1⟧(𝜏1 ↦ 𝑒)", "⊥", "¬(𝜏1 ∈ 𝐵1) and ¬(𝜏1 = ρ)", ""),
         shape=".appForm",
-        conds="[.attrNotAlpha, .slotAbsent, .attrNeRho]",
+        conds="[.slotAbsent, .attrNeRho]",
         rhs=".bot",
     ),
     "norho": dict(expect=("⟦𝐵1⟧.ρ", "⊥", "¬(ρ ∈ 𝐵1)", ""), shape=".dispatchForm", conds="[.attrIsRho, .slotAbsent]", rhs=".bot"),
     "null": dict(expect=("⟦𝐵1, 𝜏1 ↦ ∅, 𝐵2⟧.𝜏1", "⊥", "", ""), shape=".dispatchForm", conds="[.slotVoid]", rhs=".bot"),
     "over": dict(
         expect=("⟦𝐵1, 𝜏1 ↦ 𝑒1, 𝐵2⟧(𝜏1 ↦ 𝑒2)", "⊥", "¬(𝜏1 = ρ)", ""), shape=".appForm", conds="[.slotAttached, .attrNeRho]", rhs=".bot"
-    ),
-    "overa": dict(
-        expect=("⟦𝐵1, 𝜏1 ↦ 𝑒1, 𝐵2⟧(α𝑖1 ↦ 𝑒2)", "⊥", "𝑖1 = domain(𝐵1) and ¬(𝜏1 = ρ)", ""),
-        shape=".appForm",
-        conds="[.attrIsAlpha, .ordinalAttached]",
-        rhs=".bot",
     ),
     "skip": dict(expect=("⟦𝐵1⟧(ρ ↦ 𝑒1)", "⟦𝐵1⟧", "¬(ρ ∈ 𝐵1)", ""), shape=".appForm", conds="[.attrIsRho, .slotAbsent]", rhs=".formSame"),
     "stay": dict(
@@ -160,7 +144,7 @@ def main():
         "/-!",
         "# Normalization rules as structured data, generated from phino",
         "",
-        "The sixteen rules as `RuleEntry` tags (types in PhiConfluence/RuleSchema.lean), emitted",
+        "The rules as `RuleEntry` tags (types in PhiConfluence/RuleSchema.lean), emitted",
         "by the fidelity-lock deriver `.github/gen-rule-data.py`. This file is not tracked by",
         "Git: it is regenerated from pinned phino before every build.",
         "-/",

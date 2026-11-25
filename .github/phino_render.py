@@ -24,8 +24,6 @@ def rcmp(x):
     if isinstance(x, dict):
         k = next(iter(x))
         v = x[k]
-        if k == "index":
-            return f"index({rterm(v)})"
         if k == "length":
             return f"|{rterm(v)}|"
         return f"{k}({rterm(v)})"
@@ -49,8 +47,6 @@ def rcond(w):
         return f"{rset(v[0])} {'⊆' if isinstance(v[0], list) else '∈'} {rset(v[1])}"
     if k == "nf":
         return f"nf({rterm(v)})"
-    if k == "alpha":
-        return f"α-attr({rterm(v)})"
     if k == "eq":
         return f"{rcmp(v[0])} = {rcmp(v[1])}"
     if k == "disjoint":

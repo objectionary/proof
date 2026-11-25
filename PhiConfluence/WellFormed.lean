@@ -9,9 +9,7 @@ import PhiConfluence.Syntax
 The confluence theorem is stated for **well-formed** terms. A formation is well-formed
 when its attribute `domain` (the keys, with `Δ`/`λ` assets excluded — paper Def. Domain,
 `foundations.tex`) has **no duplicates** (Def. Binding "all keys are unique", README
-difference #6) and **every key is legal** — i.e. not a positional `αᵢ` (the paper grammar
-puts `αᵢ` solely in application-argument pairs, README difference #8). Without the
-second invariant, `alpha` vs `over` is a non-joinable critical pair.
+difference #6).
 
 `WF`/`WFB` are a **recursive `Prop` predicate** carried as a *hypothesis* on the diamond
 and headline theorems — not an indexed `Binding` type (which would force re-deriving all
@@ -34,11 +32,6 @@ def Binding.key? : Binding → Option Attr
   | .delta _ => none
   | .lambda _ => none
 
-/-- A legal formation key is anything but a positional `αᵢ` (deviation #8). -/
-def Attr.legalKey : Attr → Bool
-  | .alpha _ => false
-  | _ => true
-
 /-- The domain of a binding list: its attribute keys, assets excluded (paper Def. Domain). -/
 def domain : List Binding → List Attr
   | [] => []
@@ -49,14 +42,14 @@ def domain : List Binding → List Attr
 
 mutual
 
-/-- A term is well-formed: every formation has a duplicate-free, `αᵢ`-free domain and
-well-formed binding values. -/
+/-- A term is well-formed: every formation has a duplicate-free domain and well-formed binding
+values. -/
 inductive WF : Term → Prop where
   | bot : WF .bot
   | glob : WF .glob
   | xi : WF .xi
   | form {bs : List Binding} :
-      (domain bs).Nodup → (∀ a ∈ domain bs, a.legalKey = true) → WFB bs → WF (.form bs)
+      (domain bs).Nodup → WFB bs → WF (.form bs)
   | dispatch {e : Term} {a : Attr} : WF e → WF (.dispatch e a)
   | app {e arg : Term} {a : Attr} : WF e → WF arg → WF (.app e a arg)
 

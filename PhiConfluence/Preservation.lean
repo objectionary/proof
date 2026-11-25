@@ -11,7 +11,7 @@ The headline diamond and confluence theorems are stated for well-formed terms, s
 reduction relations must not break that invariant. This module proves that one `Step`
 and one `Par` step both preserve `WF`, adding no new rules. The engine is
 `domain_set`/`parB_domain`: neither relation touches a binding's key, so the `domain`
-(hence `Nodup`/`legalKey`) is fixed, and only the attached values must be re-proved
+(hence `Nodup`) is fixed, and only the attached values must be re-proved
 well-formed — `wfb_set` for `Step.congForm`'s append index and `wf_form_of_parB` for the
 `Par` formation cases. `WF.par`'s binding-list leg is handled inline by the recursor's
 `motive₂` (no separate `ParB` companion — that would duplicate the case analysis).
@@ -61,10 +61,8 @@ theorem parB_domain {bs bs' : List Binding} (h : ParB bs bs') : domain bs = doma
 formation — the domain is transported by `parB_domain`, while the well-formed values
 `WFB bs'` are supplied by the caller (`WF.par`'s `motive₂` leg). -/
 theorem wf_form_of_parB {bs bs' : List Binding}
-    (hnd : (domain bs).Nodup) (hlk : ∀ a ∈ domain bs, a.legalKey = true)
-    (hd : domain bs = domain bs') (hb : WFB bs') : WF (.form bs') := by
-  refine .form (hd ▸ hnd) ?_ hb
-  intro a ha; exact hlk a (hd ▸ ha)
+    (hnd : (domain bs).Nodup) (hd : domain bs = domain bs') (hb : WFB bs') : WF (.form bs') :=
+  .form (hd ▸ hnd) hb
 
 /-- The value `lookup` finds in a well-formed binding list is well-formed. -/
 theorem wfb_lookup_attached : ∀ {bs : List Binding} {a : Attr} {e : Term},
@@ -104,7 +102,7 @@ theorem wf_contextualize {b : Term} (hb : WF b) : ∀ {e : Term}, WF e → WF (c
       cases he with | app hs ha => exact .app (wf_contextualize hb hs) (wf_contextualize hb ha)
 
 /-- `fill` keeps every key (it turns a `void a` into an `attached a e`, both keyed `a`), so the
-`domain` is unchanged — the engine behind `copy`'s `Nodup`/`legalKey` preservation. -/
+`domain` is unchanged — the engine behind `copy`'s `Nodup` preservation. -/
 theorem domain_fill {bs : List Binding} (a : Attr) (e : Term) : domain (fill bs a e) = domain bs := by
   induction bs with
   | nil => rfl
@@ -205,14 +203,12 @@ theorem wfb_erase {a : Attr} : ∀ {bs : List Binding}, WFB bs → WFB (erase bs
 theorem wf_dot_context {bs : List Binding} (h : WF (.form bs)) (a : Attr) :
     WF (.form (erase bs a)) := by
   cases h with
-  | form hnd hlk hbb =>
-      exact .form ((domain_erase bs a).nodup hnd)
-        (fun x hx => hlk x ((domain_erase bs a).subset hx)) (wfb_erase hbb)
+  | form hnd hbb => exact .form ((domain_erase bs a).nodup hnd) (wfb_erase hbb)
 
 /-- Preservation of well-formedness under one single step (`↝`), by ordinary structural
 induction on the `Step` derivation. The discard rules land in `WF.bot`; `stay` and `skip` return the
 (already well-formed) subject formation; `dot` embeds its value into the narrowed context `wf_dot_context`; `congForm` re-derives the value via `wfb_attached_wf`, the inductive hypothesis,
-and `wfb_set`, transporting `Nodup`/`legalKey` across the unchanged domain by `domain_set`. -/
+and `wfb_set`, transporting `Nodup` across the unchanged domain by `domain_set`. -/
 theorem WF.step {e e' : Term} (hwf : WF e) (h : e ↝ e') : WF e' := by
   induction h with
   | dd a => exact .bot
@@ -221,28 +217,21 @@ theorem WF.step {e e' : Term} (hwf : WF e) (h : e ↝ e') : WF e' := by
   | «over» hatt hne => exact .bot
   | stop habs hphi hlam => exact .bot
   | norho habs => exact .bot
-  | miss habs hna hne => exact .bot
+  | miss habs hne => exact .bot
   | stay hs => cases hwf with | app hf _ => exact hf
   | skip hs => cases hwf with | app hf _ => exact hf
-  | alpha hord hv =>
-      cases hwf with | app hf ha => exact .app hf ha
-  | overa hord hat => exact .bot
-  | amiss hord => exact .bot
   | dot hl hnf hld =>
       rename_i bs a e₁
       cases hwf with
       | dispatch hf =>
-          have hv : WF e₁ := by cases hf with | form _ _ hbb => exact wfb_lookup_attached hbb hl
+          have hv : WF e₁ := by cases hf with | form _ hbb => exact wfb_lookup_attached hbb hl
           exact .app (wf_contextualize (wf_dot_context hf a) hv) hf
   | dl hl hd => exact .bot
   | copy hl hxi hnf =>
       cases hwf with
       | app hf harg =>
           cases hf with
-          | form hnd hlk hbb =>
-              refine .form ?_ ?_ (wfb_fill harg hbb)
-              · rw [domain_fill]; exact hnd
-              · intro x hx; rw [domain_fill] at hx; exact hlk x hx
+          | form hnd hbb => exact .form (by rw [domain_fill]; exact hnd) (wfb_fill harg hbb)
   | congDispatch _ ih =>
       cases hwf with | dispatch hf => exact .dispatch (ih hf)
   | congAppFn _ ih =>
@@ -251,9 +240,7 @@ theorem WF.step {e e' : Term} (hwf : WF e) (h : e ↝ e') : WF e' := by
       cases hwf with | app hf ha => exact .app hf (ih ha)
   | @congForm bs₁ bs₂ a e e' hstep ih =>
       cases hwf with
-      | form hnd hlk hb =>
-          exact .form (domain_set ▸ hnd) (fun x hx => hlk x (domain_set ▸ hx))
-            (wfb_set hb (ih (wfb_attached_wf hb)))
+      | form hnd hb => exact .form (domain_set ▸ hnd) (wfb_set hb (ih (wfb_attached_wf hb)))
 
 /-- Preservation of well-formedness under one parallel step (`Par`), proved via the
 two-motive `Par.rec` recursor whose binding-list leg (`motive₂`) is exactly the
@@ -271,37 +258,28 @@ theorem WF.par {e e' : Term} (hwf : WF e) (h : Par e e') : WF e' := by
   | «over» hb hl hne he ihb ihe => exact fun _ => .bot
   | stop hb h1 h2 h3 ihb => exact fun _ => .bot
   | norho hb hl ihb => exact fun _ => .bot
-  | miss hb hl hna hne he ihb ihe => exact fun _ => .bot
+  | miss hb hl hne he ihb ihe => exact fun _ => .bot
   | stay hb hl he ihb ihe =>
       intro hw
       cases hw with
       | app hf _ =>
           cases hf with
-          | form hnd hlk hbb => exact wf_form_of_parB hnd hlk (parB_domain hb) (ihb hbb)
+          | form hnd hbb => exact wf_form_of_parB hnd (parB_domain hb) (ihb hbb)
   | skip hb hl he ihb ihe =>
       intro hw
       cases hw with
       | app hf _ =>
           cases hf with
-          | form hnd hlk hbb => exact wf_form_of_parB hnd hlk (parB_domain hb) (ihb hbb)
-  | alpha hb hord hv he ihb ihe =>
-      intro hw
-      cases hw with
-      | app hf harg =>
-          cases hf with
-          | form hnd hlk hbb =>
-              exact .app (wf_form_of_parB hnd hlk (parB_domain hb) (ihb hbb)) (ihe harg)
-  | overa hb hord hat he ihb ihe => exact fun _ => .bot
-  | amiss hb hord he ihb ihe => exact fun _ => .bot
+          | form hnd hbb => exact wf_form_of_parB hnd (parB_domain hb) (ihb hbb)
   | dot hb hl0 hl1 hnf hld ihb =>
       rename_i bs bs' a e₀ e₁
       intro hw
       cases hw with
       | dispatch hf =>
           cases hf with
-          | form hnd hlk hbb =>
-              have hf' := wf_form_of_parB hnd hlk (parB_domain hb) (ihb hbb)
-              have hv : WF e₁ := by cases hf' with | form _ _ hbb' => exact wfb_lookup_attached hbb' hl1
+          | form hnd hbb =>
+              have hf' := wf_form_of_parB hnd (parB_domain hb) (ihb hbb)
+              have hv : WF e₁ := by cases hf' with | form _ hbb' => exact wfb_lookup_attached hbb' hl1
               exact .app (wf_contextualize (wf_dot_context hf' a) hv) hf'
   | dl hl hd => exact fun _ => .bot
   | ddl hl hd => exact fun _ => .bot
@@ -311,10 +289,9 @@ theorem WF.par {e e' : Term} (hwf : WF e) (h : Par e e') : WF e' := by
       cases hw with
       | app hf harg2 =>
           cases hf with
-          | form hnd hlk hbb =>
-              refine .form ?_ ?_ (wfb_fill (iharg harg2) (ihb hbb))
-              · rw [domain_fill, ← parB_domain hb]; exact hnd
-              · intro x hx; rw [domain_fill, ← parB_domain hb] at hx; exact hlk x hx
+          | form hnd hbb =>
+              exact .form (by rw [domain_fill, ← parB_domain hb]; exact hnd)
+                (wfb_fill (iharg harg2) (ihb hbb))
   | congDispatch he ihe =>
       intro hw
       cases hw with | dispatch hf => exact .dispatch (ihe hf)
@@ -324,7 +301,7 @@ theorem WF.par {e e' : Term} (hwf : WF e) (h : Par e e') : WF e' := by
   | congForm hb ihb =>
       intro hw
       cases hw with
-      | form hnd hlk hbb => exact wf_form_of_parB hnd hlk (parB_domain hb) (ihb hbb)
+      | form hnd hbb => exact wf_form_of_parB hnd (parB_domain hb) (ihb hbb)
   | nil hw => exact hw
   | consVoid hb ihb hw =>
       cases hw with | consVoid hr => exact .consVoid (ihb hr)

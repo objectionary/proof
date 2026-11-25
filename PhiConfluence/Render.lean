@@ -34,7 +34,6 @@ def ppRule (r : RuleSpec) : String :=
 def ppAttr : Attr → String
   | .phi => "φ"
   | .rho => "ρ"
-  | .alpha i => "α" ++ toString i
   | .label s => s
 
 /-- Render one byte as two upper-case hex digits. -/

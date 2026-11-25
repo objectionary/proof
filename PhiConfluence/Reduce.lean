@@ -8,7 +8,7 @@ import PhiConfluence.Step
 
 The relation `Step` is declarative (it allows *any* legal reduction). To actually run programs and
 print traces, we add an executable, deterministic `reduceStep`. It first tries every rule at the
-root (`rootStep`: `dd, dc, null, over, stop, norho, miss, stay, skip, alpha, overa, amiss, dot, copy, dl`); when
+root (`rootStep`: `dd, dc, null, over, stop, norho, miss, stay, skip, dot, copy, dl`); when
 none fires or its guard is blocked (e.g. `dot` needs `nf e₁`), it recurses **into the subterms** —
 the subject first, then the argument, and a formation's bindings in list order (`reduceForm`, the
 executable counterpart of `congForm`) — so a redex buried inside a formation is found, not missed.
@@ -24,7 +24,7 @@ prints — is a genuine `Step`, governed by the confluence theorem. It is **soun
 
 namespace PhiConfluence
 
-/-- The root contraction of an application `⟦bs⟧(a ↦ arg)` by a non-positional `a`: `stay`,
+/-- The root contraction of an application `⟦bs⟧(a ↦ arg)`: `stay`,
 `over`, `skip`, `miss`, or `copy` when the argument is `ξ`-free and normal. -/
 def rootAttr (bs : List Binding) (a : Attr) (arg : Term) : Option Term :=
   match lookup bs a with
@@ -49,14 +49,6 @@ def rootStep : Term → Option Term
           | .absent => if hasLambda bs then none else some .bot
           | _ => none
   | .app .bot _ _ => some .bot
-  | .app (.form bs) (.alpha i) arg =>
-      match ordinal bs i with
-      | none => some .bot
-      | some τ =>
-          match lookup bs τ with
-          | .void => some (.app (.form bs) τ arg)
-          | .attached _ => some .bot
-          | .absent => none
   | .app (.form bs) a arg => rootAttr bs a arg
   | _ => none
 
@@ -103,7 +95,7 @@ theorem formStepCons {bs bs' : List Binding} (b : Binding) (h : Step (.form bs) 
   cases h with | congForm st => exact Step.congForm (bs₁ := b :: _) st
 
 /-- `rootAttr` contracts only genuine `Step` redexes. -/
-theorem rootAttr_sound {bs : List Binding} {a : Attr} {arg e' : Term} (hna : a.isAlpha = false)
+theorem rootAttr_sound {bs : List Binding} {a : Attr} {arg e' : Term}
     (h : rootAttr bs a arg = some e') : Step (.app (.form bs) a arg) e' := by
   cases hl : lookup bs a with
   | attached v =>
@@ -119,7 +111,7 @@ theorem rootAttr_sound {bs : List Binding} {a : Attr} {arg e' : Term} (hna : a.i
         simp only [rootAttr, hl, if_true, Option.some.injEq] at h
         subst h; exact Step.skip hl
       · simp only [rootAttr, hl, hr, if_false, Option.some.injEq] at h
-        subst h; exact Step.miss hl hna hr
+        subst h; exact Step.miss hl hr
   | void =>
       by_cases hg : (xiFree arg && nf arg) = true
       · simp only [rootAttr, hl, hg, if_true, Option.some.injEq] at h
@@ -171,19 +163,9 @@ theorem rootStep_sound : ∀ {e e' : Term}, rootStep e = some e' → e ↝ e'
   | .dispatch (.app _ _ _) _, _, h => by simp [rootStep] at h
   | .app .bot a arg, e', h => by
       simp only [rootStep, Option.some.injEq] at h; subst h; exact Step.dc a arg
-  | .app (.form bs) (.alpha i) arg, e', h => by
-      cases hord : ordinal bs i with
-      | none => simp only [rootStep, hord, Option.some.injEq] at h; subst h; exact Step.amiss hord
-      | some τ =>
-          cases hl : lookup bs τ with
-          | void =>
-              simp only [rootStep, hord, hl, Option.some.injEq] at h; subst h; exact Step.alpha hord hl
-          | attached v =>
-              simp only [rootStep, hord, hl, Option.some.injEq] at h; subst h; exact Step.overa hord hl
-          | absent => simp [rootStep, hord, hl] at h
-  | .app (.form bs) .phi arg, _, h => rootAttr_sound rfl h
-  | .app (.form bs) .rho arg, _, h => rootAttr_sound rfl h
-  | .app (.form bs) (.label _) arg, _, h => rootAttr_sound rfl h
+  | .app (.form bs) .phi arg, _, h => rootAttr_sound h
+  | .app (.form bs) .rho arg, _, h => rootAttr_sound h
+  | .app (.form bs) (.label _) arg, _, h => rootAttr_sound h
   | .app .glob _ _, _, h => by simp [rootStep] at h
   | .app .xi _ _, _, h => by simp [rootStep] at h
   | .app (.dispatch _ _) _ _, _, h => by simp [rootStep] at h

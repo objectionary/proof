@@ -58,8 +58,7 @@ It uses no `sorry` (Lean's placeholder for a missing proof)
     or `⊥`, the dead object that results from an error.
 * **Attribute** — the name of a binding.
   It is a plain label such as `x`,
-    one of the special names `φ` and `ρ` (`ρ` is the object's parent),
-    or a *positional* name `αᵢ`, meaning "the attribute at position `i`".
+    or one of the special names `φ` and `ρ` (`ρ` is the object's parent).
   A binding `x↦∅` is *void*, because it has no value yet;
     a binding `x↦e` is *attached*.
   The special bindings `λ` and `Δ` hold native code and raw data;
@@ -70,14 +69,13 @@ It uses no `sorry` (Lean's placeholder for a missing proof)
 * **Redex** — a place inside a term where a rule can fire.
 * **[Normal form]** — a term with no redex, so no rule can fire.
   `nf e` means "`e` is in normal form".
-* **Well-formed** — a term with no repeated attribute names in any formation
-    and no positional name used as a formation's attribute.
+* **Well-formed** — a term with no repeated attribute names in any formation.
   Lean calls this `WF`.
 
 ## The theorem
 
-The relation `⟶` uses the rules of `phino` version 0.0.166
-  (`dd, dc, dca, null, over, stop, norho, miss, stay, skip, alpha, overa, amiss, dot, copy, dl`),
+The relation `⟶` uses the rules of `phino` version 0.0.169
+  (`dd, dc, null, over, stop, norho, miss, stay, skip, dot, copy, dl`),
   applied anywhere inside a term.
 
 The theorem, `PhiConfluence.confluence`, says:
@@ -103,22 +101,9 @@ It *assumes* confluence when it defines two terms as equal
 
 The Lean definition of a formation is deliberately looser
   than the paper's grammar:
-  it allows repeated attribute names and positional names as attributes.
-The well-formedness condition `WF` puts back the paper's own two restrictions.
-They matter for different reasons.
+  it allows repeated attribute names.
+The well-formedness condition `WF` puts back the paper's own restriction.
 
-* **No positional name as a formation attribute (`legalKey`)
-    is required for confluence.**
-  Without it, the theorem is false.
-  Take a malformed term `⟦B₁, αᵢ↦e₁, B₂⟧(αᵢ↦e₂)`
-    whose void attribute sits at position `i`.
-  The `alpha` rule renames the argument and yields an object,
-    while the `over` rule yields `⊥`,
-    and those two results can never meet (difference 8).
-  The proof uses exactly this condition
-    (`lookup_alpha_absent_of_wf`,
-    and the `over` and `copy` cases of `par_triangle`).
-  It matches `phino`, whose parser rejects such terms.
 * **Unique attribute names (`Nodup`, Def. Binding 4.8)
     keep the model faithful to the paper;
     no known example needs them for confluence.**
@@ -173,36 +158,21 @@ The paper's rule figure (`operators.tex`) is the primary source,
 In the table below, `C(e⊳ctx)` is *contextualization*:
   it resolves the current-object references `ξ` inside `e` against `ctx`
   (paper, Fig. "Contextualization by induction").
-`ordinal(B, i)` is the name of the attribute at position `i` of `B`,
-  counted as described in the note (†).
 
 | `phino` rule | Lean `Step` constructor | Pattern → result | Side condition |
 |---|---|---|---|
 | `dot`   | `Step.dot`   | `⟦B₁,τ↦e₁,B₂⟧.τ → C(e₁⊳⟦B₁,B₂⟧)(ρ↦⟦B₁,τ↦e₁,B₂⟧)` | `nf e₁` ∧ not both `λ∈B` and `Δ∈B` (difference 10) |
 | `copy`  | `Step.copy`  | `⟦B₁,τ↦∅,B₂⟧(τ↦e₁) → ⟦B₁,τ↦e₁,B₂⟧` | `e₁` has no `ξ` ∧ `nf e₁` (difference 7) |
-| `alpha` | `Step.alpha` | `⟦B⟧(αᵢ↦e) → ⟦B⟧(τ↦e)` | `τ = ordinal(B, i)` is void (†) |
-| `overa` | `Step.overa` | `⟦B⟧(αᵢ↦e) → ⊥` | `ordinal(B, i)` is attached |
-| `amiss` | `Step.amiss` | `⟦B⟧(αᵢ↦e) → ⊥` | `B` has no position `i` (†) |
 | `stay`  | `Step.stay`  | `⟦B₁,ρ↦e₁,B₂⟧(ρ↦e₂) → ⟦B₁,ρ↦e₁,B₂⟧` | — |
 | `skip`  | `Step.skip`  | `⟦B⟧(ρ↦e) → ⟦B⟧` | `ρ∉B` |
 | `over`  | `Step.over`  | `⟦B₁,τ↦e₁,B₂⟧(τ↦e₂) → ⊥` | `τ≠ρ` (attached attribute) |
 | `stop`  | `Step.stop`  | `⟦B⟧.τ → ⊥` | `τ∉B` ∧ `φ∉B` ∧ `λ∉B` |
 | `norho` | `Step.norho` | `⟦B⟧.ρ → ⊥` | `ρ∉B` |
 | `null`  | `Step.null`  | `⟦B₁,τ↦∅,B₂⟧.τ → ⊥` | — (void attribute) |
-| `miss`  | `Step.miss`  | `⟦B⟧(τ↦e) → ⊥` | `τ∉B` ∧ `τ≠ρ` ∧ `τ` is not positional |
+| `miss`  | `Step.miss`  | `⟦B⟧(τ↦e) → ⊥` | `τ∉B` ∧ `τ≠ρ` |
 | `dl`    | `Step.dl`    | `⟦B⟧ → ⊥` | `λ∈B` ∧ `Δ∈B` |
 | `dd`    | `Step.dd`    | `⊥.τ → ⊥` | — |
-| `dc`, `dca` | `Step.dc` | `⊥(τ↦e) → ⊥`, `⊥(αᵢ↦e) → ⊥` | — (one Lean rule covers both) |
-
-(†) **Positions skip the assets and the parent.**
-When counting positions, `phino` skips the assets `λ` and `Δ`
-  and the parent `ρ`, and so does `ordinal` in `Attributes.lean`.
-In `⟦λ⤍Fn, x↦∅, ρ↦∅⟧`, `x` is at position `0`,
-  and there is no position `1`.
-This follows the paper's Def. Ordinal and Def. Domain.
-The three positional rules `alpha`, `overa`, and `amiss`
-  cover every possible position,
-  so one of them always applies to a positional argument of a formation.
+| `dc`    | `Step.dc`    | `⊥(τ↦e) → ⊥` | — |
 
 Four more rules, `Step.congDispatch`, `Step.congAppFn`, `Step.congAppArg`,
   and `Step.congForm`, let any rule fire *inside* a term:
@@ -221,15 +191,13 @@ At the top of a term, at most one rule applies, with one exception:
   A dispatch of a missing name other than `ρ` on a formation holding `φ` or `λ`
     is already normal, because no rule covers it,
     and so are terms like `Φ.τ` and `ξ.τ`.
-* On an application `⟦B⟧(τ↦e)` with a named `τ`,
+* On an application `⟦B⟧(τ↦e)`,
     the rule depends on attribute `τ`:
     `stay` if it is `ρ` and attached,
     `over` if it is another attached name,
     `copy` if it is void and `e` is normal and has no `ξ`,
     `skip` if it is `ρ` and missing,
     and `miss` if it is another missing name.
-  With a positional `αᵢ`, the rule is `alpha`, `overa`, or `amiss`,
-    depending on `ordinal(B, i)`.
   On `⊥(…)`, `dc` applies.
 * **The exception:** `dl` competes with every other rule
     on a formation holding both `λ` and `Δ`.
@@ -308,13 +276,11 @@ None of them is a gap against the paper.
      without the condition, `⟦x↦∅⟧(x↦ξ)` would give a different result.
    The single normal-form test `nf` includes the `ξ` condition
      for void applications, just as `phino`'s `isNF` does.
-8. **A formation's attributes are never positional.**
-   The paper's grammar (`syntax.tex`) uses positional names `αᵢ`
-     only in application arguments;
-     a formation's attributes are `φ`, `ρ`, or labels.
-   The Lean `Binding` accepts any name, including `Attr.alpha`,
-     so it can represent a malformed formation with a positional attribute.
-   The `legalKey` part of `WF` rules such formations out.
+8. **Arguments are always named.**
+   The paper's grammar (`syntax.tex`) also has positional arguments `αᵢ`,
+     meaning "the attribute at position `i`".
+   Since version 0.0.169, `phino` refuses them and has no rules for them,
+     so the model has no positional names at all.
 9. **A formation has a parent attribute `ρ` only when it declares one.**
    This is modelled, not a difference;
      see [The parent attribute][parent].
@@ -328,7 +294,7 @@ None of them is a gap against the paper.
       and `Step.dot` writes that.
 
 Two more loose spots in the model are intentional.
-`Step.alpha` and `Step.copy` do not themselves require well-formedness;
+`Step.copy` does not itself require well-formedness;
   the theorem's `WF` condition excludes malformed terms for all rules at once,
   and `phino` does not check this per rule either.
 Also, `Nodup` ignores the assets,
@@ -382,11 +348,11 @@ Because the paper's rules and examples come from `phino`,
 | **Use `phino` and the paper's LaTeX source as the reference**, never the arXiv PDF | The LaTeX source regenerates its rules from `phino`, while a published PDF may lag behind. |
 | **Prove confluence through parallel reduction** | Some terms rewrite forever, so Newman's lemma cannot be used; the parallel-reduction method ([Tait, Martin-Löf][church-rosser], [Takahashi]) works either way. |
 | **Build on mathlib's `Relation` library** | It already proves that the diamond property implies confluence, so less new code is needed. |
-| **Keep attribute names** (`φ`, `ρ`, `αᵢ`, labels) | They match the paper and `phino` and make contextualization and positions natural; numbering variables instead ([de Bruijn indices][de-bruijn]) would hide what the names mean. |
+| **Keep attribute names** (`φ`, `ρ`, labels) | They match the paper and `phino` and make contextualization natural; numbering variables instead ([de Bruijn indices][de-bruijn]) would hide what the names mean. |
 | **Define "normal form" directly, like `phino`'s `isNF`**, not as "no step possible" | This avoids a circular dependency between Lean files; it depends only on the term itself, so it makes sense before confluence is known. One definition covers every rule, including `copy`'s `ξ` condition. |
 | **Keep a runnable reducer next to the rules, linked by `reduce_sound`** | The demo can run and print its steps, and a proof guarantees each printed step follows the rules — a closer link than `phino` has, since its Haskell engine is not proven against its YAML rules. |
 | **Leave contextualization out of `copy`** | With no `ξ` in the argument, it changes nothing, and `copy` stays independent of the surrounding term (difference 7). |
-| **State the theorem for well-formed terms only** | `legalKey` is needed for confluence; `Nodup` keeps the model faithful. Both are the paper's own rules (see [Why only well-formed terms][wf]). |
+| **State the theorem for well-formed terms only** | `Nodup` keeps the model faithful to the paper's own rule (see [Why only well-formed terms][wf]). |
 
 ## Proof strategy
 
@@ -462,8 +428,7 @@ The hardest parts were proving that contextualization and rewriting
 **Limiting the diamond to well-formed terms.**
 The general theorem (`church_rosser`, `Abstract.Diamond.confluent`)
   needs the diamond property for *all* terms,
-  but it fails for malformed ones,
-  where `alpha` and `over` conflict.
+  while the headline is stated for well-formed ones.
 So the proof uses `ParWF a b := WF a ∧ Par a b`,
   a parallel step from a well-formed term.
 Since rewriting keeps terms well-formed (`WF.par`),
@@ -487,17 +452,14 @@ Three observations, which the proof makes rigorous, show they do not:
     exclude each other,
     depending on whether `τ` is attached, void, or missing,
     whether `B` has `φ`, and what the dispatched term is.
-  On an application `⟦B⟧(τ↦e)`, the rules `copy`, `alpha`, `overa`,
-    `amiss`, `over`, `stay`, `skip`, `miss`, and `dc` exclude each other,
+  On an application `⟦B⟧(τ↦e)`, the rules `copy`, `over`, `stay`, `skip`,
+    `miss`, and `dc` exclude each other,
     depending on the attribute's state, on the kind of name
-    (positional names go to `alpha`, `overa`, or `amiss`,
-    labels to `copy`, `over`, or `miss`, and `ρ` to `copy`, `stay`, or `skip`),
+    (labels go to `copy`, `over`, or `miss`, and `ρ` to `copy`, `stay`, or `skip`),
     and on what the applied term is.
   The rule `dl` competes with others,
     but always ends at `⊥`, because `dot` is barred there.
-  This relies on the well-formedness conditions:
-    no attribute name repeats, so each attribute has one state,
-    and positional names never name a formation's attribute.
+  Our lookup takes the first match, so each attribute has one state.
 * **Conflicts deeper inside a term always resolve.**
   If `dot` copies a part that still has redexes,
     rewriting that part before or after the copy
@@ -597,7 +559,7 @@ It would not change whether the proof is correct.
 ```
 Main.lean / Difftest.lean         demo + phino differential test
 PhiConfluence/
-  Syntax · Attributes · WellFormed  Term/Binding/Attr; lookup/fill/ordinal/erase; the WF predicate
+  Syntax · Attributes · WellFormed  Term/Binding/Attr; lookup/fill/erase; the WF predicate
   Step                              the relation ⟶ — phino's rules + congruence closure
   Nf · Normal                       structural normal form (the counterpart of phino's isNF)
   Context                           contextualization C(e⊳ctx)

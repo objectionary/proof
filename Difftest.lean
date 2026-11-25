@@ -10,8 +10,7 @@ Emits, for each example, a tab-separated line `<input>\t<our normal form>`, wher
 input is the bare expression, as `phino rewrite` reads it.
 `.github/difftest.sh` feeds the input to `phino rewrite --normalize` and checks
 phino's normal form matches ours — the behavioral pin between our reducer and phino.
-Corpus exercises every rule `phino rewrite` applies (all sixteen; `alpha` included — phino
-parses our printed `α0`).
+Corpus exercises every rule `phino rewrite` applies (all twelve).
 
 A formation has a parent `ρ` only when it declares one, as phino does: nothing injects a `ρ↦∅`.
 The corpus includes non-`⊥` formation results that match phino exactly, such as `⟦⟧(ρ↦Φ)`
@@ -21,8 +20,8 @@ the collapse rules.
 -/
 
 /-- Example programs across every rule `phino rewrite` applies, matching phino on `⊥`-collapse
-outcomes and on real formation results, including a `ρ` that is declared or not, positional
-ordinals that skip `ρ`, and `dot`'s context without the dispatched binding. -/
+outcomes and on real formation results, including a `ρ` that is declared or not, and `dot`'s
+context without the dispatched binding. -/
 def cases : List Term :=
   [ dispatch (form [void (label "x")]) (label "x"),                     -- Rnull → ⊥
     dispatch bot (label "x"),                                           -- Rdd → ⊥
@@ -43,12 +42,8 @@ def cases : List Term :=
     app (form []) rho glob,                                             -- Rskip drops an undeclared ρ → ⟦⟧
     app (form [attached (label "x") glob]) rho glob,                    -- Rskip, not Rmiss → ⟦x↦Φ⟧
     app (form [void rho]) rho glob,                                     -- Rcopy fills a declared ρ → ⟦ρ↦Φ⟧
-    app (form [void (label "x")]) (alpha 0) glob,                       -- Ralpha→x, Rcopy → ⟦x↦Φ⟧
-    app (form [void (label "x")]) (alpha 1) glob,                       -- Ramiss: ordinals skip ρ → ⊥
-    app (form [attached (label "x") glob]) (alpha 0) glob,              -- Rovera: α0 is attached → ⊥
-    -- alpha indexes over the DOMAIN (skips the λ asset):
-    app (form [lambda "Fn", void (label "x")]) (alpha 0) glob,          -- α0 skips λ, hits x → ⟦λ↦Fn, x↦Φ⟧
-    app (form [lambda "Fn", void (label "x")]) (alpha 1) glob,          -- α1 past the domain (Ramiss) → ⊥
+    app (form [void (label "x")]) (label "x") glob,                     -- Rcopy → ⟦x↦Φ⟧
+    app (form [lambda "Fn", void (label "x")]) (label "x") glob,        -- Rcopy beside a λ → ⟦λ⤍Fn, x↦Φ⟧
     -- a formation with both λ and Δ collapses (Rdl), even under a dispatch:
     form [lambda "Fn", delta [1]],                                      -- Rdl → ⊥
     dispatch (form [attached (label "x") (dispatch glob (label "y")), lambda "Fn", delta [0]])
@@ -58,7 +53,7 @@ def cases : List Term :=
     dispatch (form [attached (label "x") xi]) (label "x"),              -- Rdot, Rskip → ⟦⟧
     dispatch (form [attached rho xi]) rho,                              -- Rdot, Rskip → ⟦⟧
     dispatch (form [void rho, attached (label "x") xi]) (label "x"),    -- Rdot, Rcopy → ⟦ρ↦⟦ρ↦∅, x↦ξ⟧⟧
-    app (form [void rho, void (label "x")]) (alpha 0) glob,             -- ordinals skip ρ: α0 is x → ⟦ρ↦∅, x↦Φ⟧
+    app (form [void rho, void (label "x")]) (label "x") glob,           -- Rcopy beside a void ρ → ⟦ρ↦∅, x↦Φ⟧
     form [attached rho (form [])] ]                                     -- nothing adds ρ → ⟦ρ↦⟦⟧⟧
 
 /-- Our reducer's normal form (bounded). -/

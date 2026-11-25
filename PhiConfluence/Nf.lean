@@ -45,14 +45,11 @@ def xiFree : Term → Bool
   | .dispatch e _ => xiFree e
   | .app e _ arg => xiFree e && xiFree arg
 
-/-- An application `e.a(arg)` has no root redex (`dc`/`stay`/`over`/`copy`/`miss` and the
-positional `alpha`/`overa`/`amiss` do not fire at the top). A positional `αᵢ` applied to a
-formation always has a redex, since the three positional rules split every ordinal. A void
-slot keyed by a non-positional attribute is a `copy`-redex exactly when the argument is
-`ξ`-free (its normality is checked by `nf` itself). -/
+/-- An application `e.a(arg)` has no root redex (`dc`/`stay`/`over`/`copy`/`miss` do not fire
+at the top). A void slot is a `copy`-redex exactly when the argument is `ξ`-free (its normality
+is checked by `nf` itself). -/
 def appNF : Term → Attr → Term → Bool
   | .bot, _, _ => false
-  | .form _, .alpha _, _ => false
   | .form bs, a, arg =>
       match lookup bs a with
       | .attached _ => false
