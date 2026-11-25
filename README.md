@@ -279,8 +279,9 @@ None of them is a gap against the paper.
 8. **Arguments are always named.**
    The paper's grammar (`syntax.tex`) also has positional arguments `αᵢ`,
      meaning "the attribute at position `i`".
-   Since version 0.0.169, `phino` refuses them and has no rules for them,
-     so the model has no positional names at all.
+   Since version 0.0.169, `phino`, which generates Fig. 4, refuses them
+     and has no rules for them,
+     so the model, like Fig. 4, has no positional names at all.
 9. **A formation has a parent attribute `ρ` only when it declares one.**
    This is modelled, not a difference;
      see [The parent attribute][parent].
