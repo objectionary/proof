@@ -64,3 +64,14 @@ def test_aborts_when_the_directory_holds_no_rules(tmp_path):
         equal_to(1),
         "Did not fail on a directory without rules",
     )
+
+
+def test_states_the_real_number_of_rules_in_the_header(tmp_path):
+    Rules().run("gen-rules.py", tmp_path)
+    text = (tmp_path / "Out.lean").read_text(encoding="utf-8")
+    count = text.count('{ name := "')
+    assert_that(
+        text,
+        contains_string(f"The {count} rules rendered from phino's"),
+        "Did not state the real number of rules in the header",
+    )

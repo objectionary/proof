@@ -22,7 +22,8 @@ tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
 echo "cloning $PHINO_REPO at tag $PHINO_VERSION, pinned via .phino-version ..."
-git clone --depth 1 --branch "$PHINO_VERSION" "$PHINO_REPO" "$tmp/phino" >/dev/null 2>&1
+git clone --depth 1 --branch "$PHINO_VERSION" "$PHINO_REPO" "$tmp/phino" >/dev/null \
+  || { echo "FATAL: cannot clone $PHINO_REPO at tag $PHINO_VERSION" >&2; exit 1; }
 
 python3 .github/gen-rules.py "$tmp/phino/resources/normalize" PhiConfluence/Rules.lean
 python3 .github/gen-rule-data.py "$tmp/phino/resources/normalize" PhiConfluence/RuleData.lean

@@ -30,11 +30,23 @@ def ppRule (r : RuleSpec) : String :=
   let base := if r.cond == "" then base else base ++ "   if " ++ r.cond
   if r.wher == "" then base else base ++ "   where " ++ r.wher
 
-/-- Render an attribute. -/
+/-- Whether an ordinary label spells a reserved attribute: `φ`, `ρ`, or `α` followed by digits. -/
+def reservedSpelling (s : String) : Bool :=
+  s == "φ" || s == "ρ" ||
+    (s.startsWith "α" && !(s.drop 1).isEmpty && (s.drop 1).all Char.isDigit)
+
+/-- Render an attribute. An ordinary label that spells a reserved attribute is quoted, so it
+never prints like `φ` or `ρ`, which reduce differently, or like a positional `αᵢ`, which phino
+refuses. -/
 def ppAttr : Attr → String
   | .phi => "φ"
   | .rho => "ρ"
-  | .label s => s
+  | .label s => if reservedSpelling s then "\"" ++ s ++ "\"" else s
+
+#guard ppAttr (.label "ρ") != ppAttr .rho
+#guard ppAttr (.label "φ") != ppAttr .phi
+#guard ppAttr (.label "α0") == "\"α0\""
+#guard ppAttr (.label "x") == "x"
 
 /-- Render one byte as two upper-case hex digits. -/
 def ppByte (b : UInt8) : String :=
